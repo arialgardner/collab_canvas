@@ -106,10 +106,15 @@ export default {
       return user.value.displayName || user.value.email?.split('@')[0] || 'Anonymous'
     })
 
-    // Load user's cursor color from Firestore
+    // Load user's cursor color from Firestore (disabled until PR #5)
     const loadUserCursorColor = async () => {
       if (!user.value) return
       
+      // TODO: Enable in PR #5 - Firestore Integration
+      // For now, use default color
+      userCursorColor.value = '#667eea'
+      
+      /* 
       try {
         const userDoc = await getDoc(doc(db, 'users', user.value.uid))
         if (userDoc.exists()) {
@@ -119,6 +124,7 @@ export default {
       } catch (error) {
         console.error('Error loading user cursor color:', error)
       }
+      */
     }
 
     // Mock presence data for now (will be implemented in PR #8)

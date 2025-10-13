@@ -19,7 +19,13 @@
         @mouseup="handleMouseUp"
       >
         <v-layer ref="shapeLayer">
-          <!-- Shapes will be added here in PR #4 -->
+          <!-- Rectangles -->
+          <Rectangle
+            v-for="rectangle in rectanglesList"
+            :key="rectangle.id"
+            :rectangle="rectangle"
+            @update="handleRectangleUpdate"
+          />
         </v-layer>
       </v-stage>
     </div>
@@ -30,13 +36,21 @@
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import VueKonva from 'vue-konva'
 import ZoomControls from '../components/ZoomControls.vue'
+import Rectangle from '../components/Rectangle.vue'
+import { useRectangles } from '../composables/useRectangles'
+import { useAuth } from '../composables/useAuth'
 
 export default {
   name: 'CanvasView',
   components: {
-    ZoomControls
+    ZoomControls,
+    Rectangle
   },
   setup() {
+    // Composables
+    const { rectangles, createRectangle, updateRectangle, getAllRectangles } = useRectangles()
+    const { user } = useAuth()
+
     // Refs
     const stage = ref(null)
     const canvasWrapper = ref(null)
@@ -62,6 +76,9 @@ export default {
     const zoomLevel = ref(1)
     const isDragging = ref(false)
     const lastPointerPosition = reactive({ x: 0, y: 0 })
+
+    // Rectangle state
+    const rectanglesList = computed(() => getAllRectangles())
 
     // Stage configuration
     const stageConfig = computed(() => ({
@@ -145,9 +162,28 @@ export default {
       zoomAtPoint(pointer, direction)
     }
 
-    // Pan functionality
+    // Mouse events for canvas interaction
     const handleMouseDown = (e) => {
-      // Only pan on background (not on shapes)
+      const clickedOnEmpty = e.target === stage.value.getNode()
+      
+      if (clickedOnEmpty) {
+        // Get click position relative to the stage (accounting for pan/zoom)
+        const pointer = stage.value.getNode().getPointerPosition()
+        const stageAttrs = stage.value.getNode().attrs
+        
+        // Convert screen coordinates to canvas coordinates
+        const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
+        const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
+        
+        // Create rectangle at click position
+        const userId = user.value?.uid || 'anonymous'
+        createRectangle(canvasX, canvasY, userId)
+        
+        // Don't start panning when creating rectangle
+        return
+      }
+
+      // Start panning only if clicked on empty area
       if (e.target === stage.value.getNode()) {
         isDragging.value = true
         const pointer = stage.value.getNode().getPointerPosition()
@@ -164,8 +200,6 @@ export default {
         // Change cursor based on what's under the mouse
         if (e.target === stage.value.getNode()) {
           canvasWrapper.value.style.cursor = 'grab'
-        } else {
-          canvasWrapper.value.style.cursor = 'default'
         }
         return
       }
@@ -180,6 +214,17 @@ export default {
 
       lastPointerPosition.x = pointer.x
       lastPointerPosition.y = pointer.y
+    }
+
+    // Handle rectangle updates
+    const handleRectangleUpdate = (rectangleId, updates, isDragEnd = false) => {
+      const userId = user.value?.uid || 'anonymous'
+      updateRectangle(rectangleId, updates, userId)
+      
+      if (isDragEnd) {
+        console.log(`Rectangle ${rectangleId} moved to:`, updates)
+        // In PR #5, this is where we'll save to Firestore
+      }
     }
 
     const handleMouseUp = () => {
@@ -218,6 +263,7 @@ export default {
       // State
       stageConfig,
       zoomLevel,
+      rectanglesList,
       
       // Event handlers
       handleWheel,
@@ -226,7 +272,8 @@ export default {
       handleMouseUp,
       handleZoomIn,
       handleZoomOut,
-      handleZoomReset
+      handleZoomReset,
+      handleRectangleUpdate
     }
   }
 }
