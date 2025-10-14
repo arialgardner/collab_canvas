@@ -95,7 +95,9 @@ export const useShapes = () => {
             ...baseShape,
             x,
             y,
-            ...DEFAULT_SHAPE_PROPERTIES.text
+            ...DEFAULT_SHAPE_PROPERTIES.text,
+            lockedBy: null,
+            lockedAt: null
           }
           break
         }
@@ -130,11 +132,30 @@ export const useShapes = () => {
       return null
     }
 
-    // If updating position, constrain to bounds for rectangles
-    if (shape.type === 'rectangle' && (updates.x !== undefined || updates.y !== undefined)) {
+    // Constrain all shapes to canvas bounds
+    if (updates.x !== undefined || updates.y !== undefined) {
       const newX = updates.x !== undefined ? updates.x : shape.x
       const newY = updates.y !== undefined ? updates.y : shape.y
-      const constrainedPos = constrainToBounds(newX, newY, shape.width, shape.height)
+      
+      // Get dimensions based on shape type
+      let width = 0
+      let height = 0
+      
+      if (shape.type === 'rectangle' || shape.type === 'text') {
+        width = updates.width !== undefined ? updates.width : shape.width || 0
+        height = updates.height !== undefined ? updates.height : shape.height || 0
+      } else if (shape.type === 'circle') {
+        const radius = updates.radius !== undefined ? updates.radius : shape.radius
+        width = radius * 2
+        height = radius * 2
+      } else if (shape.type === 'line') {
+        // For lines, ensure endpoints stay within bounds
+        // Lines use points array, keep x,y at 0,0 and constrain points instead
+        width = 0
+        height = 0
+      }
+      
+      const constrainedPos = constrainToBounds(newX, newY, width, height)
       updates.x = constrainedPos.x
       updates.y = constrainedPos.y
     }

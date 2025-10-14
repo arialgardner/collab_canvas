@@ -37,6 +37,12 @@ export default {
       strokeWidth: props.circle.strokeWidth || 0,
       rotation: props.circle.rotation || 0,
       draggable: true,
+      // Transformer needs width/height for proper resize
+      width: props.circle.radius * 2,
+      height: props.circle.radius * 2,
+      // Offset so transformer treats circle like a rectangle (top-left origin)
+      offsetX: props.circle.radius,
+      offsetY: props.circle.radius,
       // Visual feedback for selection
       shadowBlur: props.isSelected ? 10 : 0,
       shadowColor: props.isSelected ? '#3b82f6' : 'transparent',

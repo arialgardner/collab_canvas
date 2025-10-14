@@ -3,6 +3,7 @@
     v-if="isVisible" 
     class="text-format-toolbar"
     :style="toolbarStyle"
+    @mousedown.stop
   >
     <!-- Font Size -->
     <select 

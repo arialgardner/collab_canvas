@@ -95,9 +95,8 @@ export const DEFAULT_SHAPE_PROPERTIES = {
   },
   circle: {
     radius: 50,
-    fill: '#EF4444', // Red
-    stroke: undefined,
-    strokeWidth: 0
+    fill: '#EF4444' // Red
+    // stroke and strokeWidth are optional, omit from defaults
   },
   line: {
     stroke: '#000000', // Black
@@ -109,8 +108,8 @@ export const DEFAULT_SHAPE_PROPERTIES = {
     fontFamily: 'Arial',
     fill: '#000000', // Black
     fontStyle: 'normal' as const,
-    align: 'left' as const,
-    width: undefined
+    align: 'left' as const
+    // width is optional, omit from defaults
   }
 }
 

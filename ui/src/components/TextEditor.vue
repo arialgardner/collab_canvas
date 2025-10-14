@@ -102,13 +102,22 @@ export default {
       }
     }
 
-    const handleBlur = () => {
-      // Save on blur (click outside)
-      if (props.isVisible && localText.value.trim()) {
-        emit('save', localText.value)
-      } else if (props.isVisible) {
-        emit('cancel')
-      }
+    const handleBlur = (e) => {
+      // Add a small delay to check if focus is moving to the toolbar
+      setTimeout(() => {
+        // Check if the new focused element is part of the toolbar
+        const activeElement = document.activeElement
+        const isToolbarElement = activeElement?.closest('.text-format-toolbar')
+        
+        // Only save/close if not clicking on toolbar
+        if (!isToolbarElement) {
+          if (props.isVisible && localText.value.trim()) {
+            emit('save', localText.value)
+          } else if (props.isVisible) {
+            emit('cancel')
+          }
+        }
+      }, 100)
     }
 
     const handleCancel = () => {

@@ -567,10 +567,12 @@ export default {
           })
           break
         case 'circle':
-          // 4 handles only (N, S, E, W), no rotation handle
-          transformerNode.enabledAnchors(['top-center', 'bottom-center', 
-                                         'middle-left', 'middle-right'])
+          // 8 handles with keepRatio for uniform scaling
+          transformerNode.enabledAnchors(['top-left', 'top-center', 'top-right', 
+                                         'middle-right', 'middle-left',
+                                         'bottom-left', 'bottom-center', 'bottom-right'])
           transformerNode.rotateEnabled(false)
+          transformerNode.keepRatio(true) // Keep circular shape
           // Minimum 5px radius (10px diameter)
           transformerNode.boundBoxFunc((oldBox, newBox) => {
             const minDiameter = 10
@@ -637,9 +639,13 @@ export default {
         updates.width = node.width() * node.scaleX()
         updates.height = node.height() * node.scaleY()
       } else if (shape.type === 'circle') {
+        // Calculate new radius (keepRatio ensures uniform scaling)
+        const newWidth = node.width() * node.scaleX()
+        const newRadius = Math.max(5, newWidth / 2) // Min 5px radius
+        updates.radius = newRadius
+        // Update position (circle uses center, transformer uses top-left with offset)
         updates.x = node.x()
         updates.y = node.y()
-        updates.radius = shape.radius * Math.max(node.scaleX(), node.scaleY())
       } else if (shape.type === 'line') {
         updates.x = node.x()
         updates.y = node.y()
@@ -678,10 +684,18 @@ export default {
         node.scaleX(1)
         node.scaleY(1)
       } else if (shape.type === 'circle') {
+        // Calculate new radius (keepRatio ensures uniform scaling)
+        const newWidth = node.width() * node.scaleX()
+        const newRadius = Math.max(5, newWidth / 2) // Min 5px radius
+        updates.radius = newRadius
+        // Update position (circle uses center, transformer uses top-left with offset)
         updates.x = node.x()
         updates.y = node.y()
-        // Calculate new radius from scale
-        updates.radius = shape.radius * Math.max(node.scaleX(), node.scaleY())
+        // Reset scale and update node dimensions with new offset
+        node.width(newRadius * 2)
+        node.height(newRadius * 2)
+        node.offsetX(newRadius)
+        node.offsetY(newRadius)
         node.scaleX(1)
         node.scaleY(1)
       } else if (shape.type === 'line') {
@@ -969,6 +983,7 @@ export default {
       
       // State
       stageConfig,
+      stagePosition,
       zoomLevel,
       activeTool,
       shapesList,
