@@ -48,6 +48,7 @@
         @mousemove="handleMouseMove"
         @mouseup="handleMouseUp"
         @mouseleave="handleMouseLeave"
+        @dblclick="handleDoubleClick"
       >
         <v-layer ref="shapeLayer">
           <!-- Empty state when no shapes -->
@@ -65,23 +66,42 @@
             <Rectangle
               v-if="shape.type === 'rectangle'"
               :rectangle="shape"
+              :is-selected="selectedShapeIds.includes(shape.id)"
               @update="handleShapeUpdate"
+              @select="handleShapeSelect"
             />
             
             <!-- Circles -->
             <Circle
               v-if="shape.type === 'circle'"
               :circle="shape"
+              :is-selected="selectedShapeIds.includes(shape.id)"
               @update="handleShapeUpdate"
+              @select="handleShapeSelect"
             />
             
             <!-- Lines -->
             <Line
               v-if="shape.type === 'line'"
               :line="shape"
+              :is-selected="selectedShapeIds.includes(shape.id)"
               @update="handleShapeUpdate"
+              @select="handleShapeSelect"
+            />
+
+            <!-- Text -->
+            <TextShape
+              v-if="shape.type === 'text'"
+              :text="shape"
+              :is-selected="selectedShapeIds.includes(shape.id)"
+              @update="handleShapeUpdate"
+              @edit="handleTextEdit"
+              @select="handleShapeSelect"
             />
           </template>
+
+          <!-- Transformer for resize/rotate handles -->
+          <v-transformer ref="transformer" />
         </v-layer>
       </v-stage>
 
@@ -91,6 +111,25 @@
         :key="cursor.userId"
         :cursor="cursor"
         :stage-attrs="stageConfig"
+      />
+
+      <!-- Text Editor -->
+      <TextEditor
+        :is-visible="showTextEditor"
+        :text-shape="editingText"
+        :stage-position="stagePosition"
+        :stage-scale="zoomLevel"
+        @save="handleTextSave"
+        @cancel="handleTextCancel"
+      />
+
+      <!-- Text Format Toolbar -->
+      <TextFormatToolbar
+        :is-visible="showFormatToolbar"
+        :text-shape="editingText"
+        :stage-position="stagePosition"
+        :stage-scale="zoomLevel"
+        @format-change="handleFormatChange"
       />
     </div>
   </div>
@@ -104,6 +143,9 @@ import ZoomControls from '../components/ZoomControls.vue'
 import Rectangle from '../components/Rectangle.vue'
 import Circle from '../components/Circle.vue'
 import Line from '../components/Line.vue'
+import TextShape from '../components/TextShape.vue'
+import TextEditor from '../components/TextEditor.vue'
+import TextFormatToolbar from '../components/TextFormatToolbar.vue'
 import SyncStatus from '../components/SyncStatus.vue'
 import UserCursor from '../components/UserCursor.vue'
 import PerformanceMonitor from '../components/PerformanceMonitor.vue'
@@ -125,6 +167,9 @@ export default {
     Rectangle,
     Circle,
     Line,
+    TextShape,
+    TextEditor,
+    TextFormatToolbar,
     SyncStatus,
     UserCursor,
     PerformanceMonitor,
@@ -150,7 +195,12 @@ export default {
       isLoading, 
       error,
       isConnected,
-      isSyncing 
+      isSyncing,
+      // Text lock management
+      isTextLocked,
+      acquireTextLock,
+      releaseTextLock,
+      getLockedTextOwner
     } = useShapes()
     const { user } = useAuth()
     const {
@@ -203,6 +253,19 @@ export default {
     const activeTool = ref('select')
     const isCreatingLine = ref(false)
     const lineStartPoint = ref(null)
+
+    // Selection state
+    const selectedShapeIds = ref([])
+    const transformer = ref(null)
+
+    // Text editing state
+    const editingTextId = ref(null)
+    const showTextEditor = ref(false)
+    const showFormatToolbar = ref(false)
+    const editingText = computed(() => {
+      if (!editingTextId.value) return null
+      return shapes.get(editingTextId.value)
+    })
 
     // Shape state
     const shapesList = computed(() => getAllShapes())
@@ -300,6 +363,9 @@ export default {
       const clickedOnEmpty = e.target === stage.value.getNode()
       
       if (clickedOnEmpty) {
+        // Clear selection when clicking on empty canvas
+        clearSelection()
+        
         // Get click position relative to the stage (accounting for pan/zoom)
         const pointer = stage.value.getNode().getPointerPosition()
         const stageAttrs = stage.value.getNode().attrs
@@ -403,6 +469,299 @@ export default {
       }
     }
 
+    // Shape selection handlers
+    const handleShapeSelect = (shapeId, event) => {
+      // Check if Shift key is pressed for multi-select
+      const isShiftKey = event?.shiftKey || false
+      
+      if (isShiftKey) {
+        // Multi-select: add/remove from selection
+        const index = selectedShapeIds.value.indexOf(shapeId)
+        if (index > -1) {
+          // Already selected, remove it
+          selectedShapeIds.value = selectedShapeIds.value.filter(id => id !== shapeId)
+        } else {
+          // Not selected, add it
+          selectedShapeIds.value = [...selectedShapeIds.value, shapeId]
+        }
+      } else {
+        // Single select: replace selection
+        selectedShapeIds.value = [shapeId]
+      }
+      
+      // Attach transformer to selected shapes
+      updateTransformer()
+    }
+
+    const clearSelection = () => {
+      selectedShapeIds.value = []
+      if (transformer.value) {
+        transformer.value.getNode().nodes([])
+      }
+    }
+
+    const updateTransformer = () => {
+      if (!transformer.value || !stage.value) return
+      
+      const transformerNode = transformer.value.getNode()
+      const stageNode = stage.value.getNode()
+      
+      if (selectedShapeIds.value.length === 0) {
+        transformerNode.nodes([])
+        return
+      }
+      
+      // Find selected shape nodes
+      const selectedNodes = selectedShapeIds.value
+        .map(id => stageNode.findOne(`#${id}`))
+        .filter(node => node != null)
+      
+      if (selectedNodes.length > 0) {
+        transformerNode.nodes(selectedNodes)
+        
+        // Configure transformer based on shape type
+        const firstShape = shapes.get(selectedShapeIds.value[0])
+        if (firstShape) {
+          configureTransformer(firstShape.type)
+        }
+      }
+    }
+
+    const configureTransformer = (shapeType) => {
+      if (!transformer.value) return
+      
+      const transformerNode = transformer.value.getNode()
+      
+      // Global transformer styling
+      transformerNode.borderStroke('#3B82F6') // Blue border
+      transformerNode.borderStrokeWidth(2)
+      transformerNode.anchorFill('white')
+      transformerNode.anchorStroke('#3B82F6')
+      transformerNode.anchorStrokeWidth(2)
+      transformerNode.anchorSize(8)
+      transformerNode.anchorCornerRadius(2)
+      
+      // Rotation handle styling
+      transformerNode.rotateAnchorOffset(20)
+      transformerNode.rotationSnaps([0, 45, 90, 135, 180, 225, 270, 315]) // Snap angles for Shift+rotate
+      transformerNode.rotationSnapTolerance(5) // Snap tolerance in degrees
+      
+      // Enable Shift for aspect ratio lock, Alt for center resize (Konva handles these automatically)
+      // These work when user holds Shift or Alt during resize/rotate
+      
+      // Configure based on shape type
+      switch (shapeType) {
+        case 'rectangle':
+          // Standard 8-handle resize + rotation
+          transformerNode.enabledAnchors(['top-left', 'top-center', 'top-right', 
+                                         'middle-right', 'middle-left',
+                                         'bottom-left', 'bottom-center', 'bottom-right'])
+          transformerNode.rotateEnabled(true)
+          // Minimum size constraint
+          transformerNode.boundBoxFunc((oldBox, newBox) => {
+            // Minimum 10x10px
+            if (Math.abs(newBox.width) < 10 || Math.abs(newBox.height) < 10) {
+              return oldBox
+            }
+            return newBox
+          })
+          break
+        case 'circle':
+          // 4 handles only (N, S, E, W), no rotation handle
+          transformerNode.enabledAnchors(['top-center', 'bottom-center', 
+                                         'middle-left', 'middle-right'])
+          transformerNode.rotateEnabled(false)
+          // Minimum 5px radius (10px diameter)
+          transformerNode.boundBoxFunc((oldBox, newBox) => {
+            const minDiameter = 10
+            if (Math.abs(newBox.width) < minDiameter || Math.abs(newBox.height) < minDiameter) {
+              return oldBox
+            }
+            return newBox
+          })
+          break
+        case 'line':
+          // Endpoint handles only
+          transformerNode.enabledAnchors(['top-left', 'bottom-right'])
+          transformerNode.rotateEnabled(true)
+          transformerNode.boundBoxFunc(null) // No minimum for lines
+          break
+        case 'text':
+          // Horizontal resize only (E/W handles)
+          transformerNode.enabledAnchors(['middle-left', 'middle-right'])
+          transformerNode.rotateEnabled(true)
+          // Minimum 20px width
+          transformerNode.boundBoxFunc((oldBox, newBox) => {
+            if (Math.abs(newBox.width) < 20) {
+              return oldBox
+            }
+            return newBox
+          })
+          break
+        default:
+          // Full transform
+          transformerNode.enabledAnchors(['top-left', 'top-center', 'top-right', 
+                                         'middle-right', 'middle-left',
+                                         'bottom-left', 'bottom-center', 'bottom-right'])
+          transformerNode.rotateEnabled(true)
+          transformerNode.boundBoxFunc(null)
+      }
+      
+      transformerNode.getLayer().batchDraw()
+    }
+
+    // Throttled transform update during drag (60 FPS = 16ms)
+    const throttledTransformUpdate = throttle(async (shapeId, updates, userId) => {
+      // Update local state only during transform (no Firestore save)
+      await updateShape(shapeId, updates, userId, 'default', false)
+    }, 16)
+
+    // Handle transform changes during drag (throttled)
+    const handleTransform = (e) => {
+      const node = e.target
+      const shapeId = node.id()
+      
+      if (!shapeId || !shapes.has(shapeId)) return
+      
+      const userId = user.value?.uid || 'anonymous'
+      const shape = shapes.get(shapeId)
+      
+      // Get transform updates based on shape type
+      const updates = {
+        rotation: node.rotation()
+      }
+      
+      if (shape.type === 'rectangle' || shape.type === 'text') {
+        updates.x = node.x()
+        updates.y = node.y()
+        updates.width = node.width() * node.scaleX()
+        updates.height = node.height() * node.scaleY()
+      } else if (shape.type === 'circle') {
+        updates.x = node.x()
+        updates.y = node.y()
+        updates.radius = shape.radius * Math.max(node.scaleX(), node.scaleY())
+      } else if (shape.type === 'line') {
+        updates.x = node.x()
+        updates.y = node.y()
+        const scaleX = node.scaleX()
+        const scaleY = node.scaleY()
+        updates.points = shape.points.map((coord, i) => 
+          i % 2 === 0 ? coord * scaleX : coord * scaleY
+        )
+      }
+      
+      // Throttled update during transform
+      throttledTransformUpdate(shapeId, updates, userId)
+    }
+
+    // Handle transformer end (final save)
+    const handleTransformEnd = async (e) => {
+      const node = e.target
+      const shapeId = node.id()
+      
+      if (!shapeId || !shapes.has(shapeId)) return
+      
+      const userId = user.value?.uid || 'anonymous'
+      const shape = shapes.get(shapeId)
+      
+      // Get transform updates based on shape type
+      const updates = {
+        rotation: node.rotation()
+      }
+      
+      if (shape.type === 'rectangle' || shape.type === 'text') {
+        updates.x = node.x()
+        updates.y = node.y()
+        updates.width = node.width() * node.scaleX()
+        updates.height = node.height() * node.scaleY()
+        // Reset scale after applying to width/height
+        node.scaleX(1)
+        node.scaleY(1)
+      } else if (shape.type === 'circle') {
+        updates.x = node.x()
+        updates.y = node.y()
+        // Calculate new radius from scale
+        updates.radius = shape.radius * Math.max(node.scaleX(), node.scaleY())
+        node.scaleX(1)
+        node.scaleY(1)
+      } else if (shape.type === 'line') {
+        updates.x = node.x()
+        updates.y = node.y()
+        // For lines, scale affects the points
+        const scaleX = node.scaleX()
+        const scaleY = node.scaleY()
+        updates.points = shape.points.map((coord, i) => 
+          i % 2 === 0 ? coord * scaleX : coord * scaleY
+        )
+        node.scaleX(1)
+        node.scaleY(1)
+      }
+      
+      // Final update with Firestore save
+      await updateShape(shapeId, updates, userId, 'default', true)
+    }
+
+    // Text editing handlers
+    const handleTextEdit = async (textId) => {
+      const userId = user.value?.uid
+      if (!userId) return
+
+      // Check if locked by another user
+      if (isTextLocked(textId, userId)) {
+        const owner = getLockedTextOwner(textId)
+        alert(`This text is currently being edited by ${owner}`)
+        return
+      }
+
+      // Acquire lock
+      const lockResult = await acquireTextLock(textId, userId)
+      if (!lockResult.success) {
+        alert(lockResult.message)
+        return
+      }
+
+      // Open editor
+      editingTextId.value = textId
+      showTextEditor.value = true
+      showFormatToolbar.value = true
+    }
+
+    const handleTextSave = async (newText) => {
+      if (!editingTextId.value) return
+
+      const userId = user.value?.uid || 'anonymous'
+
+      // Update text content
+      await updateShape(editingTextId.value, { text: newText }, userId, 'default', true)
+
+      // Release lock and close editor
+      await releaseTextLock(editingTextId.value, userId)
+      editingTextId.value = null
+      showTextEditor.value = false
+      showFormatToolbar.value = false
+    }
+
+    const handleTextCancel = async () => {
+      if (!editingTextId.value) return
+
+      const userId = user.value?.uid || 'anonymous'
+
+      // Release lock and close editor
+      await releaseTextLock(editingTextId.value, userId)
+      editingTextId.value = null
+      showTextEditor.value = false
+      showFormatToolbar.value = false
+    }
+
+    const handleFormatChange = async (format) => {
+      if (!editingTextId.value) return
+
+      const userId = user.value?.uid || 'anonymous'
+
+      // Update text formatting
+      await updateShape(editingTextId.value, format, userId, 'default', true)
+    }
+
     // Generic shape update handler
     const handleShapeUpdate = async (shapeUpdate) => {
       const { id, saveToFirestore, ...updates } = shapeUpdate
@@ -475,6 +834,31 @@ export default {
       }
     }
 
+    // Handle double-click for text creation
+    const handleDoubleClick = async (e) => {
+      const clickedOnEmpty = e.target === stage.value.getNode()
+      
+      if (clickedOnEmpty) {
+        // Double-click on empty canvas - create new text
+        const pointer = stage.value.getNode().getPointerPosition()
+        const stageAttrs = stage.value.getNode().attrs
+        
+        // Convert screen coordinates to canvas coordinates
+        const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
+        const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
+        
+        const userId = user.value?.uid || 'anonymous'
+        
+        // Create text shape
+        const newText = await createShape('text', { x: canvasX, y: canvasY }, userId)
+        
+        // Immediately open editor for the new text
+        if (newText) {
+          handleTextEdit(newText.id)
+        }
+      }
+    }
+
     // Handle window resize
     const handleResize = () => {
       stageSize.width = window.innerWidth
@@ -491,6 +875,13 @@ export default {
       
       // Set initial cursor
       canvasWrapper.value.style.cursor = 'grab'
+      
+      // Set up transformer event listeners
+      if (transformer.value) {
+        const transformerNode = transformer.value.getNode()
+        transformerNode.on('transform', handleTransform) // During transform (throttled)
+        transformerNode.on('transformend', handleTransformEnd) // On transform end (save)
+      }
       
       // Load existing shapes from Firestore
       try {
@@ -574,6 +965,7 @@ export default {
       stage,
       canvasWrapper,
       shapeLayer,
+      transformer,
       
       // State
       stageConfig,
@@ -587,6 +979,13 @@ export default {
       error,
       isConnected,
       isSyncing,
+      // Selection state
+      selectedShapeIds,
+      // Text editing state
+      editingTextId,
+      showTextEditor,
+      showFormatToolbar,
+      editingText,
       
       // Event handlers
       handleToolSelected,
@@ -595,11 +994,22 @@ export default {
       handleMouseMove,
       handleMouseUp,
       handleMouseLeave,
+      handleDoubleClick,
       handleZoomIn,
       handleZoomOut,
       handleZoomReset,
       handleShapeUpdate,
-      handleRectangleUpdate // Backward compatible
+      handleRectangleUpdate, // Backward compatible
+      // Selection handlers
+      handleShapeSelect,
+      clearSelection,
+      updateTransformer,
+      handleTransformEnd,
+      // Text handlers
+      handleTextEdit,
+      handleTextSave,
+      handleTextCancel,
+      handleFormatChange
     }
   }
 }

@@ -74,6 +74,9 @@ export default {
     const handleDragStart = (e) => {
       isDragging.value = true
       
+      // Emit select event (pass native event for shift key detection)
+      emit('select', props.rectangle.id, e.evt)
+      
       // Bring to front during drag
       e.target.moveToTop()
       

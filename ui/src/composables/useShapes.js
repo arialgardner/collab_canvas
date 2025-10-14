@@ -319,6 +319,99 @@ export const useShapes = () => {
     return shapes.size
   }
 
+  // Text editing lock management
+  const LOCK_EXPIRY_MS = 30000 // 30 seconds
+
+  const isLockExpired = (lockedAt) => {
+    if (!lockedAt) return true
+    return Date.now() - lockedAt > LOCK_EXPIRY_MS
+  }
+
+  const isTextLocked = (shapeId, userId) => {
+    const shape = shapes.get(shapeId)
+    if (!shape || shape.type !== 'text') return false
+    
+    // Not locked
+    if (!shape.lockedBy) return false
+    
+    // Locked by current user
+    if (shape.lockedBy === userId) return false
+    
+    // Lock expired
+    if (isLockExpired(shape.lockedAt)) return false
+    
+    // Locked by another user
+    return true
+  }
+
+  const acquireTextLock = async (shapeId, userId, canvasId = 'default') => {
+    const shape = shapes.get(shapeId)
+    if (!shape || shape.type !== 'text') {
+      throw new Error('Shape is not a text shape')
+    }
+
+    // Check if locked by another user
+    if (shape.lockedBy && shape.lockedBy !== userId && !isLockExpired(shape.lockedAt)) {
+      return {
+        success: false,
+        lockedBy: shape.lockedBy,
+        message: 'Text is currently being edited by another user'
+      }
+    }
+
+    // Acquire lock
+    const updates = {
+      lockedBy: userId,
+      lockedAt: Date.now()
+    }
+
+    // Update local state
+    shapes.set(shapeId, { ...shape, ...updates })
+
+    // Update Firestore
+    try {
+      await updateShapeInFirestore(canvasId, shapeId, updates, userId)
+      return { success: true }
+    } catch (err) {
+      console.error('Failed to acquire text lock:', err)
+      return { success: false, message: 'Failed to acquire lock' }
+    }
+  }
+
+  const releaseTextLock = async (shapeId, userId, canvasId = 'default') => {
+    const shape = shapes.get(shapeId)
+    if (!shape || shape.type !== 'text') return
+
+    // Only release if locked by current user
+    if (shape.lockedBy !== userId) return
+
+    // Release lock
+    const updates = {
+      lockedBy: null,
+      lockedAt: null
+    }
+
+    // Update local state
+    shapes.set(shapeId, { ...shape, ...updates })
+
+    // Update Firestore
+    try {
+      await updateShapeInFirestore(canvasId, shapeId, updates, userId)
+    } catch (err) {
+      console.error('Failed to release text lock:', err)
+    }
+  }
+
+  const getLockedTextOwner = (shapeId) => {
+    const shape = shapes.get(shapeId)
+    if (!shape || shape.type !== 'text') return null
+    
+    if (shape.lockedBy && !isLockExpired(shape.lockedAt)) {
+      return shape.lockedBy
+    }
+    return null
+  }
+
   return {
     // State
     shapes, // New primary state
@@ -351,6 +444,12 @@ export const useShapes = () => {
     // Real-time sync
     startRealtimeSync,
     stopRealtimeSync,
-    handleConnectionError
+    handleConnectionError,
+
+    // Text lock management
+    isTextLocked,
+    acquireTextLock,
+    releaseTextLock,
+    getLockedTextOwner
   }
 }

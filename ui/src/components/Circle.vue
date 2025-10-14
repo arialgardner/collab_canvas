@@ -60,8 +60,8 @@ export default {
       }
     }
 
-    const handleDragStart = () => {
-      emit('select', props.circle.id)
+    const handleDragStart = (e) => {
+      emit('select', props.circle.id, e.evt)
     }
 
     const handleDragMove = (e) => {

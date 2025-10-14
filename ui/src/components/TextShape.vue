@@ -1,11 +1,12 @@
 <template>
-  <v-line
-    :config="lineConfig"
+  <v-text
+    :config="textConfig"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
     @dragstart="handleDragStart"
     @dragmove="handleDragMove"
     @dragend="handleDragEnd"
+    @dblclick="handleDoubleClick"
   />
 </template>
 
@@ -13,9 +14,9 @@
 import { computed } from 'vue'
 
 export default {
-  name: 'Line',
+  name: 'TextShape',
   props: {
-    line: {
+    text: {
       type: Object,
       required: true
     },
@@ -24,28 +25,29 @@ export default {
       default: false
     }
   },
-  emits: ['update', 'select'],
+  emits: ['update', 'select', 'edit'],
   setup(props, { emit }) {
-    // Configure Konva line
-    const lineConfig = computed(() => ({
-      id: props.line.id,
-      points: props.line.points, // [x1, y1, x2, y2]
-      stroke: props.line.stroke,
-      strokeWidth: props.line.strokeWidth,
-      rotation: props.line.rotation || 0,
+    // Configure Konva text
+    const textConfig = computed(() => ({
+      id: props.text.id,
+      x: props.text.x,
+      y: props.text.y,
+      text: props.text.text,
+      fontSize: props.text.fontSize,
+      fontFamily: props.text.fontFamily,
+      fill: props.text.fill,
+      fontStyle: props.text.fontStyle,
+      align: props.text.align,
+      width: props.text.width || undefined,
+      rotation: props.text.rotation || 0,
       draggable: true,
-      // Line specific properties
-      lineCap: 'round',
-      lineJoin: 'round',
       // Visual feedback for selection
       shadowBlur: props.isSelected ? 10 : 0,
       shadowColor: props.isSelected ? '#3b82f6' : 'transparent',
       shadowOpacity: props.isSelected ? 0.5 : 0,
       // Performance optimization
       listening: true,
-      perfectDrawEnabled: false,
-      // Hit area for easier selection
-      hitStrokeWidth: Math.max(props.line.strokeWidth + 10, 15)
+      perfectDrawEnabled: false
     }))
 
     const handleMouseEnter = (e) => {
@@ -63,7 +65,7 @@ export default {
     }
 
     const handleDragStart = (e) => {
-      emit('select', props.line.id, e.evt)
+      emit('select', props.text.id, e.evt)
     }
 
     const handleDragMove = (e) => {
@@ -73,7 +75,7 @@ export default {
 
       // Emit update with new position
       emit('update', {
-        id: props.line.id,
+        id: props.text.id,
         x: newX,
         y: newY
       })
@@ -86,20 +88,26 @@ export default {
 
       // Emit update with save flag
       emit('update', {
-        id: props.line.id,
+        id: props.text.id,
         x: finalX,
         y: finalY,
         saveToFirestore: true
       })
     }
 
+    const handleDoubleClick = () => {
+      // Emit edit event to open text editor
+      emit('edit', props.text.id)
+    }
+
     return {
-      lineConfig,
+      textConfig,
       handleMouseEnter,
       handleMouseLeave,
       handleDragStart,
       handleDragMove,
-      handleDragEnd
+      handleDragEnd,
+      handleDoubleClick
     }
   }
 }
