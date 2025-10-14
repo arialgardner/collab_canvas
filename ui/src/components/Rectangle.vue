@@ -45,8 +45,11 @@ export default {
       strokeWidth: isHovered.value ? 2 : 0,
       
       // Performance optimizations
-      listening: true,
-      perfectDrawEnabled: false
+      listening: true, // Keep listening for interactions
+      perfectDrawEnabled: false, // Faster drawing
+      shadowForStrokeEnabled: false, // Disable expensive shadows
+      hitStrokeWidth: 0, // No hit area expansion
+      transformsEnabled: 'position' // Only position transforms
     }))
 
     // Event handlers

@@ -6,10 +6,12 @@ import {
   constrainToBounds 
 } from '../types/shapes'
 import { useFirestore } from './useFirestore'
+import { usePerformance } from './usePerformance'
 
 export const useRectangles = () => {
   // Firestore integration
   const { saveRectangle, updateRectanglePosition, loadRectangles, subscribeToRectangles } = useFirestore()
+  const { measureRectangleSync, measureRender, trackListener } = usePerformance()
   
   // Store rectangles in a reactive Map for O(1) lookups
   const rectangles = reactive(new Map())

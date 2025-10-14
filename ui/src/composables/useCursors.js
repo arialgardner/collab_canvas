@@ -8,8 +8,11 @@ import {
   deleteDoc
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { usePerformance } from './usePerformance'
 
 export const useCursors = () => {
+  const { measureCursorSync, trackFirestoreOperation, trackListener } = usePerformance()
+  
   // Store cursors for other users (not including current user)
   const cursors = reactive(new Map())
   const isTracking = ref(false)
@@ -36,6 +39,9 @@ export const useCursors = () => {
 
     const now = Date.now()
     
+    // Start measuring cursor sync latency
+    const measurement = measureCursorSync()
+    
     // Throttle updates to avoid excessive writes
     if (now - lastUpdateTime < UPDATE_THROTTLE) {
       // Clear previous timeout and set new one
@@ -51,6 +57,7 @@ export const useCursors = () => {
 
     try {
       lastUpdateTime = now
+      trackFirestoreOperation()
       
       const cursorData = {
         userId,
@@ -65,8 +72,12 @@ export const useCursors = () => {
       const docRef = getCursorDocRef(canvasId, userId)
       await setDoc(docRef, cursorData)
       
+      // End measurement
+      measurement.end()
+      
     } catch (error) {
       console.error('Error updating cursor position:', error)
+      measurement.end()
     }
   }
 
@@ -78,6 +89,8 @@ export const useCursors = () => {
     }
 
     try {
+      trackListener('add')
+      
       const cursorsRef = getCursorCollectionRef(canvasId)
       
       cursorUnsubscribe = onSnapshot(cursorsRef, (snapshot) => {
@@ -103,10 +116,25 @@ export const useCursors = () => {
             cursors.delete(userId)
           }
         })
+      }, (error) => {
+        console.error('Error in cursor subscription:', error)
+        trackListener('remove')
       })
       
+      // Set up periodic cleanup of stale cursors
+      const cleanupInterval = setInterval(cleanupStaleCursors, 10000) // Every 10 seconds
+      
       console.log('Cursor subscription started')
-      return cursorUnsubscribe
+      
+      // Return wrapped unsubscribe that tracks listener removal
+      return () => {
+        if (cursorUnsubscribe) {
+          cursorUnsubscribe()
+          cursorUnsubscribe = null
+          trackListener('remove')
+        }
+        clearInterval(cleanupInterval)
+      }
     } catch (error) {
       console.error('Error subscribing to cursors:', error)
       throw error
@@ -118,11 +146,28 @@ export const useCursors = () => {
     if (!userId) return
     
     try {
+      // Remove from local state immediately
+      cursors.delete(userId)
+      
+      // Remove from Firestore
       const docRef = getCursorDocRef(canvasId, userId)
       await deleteDoc(docRef)
       console.log(`Cursor removed for user: ${userId}`)
     } catch (error) {
       console.error('Error removing cursor:', error)
+    }
+  }
+
+  // Clean up stale cursors (older than 30 seconds)
+  const cleanupStaleCursors = () => {
+    const now = Date.now()
+    const STALE_THRESHOLD = 30000 // 30 seconds
+    
+    for (const [userId, cursor] of cursors.entries()) {
+      if (cursor.lastSeen && (now - cursor.lastSeen > STALE_THRESHOLD)) {
+        console.log(`Removing stale cursor for user: ${userId}`)
+        cursors.delete(userId)
+      }
     }
   }
 
@@ -198,6 +243,7 @@ export const useCursors = () => {
     updateCursorPosition,
     subscribeToCursors,
     removeCursor,
+    cleanupStaleCursors,
     startCursorTracking,
     stopCursorTracking,
     cleanup,

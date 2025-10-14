@@ -7,11 +7,15 @@ import {
   onSnapshot,
   serverTimestamp,
   query,
-  orderBy 
+  orderBy,
+  enableNetwork,
+  disableNetwork
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
+import { usePerformance } from './usePerformance'
 
 export const useFirestore = () => {
+  const { trackFirestoreOperation, trackListener, debounce } = usePerformance()
   // Get reference to canvas rectangles collection
   const getCanvasRectanglesRef = (canvasId = 'default') => {
     return collection(db, 'canvases', canvasId, 'rectangles')
@@ -25,6 +29,8 @@ export const useFirestore = () => {
   // Save rectangle to Firestore
   const saveRectangle = async (canvasId = 'default', rectangle) => {
     try {
+      trackFirestoreOperation()
+      
       const rectangleData = {
         ...rectangle,
         lastModified: serverTimestamp()
@@ -41,9 +47,11 @@ export const useFirestore = () => {
     }
   }
 
-  // Update rectangle position in Firestore
-  const updateRectanglePosition = async (canvasId = 'default', rectangleId, x, y, userId = 'anonymous') => {
+  // Debounced update for rapid position changes
+  const debouncedUpdatePosition = debounce(async (canvasId, rectangleId, x, y, userId) => {
     try {
+      trackFirestoreOperation()
+      
       const docRef = getRectangleDocRef(canvasId, rectangleId)
       await updateDoc(docRef, {
         x,
@@ -58,6 +66,12 @@ export const useFirestore = () => {
       console.error('Error updating rectangle position:', error)
       throw error
     }
+  }, 250) // Debounce rapid updates by 250ms
+
+  // Update rectangle position in Firestore (with debouncing)
+  const updateRectanglePosition = async (canvasId = 'default', rectangleId, x, y, userId = 'anonymous') => {
+    // Use debounced version for performance
+    return debouncedUpdatePosition(canvasId, rectangleId, x, y, userId)
   }
 
   // Load all rectangles from Firestore (one-time fetch)
@@ -90,16 +104,26 @@ export const useFirestore = () => {
   // Subscribe to rectangle changes (for real-time sync - used in PR #6)
   const subscribeToRectangles = (canvasId = 'default', callback) => {
     try {
+      trackListener('add')
+      
       const rectanglesRef = getCanvasRectanglesRef(canvasId)
       const q = query(rectanglesRef, orderBy('createdAt', 'asc'))
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const changes = snapshot.docChanges()
         callback(changes, snapshot)
+      }, (error) => {
+        console.error('Firestore listener error:', error)
+        trackListener('remove')
       })
       
       console.log(`Subscribed to rectangle changes for canvas: ${canvasId}`)
-      return unsubscribe
+      
+      // Return wrapped unsubscribe that tracks listener removal
+      return () => {
+        unsubscribe()
+        trackListener('remove')
+      }
     } catch (error) {
       console.error('Error subscribing to rectangles:', error)
       throw error

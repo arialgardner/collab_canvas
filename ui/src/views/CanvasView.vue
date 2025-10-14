@@ -30,6 +30,9 @@
       @zoom-reset="handleZoomReset"
     />
 
+    <!-- Performance Monitor (shown with ?debug=performance) -->
+    <PerformanceMonitor />
+
     <!-- Konva Canvas -->
     <div ref="canvasWrapper" class="canvas-wrapper">
       <v-stage
@@ -70,10 +73,12 @@ import ZoomControls from '../components/ZoomControls.vue'
 import Rectangle from '../components/Rectangle.vue'
 import SyncStatus from '../components/SyncStatus.vue'
 import UserCursor from '../components/UserCursor.vue'
+import PerformanceMonitor from '../components/PerformanceMonitor.vue'
 import { useRectangles } from '../composables/useRectangles'
 import { useAuth } from '../composables/useAuth'
 import { useCursors } from '../composables/useCursors'
 import { usePresence } from '../composables/usePresence'
+import { usePerformance } from '../composables/usePerformance'
 
 export default {
   name: 'CanvasView',
@@ -81,7 +86,8 @@ export default {
     ZoomControls,
     Rectangle,
     SyncStatus,
-    UserCursor
+    UserCursor,
+    PerformanceMonitor
   },
   setup() {
     // Composables
@@ -105,7 +111,8 @@ export default {
       subscribeToCursors,
       cleanup: cleanupCursors,
       screenToCanvas,
-      getAllCursors
+      getAllCursors,
+      cleanupStaleCursors
     } = useCursors()
     const {
       setUserOnline,
@@ -115,6 +122,8 @@ export default {
       cleanup: cleanupPresence,
       handleBeforeUnload
     } = usePresence()
+    
+    const { measureRender, throttle, logPerformanceSummary } = usePerformance()
 
     // Refs
     const stage = ref(null)
