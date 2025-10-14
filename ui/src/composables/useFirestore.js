@@ -13,9 +13,11 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { usePerformance } from './usePerformance'
+import { useErrorHandling } from './useErrorHandling'
 
 export const useFirestore = () => {
   const { trackFirestoreOperation, trackListener, debounce } = usePerformance()
+  const { handleFirebaseError, retry } = useErrorHandling()
   // Get reference to canvas rectangles collection
   const getCanvasRectanglesRef = (canvasId = 'default') => {
     return collection(db, 'canvases', canvasId, 'rectangles')
@@ -26,9 +28,9 @@ export const useFirestore = () => {
     return doc(db, 'canvases', canvasId, 'rectangles', rectangleId)
   }
 
-  // Save rectangle to Firestore
+  // Save rectangle to Firestore with error handling and retry
   const saveRectangle = async (canvasId = 'default', rectangle) => {
-    try {
+    const operation = async () => {
       trackFirestoreOperation()
       
       const rectangleData = {
@@ -41,8 +43,13 @@ export const useFirestore = () => {
       
       console.log(`Rectangle ${rectangle.id} saved to Firestore`)
       return true
+    }
+
+    try {
+      return await retry(operation, 3, 1000)
     } catch (error) {
       console.error('Error saving rectangle:', error)
+      handleFirebaseError(error, 'save rectangle')
       throw error
     }
   }
@@ -101,7 +108,7 @@ export const useFirestore = () => {
     }
   }
 
-  // Subscribe to rectangle changes (for real-time sync - used in PR #6)
+  // Subscribe to rectangle changes (for real-time sync - used in PR #6) with error handling
   const subscribeToRectangles = (canvasId = 'default', callback) => {
     try {
       trackListener('add')
@@ -114,6 +121,7 @@ export const useFirestore = () => {
         callback(changes, snapshot)
       }, (error) => {
         console.error('Firestore listener error:', error)
+        handleFirebaseError(error, 'subscribe to rectangles')
         trackListener('remove')
       })
       
@@ -126,6 +134,7 @@ export const useFirestore = () => {
       }
     } catch (error) {
       console.error('Error subscribing to rectangles:', error)
+      handleFirebaseError(error, 'subscribe to rectangles')
       throw error
     }
   }

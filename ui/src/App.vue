@@ -1,5 +1,8 @@
 <template>
   <div id="app">
+    <!-- Error Handler (global) -->
+    <ErrorHandler />
+    
     <!-- Navigation Bar (only show on canvas route) -->
     <NavBar v-if="showNavBar" />
     
@@ -9,21 +12,30 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
+import ErrorHandler from './components/ErrorHandler.vue'
+import { useErrorHandling } from './composables/useErrorHandling'
 
 export default {
   name: 'App',
   components: {
-    NavBar
+    NavBar,
+    ErrorHandler
   },
   setup() {
     const route = useRoute()
+    const { setupNetworkMonitoring } = useErrorHandling()
     
     // Only show navbar on canvas route (not on auth page)
     const showNavBar = computed(() => {
       return route.name === 'Canvas'
+    })
+    
+    // Set up global error handling
+    onMounted(() => {
+      setupNetworkMonitoring()
     })
     
     return {

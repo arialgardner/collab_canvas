@@ -1,12 +1,11 @@
 <template>
   <div class="canvas-container">
     <!-- Loading indicator -->
-    <div v-if="isLoading" class="loading-overlay">
-      <div class="loading-spinner">
-        <div class="spinner"></div>
-        <p>Loading canvas...</p>
-      </div>
-    </div>
+    <LoadingSpinner 
+      v-if="isLoading" 
+      title="Loading Canvas..." 
+      message="Setting up your collaborative workspace"
+    />
 
     <!-- Error message -->
     <div v-if="error && !isLoading" class="error-message">
@@ -45,6 +44,15 @@
         @mouseleave="handleMouseLeave"
       >
         <v-layer ref="shapeLayer">
+          <!-- Empty state when no rectangles -->
+          <EmptyState 
+            v-if="!isLoading && rectanglesList.length === 0"
+            type="canvas"
+            title="Welcome to CollabCanvas!"
+            message="Click anywhere on the canvas to create your first rectangle and start collaborating"
+            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;"
+          />
+          
           <!-- Rectangles -->
           <Rectangle
             v-for="rectangle in rectanglesList"
@@ -74,6 +82,8 @@ import Rectangle from '../components/Rectangle.vue'
 import SyncStatus from '../components/SyncStatus.vue'
 import UserCursor from '../components/UserCursor.vue'
 import PerformanceMonitor from '../components/PerformanceMonitor.vue'
+import LoadingSpinner from '../components/LoadingSpinner.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useRectangles } from '../composables/useRectangles'
 import { useAuth } from '../composables/useAuth'
 import { useCursors } from '../composables/useCursors'
@@ -87,7 +97,9 @@ export default {
     Rectangle,
     SyncStatus,
     UserCursor,
-    PerformanceMonitor
+    PerformanceMonitor,
+    LoadingSpinner,
+    EmptyState
   },
   setup() {
     // Composables
