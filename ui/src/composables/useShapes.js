@@ -199,7 +199,7 @@ export const useShapes = () => {
   }
 
   const getAllShapes = () => {
-    return Array.from(shapes.values())
+    return Array.from(shapes.values()).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
   }
 
   // Remove shape (backward compatible)
@@ -433,6 +433,90 @@ export const useShapes = () => {
     return null
   }
 
+  // Layer operations
+  const bringToFront = async (shapeIds, userId, canvasId = 'default') => {
+    if (!Array.isArray(shapeIds)) shapeIds = [shapeIds]
+    
+    const maxZ = getMaxZIndex(Array.from(shapes.values()))
+    
+    for (const shapeId of shapeIds) {
+      const shape = shapes.get(shapeId)
+      if (!shape) continue
+      
+      const newZIndex = maxZ + 1
+      await updateShape(shapeId, { zIndex: newZIndex }, userId, canvasId, true)
+    }
+    
+    // Check if normalization is needed
+    await checkAndNormalizeZIndices(userId, canvasId)
+  }
+
+  const sendToBack = async (shapeIds, userId, canvasId = 'default') => {
+    if (!Array.isArray(shapeIds)) shapeIds = [shapeIds]
+    
+    const minZ = getMinZIndex(Array.from(shapes.values()))
+    
+    for (const shapeId of shapeIds) {
+      const shape = shapes.get(shapeId)
+      if (!shape) continue
+      
+      const newZIndex = Math.max(0, minZ - 1)
+      await updateShape(shapeId, { zIndex: newZIndex }, userId, canvasId, true)
+    }
+    
+    // Check if normalization is needed
+    await checkAndNormalizeZIndices(userId, canvasId)
+  }
+
+  const bringForward = async (shapeIds, userId, canvasId = 'default') => {
+    if (!Array.isArray(shapeIds)) shapeIds = [shapeIds]
+    
+    for (const shapeId of shapeIds) {
+      const shape = shapes.get(shapeId)
+      if (!shape) continue
+      
+      const newZIndex = (shape.zIndex || 0) + 1
+      await updateShape(shapeId, { zIndex: newZIndex }, userId, canvasId, true)
+    }
+    
+    // Check if normalization is needed
+    await checkAndNormalizeZIndices(userId, canvasId)
+  }
+
+  const sendBackward = async (shapeIds, userId, canvasId = 'default') => {
+    if (!Array.isArray(shapeIds)) shapeIds = [shapeIds]
+    
+    for (const shapeId of shapeIds) {
+      const shape = shapes.get(shapeId)
+      if (!shape) continue
+      
+      const newZIndex = Math.max(0, (shape.zIndex || 0) - 1)
+      await updateShape(shapeId, { zIndex: newZIndex }, userId, canvasId, true)
+    }
+    
+    // Check if normalization is needed
+    await checkAndNormalizeZIndices(userId, canvasId)
+  }
+
+  const normalizeZIndices = async (userId, canvasId = 'default') => {
+    const allShapes = getAllShapes() // Already sorted by z-index
+    
+    for (let i = 0; i < allShapes.length; i++) {
+      const shape = allShapes[i]
+      if (shape.zIndex !== i) {
+        await updateShape(shape.id, { zIndex: i }, userId, canvasId, true)
+      }
+    }
+  }
+
+  const checkAndNormalizeZIndices = async (userId, canvasId = 'default') => {
+    const allShapes = Array.from(shapes.values())
+    if (needsZIndexNormalization(allShapes)) {
+      console.log('🔄 Z-index normalization needed, renumbering shapes...')
+      await normalizeZIndices(userId, canvasId)
+    }
+  }
+
   return {
     // State
     shapes, // New primary state
@@ -471,6 +555,13 @@ export const useShapes = () => {
     isTextLocked,
     acquireTextLock,
     releaseTextLock,
-    getLockedTextOwner
+    getLockedTextOwner,
+
+    // Layer operations
+    bringToFront,
+    sendToBack,
+    bringForward,
+    sendBackward,
+    normalizeZIndices
   }
 }

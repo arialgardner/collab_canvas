@@ -39,7 +39,7 @@
     <TestingDashboard />
 
     <!-- Konva Canvas -->
-    <div ref="canvasWrapper" class="canvas-wrapper">
+    <div ref="canvasWrapper" class="canvas-wrapper" @click="handleCloseContextMenu">
       <v-stage
         ref="stage"
         :config="stageConfig"
@@ -49,6 +49,7 @@
         @mouseup="handleMouseUp"
         @mouseleave="handleMouseLeave"
         @dblclick="handleDoubleClick"
+        @contextmenu="handleContextMenu"
       >
         <v-layer ref="shapeLayer">
           <!-- Empty state when no shapes -->
@@ -147,6 +148,24 @@
         :stage-scale="zoomLevel"
         @format-change="handleFormatChange"
       />
+
+      <!-- Context Menu -->
+      <ContextMenu
+        :is-visible="contextMenuVisible"
+        :position="contextMenuPosition"
+        :has-selection="selectedShapeIds.length > 0"
+        :has-clipboard="hasClipboard"
+        @bring-to-front="handleContextBringToFront"
+        @bring-forward="handleContextBringForward"
+        @send-backward="handleContextSendBackward"
+        @send-to-back="handleContextSendToBack"
+        @duplicate="handleContextDuplicate"
+        @copy="handleContextCopy"
+        @paste="handleContextPaste"
+        @delete="handleContextDelete"
+        @select-all="handleContextSelectAll"
+        @close="handleCloseContextMenu"
+      />
     </div>
   </div>
 </template>
@@ -162,6 +181,7 @@ import Line from '../components/Line.vue'
 import TextShape from '../components/TextShape.vue'
 import TextEditor from '../components/TextEditor.vue'
 import TextFormatToolbar from '../components/TextFormatToolbar.vue'
+import ContextMenu from '../components/ContextMenu.vue'
 import SyncStatus from '../components/SyncStatus.vue'
 import UserCursor from '../components/UserCursor.vue'
 import PerformanceMonitor from '../components/PerformanceMonitor.vue'
@@ -186,6 +206,7 @@ export default {
     TextShape,
     TextEditor,
     TextFormatToolbar,
+    ContextMenu,
     SyncStatus,
     UserCursor,
     PerformanceMonitor,
@@ -216,7 +237,12 @@ export default {
       isTextLocked,
       acquireTextLock,
       releaseTextLock,
-      getLockedTextOwner
+      getLockedTextOwner,
+      // Layer operations
+      bringToFront,
+      sendToBack,
+      bringForward,
+      sendBackward
     } = useShapes()
     const { user } = useAuth()
     const {
@@ -283,6 +309,11 @@ export default {
       height: 0,
       visible: false
     })
+
+    // Context menu state
+    const contextMenuVisible = ref(false)
+    const contextMenuPosition = reactive({ x: 0, y: 0 })
+    const hasClipboard = ref(false) // Will implement copy/paste in PR #7
 
     // Text editing state
     const editingTextId = ref(null)
@@ -550,6 +581,64 @@ export default {
       }
     }
 
+    // Context menu handlers
+    const handleContextMenu = (e) => {
+      e.evt.preventDefault()
+      contextMenuPosition.x = e.evt.clientX
+      contextMenuPosition.y = e.evt.clientY
+      contextMenuVisible.value = true
+    }
+
+    const handleCloseContextMenu = () => {
+      contextMenuVisible.value = false
+    }
+
+    const handleContextBringToFront = async () => {
+      if (selectedShapeIds.value.length > 0 && user.value) {
+        await bringToFront(selectedShapeIds.value, user.value.uid, 'default')
+      }
+    }
+
+    const handleContextBringForward = async () => {
+      if (selectedShapeIds.value.length > 0 && user.value) {
+        await bringForward(selectedShapeIds.value, user.value.uid, 'default')
+      }
+    }
+
+    const handleContextSendBackward = async () => {
+      if (selectedShapeIds.value.length > 0 && user.value) {
+        await sendBackward(selectedShapeIds.value, user.value.uid, 'default')
+      }
+    }
+
+    const handleContextSendToBack = async () => {
+      if (selectedShapeIds.value.length > 0 && user.value) {
+        await sendToBack(selectedShapeIds.value, user.value.uid, 'default')
+      }
+    }
+
+    const handleContextSelectAll = () => {
+      selectedShapeIds.value = getAllShapes().map(s => s.id)
+      updateTransformer()
+    }
+
+    // Placeholder handlers for PR #7
+    const handleContextDuplicate = () => {
+      console.log('Duplicate (will implement in PR #7)')
+    }
+
+    const handleContextCopy = () => {
+      console.log('Copy (will implement in PR #7)')
+    }
+
+    const handleContextPaste = () => {
+      console.log('Paste (will implement in PR #7)')
+    }
+
+    const handleContextDelete = () => {
+      console.log('Delete (will implement in PR #7)')
+    }
+
     const updateTransformer = () => {
       if (!transformer.value || !stage.value) return
       
@@ -568,6 +657,15 @@ export default {
       
       if (selectedNodes.length > 0) {
         transformerNode.nodes(selectedNodes)
+        
+        // Ensure all nodes have their correct rotation from shape data
+        selectedNodes.forEach(node => {
+          const shapeId = node.id()
+          const shape = shapes.get(shapeId)
+          if (shape && shape.rotation !== undefined) {
+            node.rotation(shape.rotation)
+          }
+        })
         
         // Configure transformer based on shape type
         const firstShape = shapes.get(selectedShapeIds.value[0])
@@ -678,19 +776,29 @@ export default {
       const userId = user.value?.uid || 'anonymous'
       const shape = shapes.get(shapeId)
       
+      const scaleX = node.scaleX()
+      const scaleY = node.scaleY()
+      const isResizing = Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001
+      
+      // Don't send updates during pure rotation - only on transformend
+      if (!isResizing) return
+      
       // Get transform updates based on shape type
       const updates = {
         rotation: node.rotation()
       }
       
       if (shape.type === 'rectangle' || shape.type === 'text') {
-        updates.x = node.x()
-        updates.y = node.y()
-        updates.width = node.width() * node.scaleX()
-        updates.height = node.height() * node.scaleY()
+        const newWidth = node.width() * scaleX
+        const newHeight = node.height() * scaleY
+        // Convert center position back to top-left (accounting for offset)
+        updates.x = node.x() - newWidth / 2
+        updates.y = node.y() - newHeight / 2
+        updates.width = newWidth
+        updates.height = newHeight
       } else if (shape.type === 'circle') {
         // Calculate new radius (keepRatio ensures uniform scaling)
-        const newWidth = node.width() * node.scaleX()
+        const newWidth = node.width() * scaleX
         const newRadius = Math.max(5, newWidth / 2) // Min 5px radius
         updates.radius = newRadius
         // Update position (circle uses center, transformer uses top-left with offset)
@@ -699,14 +807,12 @@ export default {
       } else if (shape.type === 'line') {
         updates.x = node.x()
         updates.y = node.y()
-        const scaleX = node.scaleX()
-        const scaleY = node.scaleY()
         updates.points = shape.points.map((coord, i) => 
           i % 2 === 0 ? coord * scaleX : coord * scaleY
         )
       }
       
-      // Throttled update during transform
+      // Throttled update during transform (only for resize, not rotation)
       throttledTransformUpdate(shapeId, updates, userId)
     }
 
@@ -725,44 +831,65 @@ export default {
         rotation: node.rotation()
       }
       
+      const scaleX = node.scaleX()
+      const scaleY = node.scaleY()
+      const wasResized = Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001
+      
       if (shape.type === 'rectangle' || shape.type === 'text') {
-        updates.x = node.x()
-        updates.y = node.y()
-        updates.width = node.width() * node.scaleX()
-        updates.height = node.height() * node.scaleY()
-        // Reset scale after applying to width/height
-        node.scaleX(1)
-        node.scaleY(1)
+        if (wasResized) {
+          const newWidth = node.width() * scaleX
+          const newHeight = node.height() * scaleY
+          // Convert center position back to top-left (accounting for offset)
+          updates.x = node.x() - newWidth / 2
+          updates.y = node.y() - newHeight / 2
+          updates.width = newWidth
+          updates.height = newHeight
+          // Update node dimensions and offset
+          node.width(newWidth)
+          node.height(newHeight)
+          node.offsetX(newWidth / 2)
+          node.offsetY(newHeight / 2)
+          // Reset scale after applying to width/height
+          node.scaleX(1)
+          node.scaleY(1)
+        }
       } else if (shape.type === 'circle') {
-        // Calculate new radius (keepRatio ensures uniform scaling)
-        const newWidth = node.width() * node.scaleX()
-        const newRadius = Math.max(5, newWidth / 2) // Min 5px radius
-        updates.radius = newRadius
-        // Update position (circle uses center, transformer uses top-left with offset)
-        updates.x = node.x()
-        updates.y = node.y()
-        // Reset scale and update node dimensions with new offset
-        node.width(newRadius * 2)
-        node.height(newRadius * 2)
-        node.offsetX(newRadius)
-        node.offsetY(newRadius)
-        node.scaleX(1)
-        node.scaleY(1)
+        if (wasResized) {
+          // Calculate new radius (keepRatio ensures uniform scaling)
+          const newWidth = node.width() * scaleX
+          const newRadius = Math.max(5, newWidth / 2) // Min 5px radius
+          updates.radius = newRadius
+          // Update position (circle uses center, transformer uses top-left with offset)
+          updates.x = node.x()
+          updates.y = node.y()
+          // Reset scale and update node dimensions with new offset
+          node.width(newRadius * 2)
+          node.height(newRadius * 2)
+          node.offsetX(newRadius)
+          node.offsetY(newRadius)
+          node.scaleX(1)
+          node.scaleY(1)
+        }
       } else if (shape.type === 'line') {
-        updates.x = node.x()
-        updates.y = node.y()
-        // For lines, scale affects the points
-        const scaleX = node.scaleX()
-        const scaleY = node.scaleY()
-        updates.points = shape.points.map((coord, i) => 
-          i % 2 === 0 ? coord * scaleX : coord * scaleY
-        )
-        node.scaleX(1)
-        node.scaleY(1)
+        if (wasResized) {
+          updates.x = node.x()
+          updates.y = node.y()
+          // For lines, scale affects the points
+          updates.points = shape.points.map((coord, i) => 
+            i % 2 === 0 ? coord * scaleX : coord * scaleY
+          )
+          node.scaleX(1)
+          node.scaleY(1)
+        }
       }
       
       // Final update with Firestore save
       await updateShape(shapeId, updates, userId, 'default', true)
+      
+      // Force the layer to redraw to pick up rotation changes
+      if (shapeLayer.value) {
+        shapeLayer.value.getNode().batchDraw()
+      }
     }
 
     // Text editing handlers
@@ -981,7 +1108,10 @@ export default {
     }
 
     // Keyboard handler for global shortcuts
-    const handleKeyDown = (e) => {
+    const handleKeyDown = async (e) => {
+      // Detect platform (Mac uses Cmd, others use Ctrl)
+      const modKey = e.metaKey || e.ctrlKey
+      
       // ESC to deselect all
       if (e.key === 'Escape') {
         clearSelection()
@@ -989,6 +1119,47 @@ export default {
         if (showTextEditor.value) {
           handleTextCancel()
         }
+        return
+      }
+      
+      // Layer operations (only if shapes are selected)
+      if (selectedShapeIds.value.length > 0 && user.value) {
+        const userId = user.value.uid
+        
+        // Cmd+] or Ctrl+]: Bring to front
+        if (modKey && e.key === ']' && !e.shiftKey) {
+          e.preventDefault()
+          await bringToFront(selectedShapeIds.value, userId, 'default')
+          return
+        }
+        
+        // Cmd+[ or Ctrl+[: Send to back
+        if (modKey && e.key === '[' && !e.shiftKey) {
+          e.preventDefault()
+          await sendToBack(selectedShapeIds.value, userId, 'default')
+          return
+        }
+        
+        // Cmd+Shift+] or Ctrl+Shift+]: Bring forward
+        if (modKey && e.shiftKey && e.key === ']') {
+          e.preventDefault()
+          await bringForward(selectedShapeIds.value, userId, 'default')
+          return
+        }
+        
+        // Cmd+Shift+[ or Ctrl+Shift+[: Send backward
+        if (modKey && e.shiftKey && e.key === '[') {
+          e.preventDefault()
+          await sendBackward(selectedShapeIds.value, userId, 'default')
+          return
+        }
+      }
+      
+      // Cmd+A or Ctrl+A: Select all
+      if (modKey && e.key === 'a') {
+        e.preventDefault()
+        selectedShapeIds.value = getAllShapes().map(s => s.id)
+        updateTransformer()
       }
     }
 
@@ -1114,6 +1285,10 @@ export default {
       // Selection state
       selectedShapeIds,
       selectionRect,
+      // Context menu state
+      contextMenuVisible,
+      contextMenuPosition,
+      hasClipboard,
       // Text editing state
       editingTextId,
       showTextEditor,
@@ -1138,6 +1313,18 @@ export default {
       clearSelection,
       updateTransformer,
       handleTransformEnd,
+      // Context menu handlers
+      handleContextMenu,
+      handleCloseContextMenu,
+      handleContextBringToFront,
+      handleContextBringForward,
+      handleContextSendBackward,
+      handleContextSendToBack,
+      handleContextDuplicate,
+      handleContextCopy,
+      handleContextPaste,
+      handleContextDelete,
+      handleContextSelectAll,
       // Text handlers
       handleTextEdit,
       handleTextSave,

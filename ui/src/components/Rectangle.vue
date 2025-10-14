@@ -1,5 +1,6 @@
 <template>
       <v-rect
+        ref="rectNode"
         :config="rectConfig"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
@@ -12,7 +13,7 @@
 </template>
 
 <script>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 export default {
   name: 'Rectangle',
@@ -30,16 +31,33 @@ export default {
   setup(props, { emit }) {
     const isHovered = ref(false)
     const isDragging = ref(false)
+    const rectNode = ref(null)
+
+    // Watch for rotation changes and apply them directly to the node
+    watch(() => props.rectangle.rotation, (newRotation) => {
+      if (rectNode.value && newRotation !== undefined) {
+        const node = rectNode.value.getNode()
+        if (node && node.rotation() !== newRotation) {
+          node.rotation(newRotation)
+          node.getLayer()?.batchDraw()
+        }
+      }
+    })
 
     // Konva rectangle configuration
     const rectConfig = computed(() => ({
       id: props.rectangle.id,
-      x: props.rectangle.x,
-      y: props.rectangle.y,
+      // Adjust position so offset keeps top-left at x,y (center is at x + width/2, y + height/2)
+      x: props.rectangle.x + props.rectangle.width / 2,
+      y: props.rectangle.y + props.rectangle.height / 2,
       width: props.rectangle.width,
       height: props.rectangle.height,
       fill: props.rectangle.fill,
+      rotation: props.rectangle.rotation || 0,
       draggable: true,
+      // Rotate around center point
+      offsetX: props.rectangle.width / 2,
+      offsetY: props.rectangle.height / 2,
       
       // Visual feedback
       opacity: isDragging.value ? 0.8 : 1,
@@ -87,8 +105,9 @@ export default {
 
     const handleDragMove = (e) => {
       const node = e.target
-      const newX = node.x()
-      const newY = node.y()
+      // Convert center position back to top-left (accounting for offset)
+      const newX = node.x() - props.rectangle.width / 2
+      const newY = node.y() - props.rectangle.height / 2
 
       // Emit update with new position (new format)
       emit('update', {
@@ -103,8 +122,9 @@ export default {
       isHovered.value = false
       
       const node = e.target
-      const finalX = node.x()
-      const finalY = node.y()
+      // Convert center position back to top-left (accounting for offset)
+      const finalX = node.x() - props.rectangle.width / 2
+      const finalY = node.y() - props.rectangle.height / 2
 
       // Emit update with save flag (new format)
       emit('update', {
@@ -120,6 +140,7 @@ export default {
     }
 
     return {
+      rectNode,
       rectConfig,
       handleMouseEnter,
       handleMouseLeave,
