@@ -18,48 +18,83 @@ import { useErrorHandling } from './useErrorHandling'
 export const useFirestore = () => {
   const { trackFirestoreOperation, trackListener, debounce } = usePerformance()
   const { handleFirebaseError, retry } = useErrorHandling()
-  // Get reference to canvas rectangles collection
+  
+  // Get reference to canvas shapes collection
+  const getCanvasShapesRef = (canvasId = 'default') => {
+    return collection(db, 'canvases', canvasId, 'shapes')
+  }
+
+  // Get reference to specific shape document
+  const getShapeDocRef = (canvasId, shapeId) => {
+    return doc(db, 'canvases', canvasId, 'shapes', shapeId)
+  }
+
+  // Backward compatible aliases
   const getCanvasRectanglesRef = (canvasId = 'default') => {
-    return collection(db, 'canvases', canvasId, 'rectangles')
+    return getCanvasShapesRef(canvasId)
   }
 
-  // Get reference to specific rectangle document
   const getRectangleDocRef = (canvasId, rectangleId) => {
-    return doc(db, 'canvases', canvasId, 'rectangles', rectangleId)
+    return getShapeDocRef(canvasId, rectangleId)
   }
 
-  // Save rectangle to Firestore with error handling and retry
-  const saveRectangle = async (canvasId = 'default', rectangle) => {
+  // Save shape to Firestore with error handling and retry
+  const saveShape = async (canvasId = 'default', shape) => {
     const operation = async () => {
       trackFirestoreOperation()
       
-      const rectangleData = {
-        ...rectangle,
+      const shapeData = {
+        ...shape,
         lastModified: serverTimestamp()
       }
       
-      const docRef = getRectangleDocRef(canvasId, rectangle.id)
-      await setDoc(docRef, rectangleData)
+      const docRef = getShapeDocRef(canvasId, shape.id)
+      await setDoc(docRef, shapeData)
       
-      console.log(`Rectangle ${rectangle.id} saved to Firestore`)
+      console.log(`Shape ${shape.id} (${shape.type}) saved to Firestore`)
       return true
     }
 
     try {
       return await retry(operation, 3, 1000)
     } catch (error) {
-      console.error('Error saving rectangle:', error)
-      handleFirebaseError(error, 'save rectangle')
+      console.error('Error saving shape:', error)
+      handleFirebaseError(error, 'save shape')
+      throw error
+    }
+  }
+
+  // Backward compatible rectangle save
+  const saveRectangle = async (canvasId = 'default', rectangle) => {
+    return saveShape(canvasId, rectangle)
+  }
+
+  // Generic update shape method
+  const updateShape = async (canvasId = 'default', shapeId, updates, userId = 'anonymous') => {
+    try {
+      trackFirestoreOperation()
+      
+      const docRef = getShapeDocRef(canvasId, shapeId)
+      await updateDoc(docRef, {
+        ...updates,
+        lastModified: serverTimestamp(),
+        lastModifiedBy: userId
+      })
+      
+      console.log(`Shape ${shapeId} updated in Firestore`)
+      return true
+    } catch (error) {
+      console.error('Error updating shape:', error)
       throw error
     }
   }
 
   // Debounced update for rapid position changes
-  const debouncedUpdatePosition = debounce(async (canvasId, rectangleId, x, y, userId) => {
+  const debouncedUpdatePosition = debounce(async (canvasId, shapeId, x, y, userId) => {
     try {
       trackFirestoreOperation()
       
-      const docRef = getRectangleDocRef(canvasId, rectangleId)
+      const docRef = getShapeDocRef(canvasId, shapeId)
       await updateDoc(docRef, {
         x,
         y,
@@ -67,31 +102,31 @@ export const useFirestore = () => {
         lastModifiedBy: userId
       })
       
-      console.log(`Rectangle ${rectangleId} position updated in Firestore`)
+      console.log(`Shape ${shapeId} position updated in Firestore`)
       return true
     } catch (error) {
-      console.error('Error updating rectangle position:', error)
+      console.error('Error updating shape position:', error)
       throw error
     }
   }, 250) // Debounce rapid updates by 250ms
 
-  // Update rectangle position in Firestore (with debouncing)
+  // Update rectangle position in Firestore (with debouncing) - backward compatible
   const updateRectanglePosition = async (canvasId = 'default', rectangleId, x, y, userId = 'anonymous') => {
     // Use debounced version for performance
     return debouncedUpdatePosition(canvasId, rectangleId, x, y, userId)
   }
 
-  // Load all rectangles from Firestore (one-time fetch)
-  const loadRectangles = async (canvasId = 'default') => {
+  // Load all shapes from Firestore (one-time fetch)
+  const loadShapes = async (canvasId = 'default') => {
     try {
-      const rectanglesRef = getCanvasRectanglesRef(canvasId)
-      const q = query(rectanglesRef, orderBy('createdAt', 'asc'))
+      const shapesRef = getCanvasShapesRef(canvasId)
+      const q = query(shapesRef, orderBy('createdAt', 'asc'))
       const querySnapshot = await getDocs(q)
       
-      const rectangles = []
+      const shapes = []
       querySnapshot.forEach((doc) => {
         const data = doc.data()
-        rectangles.push({
+        shapes.push({
           id: doc.id,
           ...data,
           // Convert Firestore timestamps to numbers for local state
@@ -100,32 +135,37 @@ export const useFirestore = () => {
         })
       })
       
-      console.log(`Loaded ${rectangles.length} rectangles from Firestore`)
-      return rectangles
+      console.log(`Loaded ${shapes.length} shapes from Firestore`)
+      return shapes
     } catch (error) {
-      console.error('Error loading rectangles:', error)
+      console.error('Error loading shapes:', error)
       throw error
     }
   }
 
-  // Subscribe to rectangle changes (for real-time sync - used in PR #6) with error handling
-  const subscribeToRectangles = (canvasId = 'default', callback) => {
+  // Backward compatible load rectangles
+  const loadRectangles = async (canvasId = 'default') => {
+    return loadShapes(canvasId)
+  }
+
+  // Subscribe to shape changes (for real-time sync) with error handling
+  const subscribeToShapes = (canvasId = 'default', callback) => {
     try {
       trackListener('add')
       
-      const rectanglesRef = getCanvasRectanglesRef(canvasId)
-      const q = query(rectanglesRef, orderBy('createdAt', 'asc'))
+      const shapesRef = getCanvasShapesRef(canvasId)
+      const q = query(shapesRef, orderBy('createdAt', 'asc'))
       
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const changes = snapshot.docChanges()
         callback(changes, snapshot)
       }, (error) => {
         console.error('Firestore listener error:', error)
-        handleFirebaseError(error, 'subscribe to rectangles')
+        handleFirebaseError(error, 'subscribe to shapes')
         trackListener('remove')
       })
       
-      console.log(`Subscribed to rectangle changes for canvas: ${canvasId}`)
+      console.log(`Subscribed to shape changes for canvas: ${canvasId}`)
       
       // Return wrapped unsubscribe that tracks listener removal
       return () => {
@@ -133,17 +173,22 @@ export const useFirestore = () => {
         trackListener('remove')
       }
     } catch (error) {
-      console.error('Error subscribing to rectangles:', error)
-      handleFirebaseError(error, 'subscribe to rectangles')
+      console.error('Error subscribing to shapes:', error)
+      handleFirebaseError(error, 'subscribe to shapes')
       throw error
     }
+  }
+
+  // Backward compatible subscribe to rectangles
+  const subscribeToRectangles = (canvasId = 'default', callback) => {
+    return subscribeToShapes(canvasId, callback)
   }
 
   // Helper to check Firestore connection
   const testFirestoreConnection = async () => {
     try {
       // Try to read a small collection to test connection
-      const testRef = collection(db, 'canvases', 'default', 'rectangles')
+      const testRef = getCanvasShapesRef('default')
       await getDocs(testRef)
       console.log('Firestore connection successful')
       return true
@@ -154,7 +199,13 @@ export const useFirestore = () => {
   }
 
   return {
-    // Core operations
+    // New shape operations
+    saveShape,
+    updateShape,
+    loadShapes,
+    subscribeToShapes,
+
+    // Backward compatible rectangle operations
     saveRectangle,
     updateRectanglePosition,
     loadRectangles,
@@ -162,6 +213,8 @@ export const useFirestore = () => {
     
     // Utilities
     testFirestoreConnection,
+    getCanvasShapesRef,
+    getShapeDocRef,
     getCanvasRectanglesRef,
     getRectangleDocRef
   }

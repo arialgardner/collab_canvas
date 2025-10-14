@@ -13,6 +13,9 @@
       <button @click="error = null" class="dismiss-error">Dismiss</button>
     </div>
 
+    <!-- Toolbar -->
+    <Toolbar @tool-selected="handleToolSelected" />
+
     <!-- Sync Status -->
     <SyncStatus
       :is-connected="isConnected"
@@ -47,22 +50,38 @@
         @mouseleave="handleMouseLeave"
       >
         <v-layer ref="shapeLayer">
-          <!-- Empty state when no rectangles -->
+          <!-- Empty state when no shapes -->
           <EmptyState 
-            v-if="!isLoading && rectanglesList.length === 0"
+            v-if="!isLoading && shapesList.length === 0"
             type="canvas"
             title="Welcome to CollabCanvas!"
-            message="Click anywhere on the canvas to create your first rectangle and start collaborating"
+            message="Select a tool from the toolbar above and click on the canvas to create shapes"
             style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;"
           />
           
-          <!-- Rectangles -->
-          <Rectangle
-            v-for="rectangle in rectanglesList"
-            :key="rectangle.id"
-            :rectangle="rectangle"
-            @update="handleRectangleUpdate"
-          />
+          <!-- Render all shapes based on type -->
+          <template v-for="shape in shapesList" :key="shape.id">
+            <!-- Rectangles -->
+            <Rectangle
+              v-if="shape.type === 'rectangle'"
+              :rectangle="shape"
+              @update="handleShapeUpdate"
+            />
+            
+            <!-- Circles -->
+            <Circle
+              v-if="shape.type === 'circle'"
+              :circle="shape"
+              @update="handleShapeUpdate"
+            />
+            
+            <!-- Lines -->
+            <Line
+              v-if="shape.type === 'line'"
+              :line="shape"
+              @update="handleShapeUpdate"
+            />
+          </template>
         </v-layer>
       </v-stage>
 
@@ -80,15 +99,18 @@
 <script>
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import VueKonva from 'vue-konva'
+import Toolbar from '../components/Toolbar.vue'
 import ZoomControls from '../components/ZoomControls.vue'
 import Rectangle from '../components/Rectangle.vue'
+import Circle from '../components/Circle.vue'
+import Line from '../components/Line.vue'
 import SyncStatus from '../components/SyncStatus.vue'
 import UserCursor from '../components/UserCursor.vue'
 import PerformanceMonitor from '../components/PerformanceMonitor.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TestingDashboard from '../components/TestingDashboard.vue'
-import { useRectangles } from '../composables/useRectangles'
+import { useShapes } from '../composables/useShapes'
 import { useAuth } from '../composables/useAuth'
 import { useCursors } from '../composables/useCursors'
 import { usePresence } from '../composables/usePresence'
@@ -98,8 +120,11 @@ import { useBugFixes } from '../utils/bugFixUtils'
 export default {
   name: 'CanvasView',
   components: {
+    Toolbar,
     ZoomControls,
     Rectangle,
+    Circle,
+    Line,
     SyncStatus,
     UserCursor,
     PerformanceMonitor,
@@ -110,18 +135,23 @@ export default {
   setup() {
     // Composables
     const { 
-      rectangles, 
-      createRectangle, 
-      updateRectangle, 
-      getAllRectangles, 
-      loadRectanglesFromFirestore, 
+      shapes,
+      rectangles, // Backward compatible alias
+      createShape,
+      createRectangle, // Backward compatible
+      updateShape,
+      updateRectangle, // Backward compatible
+      getAllShapes,
+      getAllRectangles, // Backward compatible
+      loadShapesFromFirestore,
+      loadRectanglesFromFirestore, // Backward compatible
       startRealtimeSync, 
       stopRealtimeSync,
       isLoading, 
       error,
       isConnected,
       isSyncing 
-    } = useRectangles()
+    } = useShapes()
     const { user } = useAuth()
     const {
       cursors,
@@ -169,8 +199,14 @@ export default {
     const isDragging = ref(false)
     const lastPointerPosition = reactive({ x: 0, y: 0 })
 
-    // Rectangle state
-    const rectanglesList = computed(() => getAllRectangles())
+    // Tool state management
+    const activeTool = ref('select')
+    const isCreatingLine = ref(false)
+    const lineStartPoint = ref(null)
+
+    // Shape state
+    const shapesList = computed(() => getAllShapes())
+    const rectanglesList = computed(() => getAllRectangles()) // Backward compatible
 
     // Cursor state
     const remoteCursors = computed(() => getAllCursors())
@@ -272,23 +308,29 @@ export default {
         const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
         const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
         
-        // Create rectangle at click position
         const userId = user.value?.uid || 'anonymous'
-        await createRectangle(canvasX, canvasY, userId)
         
-        // Don't start panning when creating rectangle
-        return
-      }
-
-      // Start panning only if clicked on empty area
-      if (e.target === stage.value.getNode()) {
-        isDragging.value = true
-        const pointer = stage.value.getNode().getPointerPosition()
-        lastPointerPosition.x = pointer.x
-        lastPointerPosition.y = pointer.y
-        
-        // Change cursor to grabbing
-        canvasWrapper.value.style.cursor = 'grabbing'
+        // Route to appropriate shape creator based on active tool
+        if (activeTool.value === 'rectangle') {
+          await createShape('rectangle', { x: canvasX, y: canvasY }, userId)
+          return
+        } else if (activeTool.value === 'circle') {
+          await createShape('circle', { x: canvasX, y: canvasY }, userId)
+          return
+        } else if (activeTool.value === 'line') {
+          // Start line creation
+          if (!isCreatingLine.value) {
+            isCreatingLine.value = true
+            lineStartPoint.value = { x: canvasX, y: canvasY }
+            return
+          }
+        } else if (activeTool.value === 'select') {
+          // Start panning
+          isDragging.value = true
+          lastPointerPosition.x = pointer.x
+          lastPointerPosition.y = pointer.y
+          canvasWrapper.value.style.cursor = 'grabbing'
+        }
       }
     }
 
@@ -343,6 +385,40 @@ export default {
     }
 
     // Handle rectangle updates
+    // Tool selection handler
+    const handleToolSelected = (toolName) => {
+      activeTool.value = toolName
+      
+      // Reset line creation if switching away from line tool
+      if (toolName !== 'line') {
+        isCreatingLine.value = false
+        lineStartPoint.value = null
+      }
+      
+      // Update cursor
+      if (toolName === 'select') {
+        canvasWrapper.value.style.cursor = 'grab'
+      } else {
+        canvasWrapper.value.style.cursor = 'crosshair'
+      }
+    }
+
+    // Generic shape update handler
+    const handleShapeUpdate = async (shapeUpdate) => {
+      const { id, saveToFirestore, ...updates } = shapeUpdate
+      const userId = user.value?.uid || 'anonymous'
+      
+      // Always update local state immediately for smooth dragging
+      await updateShape(id, updates, userId, 'default', false)
+      
+      // Save to Firestore only when saveToFirestore flag is true (e.g., on drag end)
+      if (saveToFirestore) {
+        console.log(`Shape ${id} updated:`, updates)
+        await updateShape(id, updates, userId, 'default', true)
+      }
+    }
+
+    // Backward compatible rectangle update handler
     const handleRectangleUpdate = async (rectangleId, updates, isDragEnd = false) => {
       const userId = user.value?.uid || 'anonymous'
       
@@ -356,9 +432,47 @@ export default {
       }
     }
 
-    const handleMouseUp = () => {
+    const handleMouseUp = async (e) => {
+      // Handle line creation completion
+      if (isCreatingLine.value && lineStartPoint.value) {
+        const pointer = stage.value.getNode().getPointerPosition()
+        const stageAttrs = stage.value.getNode().attrs
+        
+        // Convert screen coordinates to canvas coordinates
+        const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
+        const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
+        
+        // Calculate line length
+        const dx = canvasX - lineStartPoint.value.x
+        const dy = canvasY - lineStartPoint.value.y
+        const length = Math.sqrt(dx * dx + dy * dy)
+        
+        // Only create line if minimum length is met (10px)
+        if (length >= 10) {
+          const userId = user.value?.uid || 'anonymous'
+          await createShape('line', { 
+            points: [
+              lineStartPoint.value.x, 
+              lineStartPoint.value.y, 
+              canvasX, 
+              canvasY
+            ] 
+          }, userId)
+        }
+        
+        // Reset line creation state
+        isCreatingLine.value = false
+        lineStartPoint.value = null
+        return
+      }
+      
+      // Handle panning end
       isDragging.value = false
-      canvasWrapper.value.style.cursor = 'grab'
+      if (activeTool.value === 'select') {
+        canvasWrapper.value.style.cursor = 'grab'
+      } else {
+        canvasWrapper.value.style.cursor = 'crosshair'
+      }
     }
 
     // Handle window resize
@@ -378,16 +492,20 @@ export default {
       // Set initial cursor
       canvasWrapper.value.style.cursor = 'grab'
       
-      // Load existing rectangles from Firestore
+      // Load existing shapes from Firestore
       try {
-        await loadRectanglesFromFirestore('default')
+        console.log('🔄 Loading shapes from Firestore...')
+        await loadShapesFromFirestore('default')
+        console.log(`✅ Loaded ${shapesList.value.length} shapes successfully`)
         
         // Start real-time synchronization after initial load
+        console.log('🔄 Starting real-time sync...')
         startRealtimeSync('default')
+        console.log('✅ Real-time sync started')
       } catch (err) {
-        console.error('Failed to load rectangles on mount:', err)
-        // Continue without rectangles - user can still create new ones
-        // Still start real-time sync for new rectangles
+        console.error('❌ Failed to load shapes on mount:', err)
+        // Continue without shapes - user can still create new ones
+        // Still start real-time sync for new shapes
         startRealtimeSync('default')
       }
 
@@ -460,7 +578,9 @@ export default {
       // State
       stageConfig,
       zoomLevel,
-      rectanglesList,
+      activeTool,
+      shapesList,
+      rectanglesList, // Backward compatible
       remoteCursors,
       activeUserCount,
       isLoading,
@@ -469,6 +589,7 @@ export default {
       isSyncing,
       
       // Event handlers
+      handleToolSelected,
       handleWheel,
       handleMouseDown,
       handleMouseMove,
@@ -477,7 +598,8 @@ export default {
       handleZoomIn,
       handleZoomOut,
       handleZoomReset,
-      handleRectangleUpdate
+      handleShapeUpdate,
+      handleRectangleUpdate // Backward compatible
     }
   }
 }

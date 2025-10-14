@@ -83,28 +83,33 @@ export default {
     }
 
     const handleDragMove = (e) => {
-      // Optimistic update - update position locally immediately
-      const newPos = {
-        x: e.target.x(),
-        y: e.target.y()
-      }
-      
-      // Emit update for parent to handle
-      emit('update', props.rectangle.id, newPos)
+      const node = e.target
+      const newX = node.x()
+      const newY = node.y()
+
+      // Emit update with new position (new format)
+      emit('update', {
+        id: props.rectangle.id,
+        x: newX,
+        y: newY
+      })
     }
 
     const handleDragEnd = (e) => {
       isDragging.value = false
       isHovered.value = false
       
-      // Final position update
-      const finalPos = {
-        x: e.target.x(),
-        y: e.target.y()
-      }
-      
-      // Emit final update
-      emit('update', props.rectangle.id, finalPos, true) // true indicates drag end
+      const node = e.target
+      const finalX = node.x()
+      const finalY = node.y()
+
+      // Emit update with save flag (new format)
+      emit('update', {
+        id: props.rectangle.id,
+        x: finalX,
+        y: finalY,
+        saveToFirestore: true
+      })
       
       // Reset cursor
       const stage = e.target.getStage()
