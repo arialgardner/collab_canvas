@@ -100,6 +100,22 @@
             />
           </template>
 
+          <!-- Marquee Selection Rectangle -->
+          <v-rect
+            v-if="selectionRect.visible"
+            :config="{
+              x: selectionRect.width < 0 ? selectionRect.x + selectionRect.width : selectionRect.x,
+              y: selectionRect.height < 0 ? selectionRect.y + selectionRect.height : selectionRect.y,
+              width: Math.abs(selectionRect.width),
+              height: Math.abs(selectionRect.height),
+              stroke: '#3B82F6',
+              strokeWidth: 2,
+              dash: [10, 5],
+              fill: 'rgba(59, 130, 246, 0.1)',
+              listening: false
+            }"
+          />
+
           <!-- Transformer for resize/rotate handles -->
           <v-transformer ref="transformer" />
         </v-layer>
@@ -257,6 +273,16 @@ export default {
     // Selection state
     const selectedShapeIds = ref([])
     const transformer = ref(null)
+    
+    // Marquee selection state
+    const isSelecting = ref(false)
+    const selectionRect = reactive({
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      visible: false
+    })
 
     // Text editing state
     const editingTextId = ref(null)
@@ -391,16 +417,40 @@ export default {
             return
           }
         } else if (activeTool.value === 'select') {
-          // Start panning
-          isDragging.value = true
-          lastPointerPosition.x = pointer.x
-          lastPointerPosition.y = pointer.y
-          canvasWrapper.value.style.cursor = 'grabbing'
+          // Check if Shift key is held for marquee selection
+          if (e.evt && e.evt.shiftKey) {
+            // Start marquee selection
+            isSelecting.value = true
+            selectionRect.x = canvasX
+            selectionRect.y = canvasY
+            selectionRect.width = 0
+            selectionRect.height = 0
+            selectionRect.visible = true
+          } else {
+            // Start panning
+            isDragging.value = true
+            lastPointerPosition.x = pointer.x
+            lastPointerPosition.y = pointer.y
+            canvasWrapper.value.style.cursor = 'grabbing'
+          }
         }
       }
     }
 
     const handleMouseMove = (e) => {
+      // Handle marquee selection update
+      if (isSelecting.value) {
+        const pointer = stage.value.getNode().getPointerPosition()
+        const stageAttrs = stage.value.getNode().attrs
+        const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
+        const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
+        
+        // Update selection rectangle dimensions
+        selectionRect.width = canvasX - selectionRect.x
+        selectionRect.height = canvasY - selectionRect.y
+        return
+      }
+      
       if (!isDragging.value) {
         // Change cursor based on what's under the mouse
         if (e.target === stage.value.getNode()) {
@@ -839,6 +889,57 @@ export default {
         return
       }
       
+      // Finalize marquee selection
+      if (isSelecting.value) {
+        // Normalize selection rectangle (handle negative width/height)
+        const selX = selectionRect.width < 0 ? selectionRect.x + selectionRect.width : selectionRect.x
+        const selY = selectionRect.height < 0 ? selectionRect.y + selectionRect.height : selectionRect.y
+        const selWidth = Math.abs(selectionRect.width)
+        const selHeight = Math.abs(selectionRect.height)
+        
+        // Find shapes that intersect with selection rectangle
+        const intersectingShapes = shapesList.value.filter(shape => {
+          // Get shape bounds based on type
+          let shapeX, shapeY, shapeWidth, shapeHeight
+          
+          if (shape.type === 'rectangle' || shape.type === 'text') {
+            shapeX = shape.x
+            shapeY = shape.y
+            shapeWidth = shape.width
+            shapeHeight = shape.height
+          } else if (shape.type === 'circle') {
+            shapeX = shape.x - shape.radius
+            shapeY = shape.y - shape.radius
+            shapeWidth = shape.radius * 2
+            shapeHeight = shape.radius * 2
+          } else if (shape.type === 'line') {
+            // Calculate line bounding box from points
+            const points = shape.points || []
+            const allX = [shape.x || 0, ...points.filter((_, i) => i % 2 === 0).map(x => (shape.x || 0) + x)]
+            const allY = [shape.y || 0, ...points.filter((_, i) => i % 2 === 1).map(y => (shape.y || 0) + y)]
+            shapeX = Math.min(...allX)
+            shapeY = Math.min(...allY)
+            shapeWidth = Math.max(...allX) - shapeX
+            shapeHeight = Math.max(...allY) - shapeY
+          }
+          
+          // Check for intersection
+          return !(shapeX + shapeWidth < selX || 
+                   shapeX > selX + selWidth ||
+                   shapeY + shapeHeight < selY ||
+                   shapeY > selY + selHeight)
+        })
+        
+        // Update selection
+        selectedShapeIds.value = intersectingShapes.map(s => s.id)
+        updateTransformer()
+        
+        // Hide selection rectangle
+        isSelecting.value = false
+        selectionRect.visible = false
+        return
+      }
+      
       // Handle panning end
       isDragging.value = false
       if (activeTool.value === 'select') {
@@ -879,6 +980,18 @@ export default {
       stageSize.height = window.innerHeight - 70 // Account for navbar
     }
 
+    // Keyboard handler for global shortcuts
+    const handleKeyDown = (e) => {
+      // ESC to deselect all
+      if (e.key === 'Escape') {
+        clearSelection()
+        // Also cancel text editing if active
+        if (showTextEditor.value) {
+          handleTextCancel()
+        }
+      }
+    }
+
     // Lifecycle
     onMounted(async () => {
       // Set initial canvas position
@@ -886,6 +999,9 @@ export default {
       
       // Add resize listener
       window.addEventListener('resize', handleResize)
+      
+      // Add keyboard listener
+      window.addEventListener('keydown', handleKeyDown)
       
       // Set initial cursor
       canvasWrapper.value.style.cursor = 'grab'
@@ -946,6 +1062,7 @@ export default {
 
     onUnmounted(() => {
       window.removeEventListener('resize', handleResize)
+      window.removeEventListener('keydown', handleKeyDown)
       
       // Clean up real-time listeners
       stopRealtimeSync()
@@ -996,6 +1113,7 @@ export default {
       isSyncing,
       // Selection state
       selectedShapeIds,
+      selectionRect,
       // Text editing state
       editingTextId,
       showTextEditor,
