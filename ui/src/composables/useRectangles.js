@@ -9,12 +9,17 @@ import { useFirestore } from './useFirestore'
 
 export const useRectangles = () => {
   // Firestore integration
-  const { saveRectangle, updateRectanglePosition, loadRectangles } = useFirestore()
+  const { saveRectangle, updateRectanglePosition, loadRectangles, subscribeToRectangles } = useFirestore()
   
   // Store rectangles in a reactive Map for O(1) lookups
   const rectangles = reactive(new Map())
   const isLoading = ref(false)
   const error = ref(null)
+  const isConnected = ref(true)
+  const isSyncing = ref(false)
+  
+  // Real-time listener management
+  let realtimeUnsubscribe = null
 
   // Create a new rectangle at specified position
   const createRectangle = async (x, y, userId = 'anonymous', canvasId = 'default') => {
@@ -135,6 +140,88 @@ export const useRectangles = () => {
     }
   }
 
+  // Set up real-time synchronization
+  const startRealtimeSync = (canvasId = 'default') => {
+    if (realtimeUnsubscribe) {
+      console.warn('Real-time sync already active')
+      return
+    }
+
+    try {
+      console.log('Starting real-time sync...')
+      isSyncing.value = true
+      
+      realtimeUnsubscribe = subscribeToRectangles(canvasId, (changes, snapshot) => {
+        isConnected.value = true
+        
+        changes.forEach((change) => {
+          const rectangleData = change.doc.data()
+          const rectangleId = change.doc.id
+          
+          // Convert Firestore timestamps
+          const rectangle = {
+            id: rectangleId,
+            ...rectangleData,
+            createdAt: rectangleData.createdAt?.toMillis ? rectangleData.createdAt.toMillis() : (rectangleData.createdAt || Date.now()),
+            lastModified: rectangleData.lastModified?.toMillis ? rectangleData.lastModified.toMillis() : (rectangleData.lastModified || Date.now())
+          }
+
+          if (change.type === 'added') {
+            // New rectangle from another user
+            if (!rectangles.has(rectangleId)) {
+              rectangles.set(rectangleId, rectangle)
+              console.log(`Real-time: Rectangle ${rectangleId} added`)
+            }
+          }
+          
+          if (change.type === 'modified') {
+            const localRectangle = rectangles.get(rectangleId)
+            
+            // Conflict resolution: Last write wins with server timestamp
+            if (!localRectangle || rectangle.lastModified > localRectangle.lastModified) {
+              rectangles.set(rectangleId, rectangle)
+              console.log(`Real-time: Rectangle ${rectangleId} updated`)
+            } else {
+              console.log(`Real-time: Ignoring older update for rectangle ${rectangleId}`)
+            }
+          }
+          
+          if (change.type === 'removed') {
+            // Rectangle deleted (future feature)
+            if (rectangles.has(rectangleId)) {
+              rectangles.delete(rectangleId)
+              console.log(`Real-time: Rectangle ${rectangleId} removed`)
+            }
+          }
+        })
+      })
+      
+      console.log('Real-time sync started successfully')
+    } catch (err) {
+      console.error('Error setting up real-time sync:', err)
+      error.value = err.message
+      isConnected.value = false
+    } finally {
+      isSyncing.value = false
+    }
+  }
+
+  // Stop real-time synchronization
+  const stopRealtimeSync = () => {
+    if (realtimeUnsubscribe) {
+      realtimeUnsubscribe()
+      realtimeUnsubscribe = null
+      console.log('Real-time sync stopped')
+    }
+  }
+
+  // Handle connection state changes
+  const handleConnectionError = (err) => {
+    console.error('Connection error:', err)
+    isConnected.value = false
+    error.value = 'Connection lost. Changes will sync when reconnected.'
+  }
+
   // Get rectangle count
   const getRectangleCount = () => {
     return rectangles.size
@@ -145,6 +232,8 @@ export const useRectangles = () => {
     rectangles,
     isLoading,
     error,
+    isConnected,
+    isSyncing,
 
     // Methods
     createRectangle,
@@ -154,6 +243,11 @@ export const useRectangles = () => {
     removeRectangle,
     clearRectangles,
     getRectangleCount,
-    loadRectanglesFromFirestore
+    loadRectanglesFromFirestore,
+    
+    // Real-time sync
+    startRealtimeSync,
+    stopRealtimeSync,
+    handleConnectionError
   }
 }

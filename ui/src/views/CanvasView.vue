@@ -14,6 +14,14 @@
       <button @click="error = null" class="dismiss-error">Dismiss</button>
     </div>
 
+    <!-- Sync Status -->
+    <SyncStatus
+      :is-connected="isConnected"
+      :is-syncing="isSyncing"
+      :has-error="!!error"
+      :user-count="1"
+    />
+
     <!-- Zoom Controls -->
     <ZoomControls 
       :zoom="zoomLevel"
@@ -51,6 +59,7 @@ import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import VueKonva from 'vue-konva'
 import ZoomControls from '../components/ZoomControls.vue'
 import Rectangle from '../components/Rectangle.vue'
+import SyncStatus from '../components/SyncStatus.vue'
 import { useRectangles } from '../composables/useRectangles'
 import { useAuth } from '../composables/useAuth'
 
@@ -58,11 +67,24 @@ export default {
   name: 'CanvasView',
   components: {
     ZoomControls,
-    Rectangle
+    Rectangle,
+    SyncStatus
   },
   setup() {
     // Composables
-    const { rectangles, createRectangle, updateRectangle, getAllRectangles, loadRectanglesFromFirestore, isLoading, error } = useRectangles()
+    const { 
+      rectangles, 
+      createRectangle, 
+      updateRectangle, 
+      getAllRectangles, 
+      loadRectanglesFromFirestore, 
+      startRealtimeSync, 
+      stopRealtimeSync,
+      isLoading, 
+      error,
+      isConnected,
+      isSyncing 
+    } = useRectangles()
     const { user } = useAuth()
 
     // Refs
@@ -269,14 +291,22 @@ export default {
       // Load existing rectangles from Firestore
       try {
         await loadRectanglesFromFirestore('default')
+        
+        // Start real-time synchronization after initial load
+        startRealtimeSync('default')
       } catch (err) {
         console.error('Failed to load rectangles on mount:', err)
         // Continue without rectangles - user can still create new ones
+        // Still start real-time sync for new rectangles
+        startRealtimeSync('default')
       }
     })
 
     onUnmounted(() => {
       window.removeEventListener('resize', handleResize)
+      
+      // Clean up real-time listener
+      stopRealtimeSync()
     })
 
     return {
@@ -291,6 +321,8 @@ export default {
       rectanglesList,
       isLoading,
       error,
+      isConnected,
+      isSyncing,
       
       // Event handlers
       handleWheel,
