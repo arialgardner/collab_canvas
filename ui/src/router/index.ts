@@ -46,7 +46,7 @@ const getCurrentUser = () => {
 }
 
 // Navigation guards
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   try {
     const user = await getCurrentUser()
     
