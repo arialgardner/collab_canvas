@@ -97,12 +97,14 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { useRouter } from 'vue-router'
 import { usePresence } from '../composables/usePresence'
+import { useCursors } from '../composables/useCursors'
 
 export default {
   name: 'NavBar',
   setup() {
     const { user, signOut, isLoading } = useAuth()
-    const { activeUsers, getActiveUsers, getActiveUserCount } = usePresence()
+    const { activeUsers, getActiveUsers, getActiveUserCount, setUserOffline } = usePresence()
+    const { removeCursor } = useCursors()
     const router = useRouter()
     
     // Local state
@@ -141,6 +143,17 @@ export default {
     // Handle logout
     const handleLogout = async () => {
       try {
+        const userId = user.value?.uid
+        
+        if (userId) {
+          // Clean up presence and cursor before signing out
+          await Promise.all([
+            setUserOffline('default', userId),
+            removeCursor('default', userId)
+          ])
+        }
+        
+        // Sign out user
         await signOut()
         router.push('/')
       } catch (error) {

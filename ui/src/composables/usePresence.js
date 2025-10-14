@@ -10,13 +10,13 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
+// Shared state across all components
+const activeUsers = reactive(new Map())
+const isOnline = ref(false)
+let presenceUnsubscribe = null
+let heartbeatInterval = null
+
 export const usePresence = () => {
-  // Store active users (excluding current user)
-  const activeUsers = reactive(new Map())
-  const isOnline = ref(false)
-  
-  let presenceUnsubscribe = null
-  let heartbeatInterval = null
 
   // Get presence collection reference
   const getPresenceCollectionRef = (canvasId = 'default') => {
