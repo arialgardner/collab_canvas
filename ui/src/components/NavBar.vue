@@ -12,7 +12,7 @@
         <div v-if="user" class="presence-section">
           <!-- User Count -->
           <div class="user-count" @click="togglePresenceDropdown">
-            <span class="count-badge">{{ onlineUsers.length }}</span>
+            <span class="count-badge">{{ activeUserCount + 1 }}</span>
             <span class="count-text">users online</span>
             <svg 
               :class="{ 'rotated': showPresenceDropdown }" 
@@ -26,22 +26,32 @@
           <!-- Presence Dropdown -->
           <div v-if="showPresenceDropdown" class="presence-dropdown">
             <div class="dropdown-header">Online Users</div>
-            <div v-if="onlineUsers.length === 0" class="empty-state">
-              No other users online
+            
+            <!-- Current User -->
+            <div class="user-item current-user">
+              <div 
+                class="cursor-color" 
+                :style="{ backgroundColor: userCursorColor }"
+              ></div>
+              <span class="user-name">{{ userDisplayName }}</span>
+              <span class="you-label">(you)</span>
+            </div>
+            
+            <!-- Other Users -->
+            <div v-if="activeUsers.length === 0 && activeUserCount === 0" class="empty-state">
+              You're the only one here
             </div>
             <div v-else class="user-list">
               <div 
-                v-for="onlineUser in onlineUsers" 
-                :key="onlineUser.userId"
-                :class="{ 'current-user': onlineUser.userId === user.uid }"
+                v-for="activeUser in activeUsers" 
+                :key="activeUser.userId"
                 class="user-item"
               >
                 <div 
                   class="cursor-color" 
-                  :style="{ backgroundColor: onlineUser.cursorColor }"
+                  :style="{ backgroundColor: activeUser.cursorColor }"
                 ></div>
-                <span class="user-name">{{ onlineUser.userName }}</span>
-                <span v-if="onlineUser.userId === user.uid" class="you-label">(you)</span>
+                <span class="user-name">{{ activeUser.userName }}</span>
               </div>
             </div>
           </div>
@@ -86,19 +96,18 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { useRouter } from 'vue-router'
-import { doc, getDoc } from 'firebase/firestore'
-import { db } from '../firebase/config'
+import { usePresence } from '../composables/usePresence'
 
 export default {
   name: 'NavBar',
   setup() {
     const { user, signOut, isLoading } = useAuth()
+    const { activeUsers, getActiveUsers, getActiveUserCount } = usePresence()
     const router = useRouter()
     
     // Local state
     const showPresenceDropdown = ref(false)
     const userCursorColor = ref('#667eea')
-    const onlineUsers = ref([])
 
     // Computed properties
     const userDisplayName = computed(() => {
@@ -106,40 +115,22 @@ export default {
       return user.value.displayName || user.value.email?.split('@')[0] || 'Anonymous'
     })
 
+    const activeUserCount = computed(() => getActiveUserCount())
+    const activeUsersList = computed(() => getActiveUsers())
+
     // Load user's cursor color from Firestore (disabled until PR #5)
     const loadUserCursorColor = async () => {
       if (!user.value) return
       
-      // TODO: Enable in PR #5 - Firestore Integration
-      // For now, use default color
+      // TODO: Load from user profile in Firestore
+      // For now, use default color  
       userCursorColor.value = '#667eea'
-      
-      /* 
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.value.uid))
-        if (userDoc.exists()) {
-          const userData = userDoc.data()
-          userCursorColor.value = userData.cursorColor || '#667eea'
-        }
-      } catch (error) {
-        console.error('Error loading user cursor color:', error)
-      }
-      */
     }
 
-    // Mock presence data for now (will be implemented in PR #8)
+    // Mock presence data for now (replaced with real presence in PR #8)
     const loadPresenceData = () => {
-      // This is a placeholder - real presence tracking will be implemented in PR #8
-      if (user.value) {
-        onlineUsers.value = [
-          {
-            userId: user.value.uid,
-            userName: userDisplayName.value,
-            cursorColor: userCursorColor.value
-          }
-          // Additional online users will be loaded from Firestore in PR #8
-        ]
-      }
+      // Presence is now handled by usePresence composable
+      // and integrated with CanvasView lifecycle
     }
 
     // Toggle presence dropdown
@@ -190,7 +181,8 @@ export default {
       isLoading,
       userDisplayName,
       userCursorColor,
-      onlineUsers,
+      activeUsers: activeUsersList,
+      activeUserCount,
       showPresenceDropdown,
       togglePresenceDropdown,
       handleLogout

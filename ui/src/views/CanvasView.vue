@@ -19,7 +19,7 @@
       :is-connected="isConnected"
       :is-syncing="isSyncing"
       :has-error="!!error"
-      :user-count="1"
+      :user-count="activeUserCount + 1"
     />
 
     <!-- Zoom Controls -->
@@ -73,6 +73,7 @@ import UserCursor from '../components/UserCursor.vue'
 import { useRectangles } from '../composables/useRectangles'
 import { useAuth } from '../composables/useAuth'
 import { useCursors } from '../composables/useCursors'
+import { usePresence } from '../composables/usePresence'
 
 export default {
   name: 'CanvasView',
@@ -106,6 +107,14 @@ export default {
       screenToCanvas,
       getAllCursors
     } = useCursors()
+    const {
+      setUserOnline,
+      setUserOffline,
+      subscribeToPresence,
+      getActiveUserCount,
+      cleanup: cleanupPresence,
+      handleBeforeUnload
+    } = usePresence()
 
     // Refs
     const stage = ref(null)
@@ -138,6 +147,7 @@ export default {
 
     // Cursor state
     const remoteCursors = computed(() => getAllCursors())
+    const activeUserCount = computed(() => getActiveUserCount())
     const isMouseOverCanvas = ref(false)
 
     // Stage configuration
@@ -357,6 +367,14 @@ export default {
       // Start cursor tracking if user is authenticated
       if (user.value) {
         subscribeToCursors('default', user.value.uid)
+        
+        // Set user online for presence
+        const userName = user.value.displayName || user.value.email?.split('@')[0] || 'Anonymous'
+        const cursorColor = '#667eea' // Will get from user profile later
+        await setUserOnline('default', user.value.uid, userName, cursorColor)
+        
+        // Subscribe to presence updates
+        subscribeToPresence('default', user.value.uid)
       }
 
       // Add cursor tracking to mousemove
@@ -365,6 +383,15 @@ export default {
         canvasWrapper.value.addEventListener('mouseenter', handleMouseEnter)
         canvasWrapper.value.addEventListener('mouseleave', handleMouseLeave)
       }
+
+      // Add beforeunload handler for presence cleanup
+      const handleUnload = () => {
+        const userId = user.value?.uid
+        if (userId) {
+          handleBeforeUnload('default', userId)
+        }
+      }
+      window.addEventListener('beforeunload', handleUnload)
     })
 
     onUnmounted(() => {
@@ -377,12 +404,24 @@ export default {
       const userId = user.value?.uid
       cleanupCursors('default', userId)
       
+      // Clean up presence tracking
+      cleanupPresence('default', userId)
+      
       // Remove cursor event listeners
       if (canvasWrapper.value) {
         canvasWrapper.value.removeEventListener('mousemove', handleCursorMove)
         canvasWrapper.value.removeEventListener('mouseenter', handleMouseEnter)
         canvasWrapper.value.removeEventListener('mouseleave', handleMouseLeave)
       }
+
+      // Remove beforeunload handler
+      const handleUnload = () => {
+        const userId = user.value?.uid
+        if (userId) {
+          handleBeforeUnload('default', userId)
+        }
+      }
+      window.removeEventListener('beforeunload', handleUnload)
     })
 
     return {
@@ -396,6 +435,7 @@ export default {
       zoomLevel,
       rectanglesList,
       remoteCursors,
+      activeUserCount,
       isLoading,
       error,
       isConnected,
