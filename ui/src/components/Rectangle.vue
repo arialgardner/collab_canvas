@@ -1,12 +1,14 @@
 <template>
-  <v-rect
-    :config="rectConfig"
-    @mouseenter="handleMouseEnter"
-    @mouseleave="handleMouseLeave"
-    @dragstart="handleDragStart"
-    @dragmove="handleDragMove"
-    @dragend="handleDragEnd"
-  />
+      <v-rect
+        :config="rectConfig"
+        @mouseenter="handleMouseEnter"
+        @mouseleave="handleMouseLeave"
+        @dragstart="handleDragStart"
+        @dragmove="handleDragMove"
+        @dragend="handleDragEnd"
+        :data-testid="`rectangle`"
+        :data-rectangle-id="rectangle.id"
+      />
 </template>
 
 <script>

@@ -2,6 +2,8 @@
   <div 
     class="user-cursor" 
     :style="cursorStyle"
+    :data-testid="`user-cursor`"
+    :data-user-id="cursor.userId"
   >
     <!-- Cursor Icon (SVG Arrow) -->
     <svg 

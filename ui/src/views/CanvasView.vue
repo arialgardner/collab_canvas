@@ -32,6 +32,9 @@
     <!-- Performance Monitor (shown with ?debug=performance) -->
     <PerformanceMonitor />
 
+    <!-- Testing Dashboard (shown with ?testing=true) -->
+    <TestingDashboard />
+
     <!-- Konva Canvas -->
     <div ref="canvasWrapper" class="canvas-wrapper">
       <v-stage
@@ -84,11 +87,13 @@ import UserCursor from '../components/UserCursor.vue'
 import PerformanceMonitor from '../components/PerformanceMonitor.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
+import TestingDashboard from '../components/TestingDashboard.vue'
 import { useRectangles } from '../composables/useRectangles'
 import { useAuth } from '../composables/useAuth'
 import { useCursors } from '../composables/useCursors'
 import { usePresence } from '../composables/usePresence'
 import { usePerformance } from '../composables/usePerformance'
+import { useBugFixes } from '../utils/bugFixUtils'
 
 export default {
   name: 'CanvasView',
@@ -99,7 +104,8 @@ export default {
     UserCursor,
     PerformanceMonitor,
     LoadingSpinner,
-    EmptyState
+    EmptyState,
+    TestingDashboard
   },
   setup() {
     // Composables
