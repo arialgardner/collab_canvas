@@ -39,6 +39,7 @@
         @mousedown="handleMouseDown"
         @mousemove="handleMouseMove"
         @mouseup="handleMouseUp"
+        @mouseleave="handleMouseLeave"
       >
         <v-layer ref="shapeLayer">
           <!-- Rectangles -->
@@ -50,6 +51,14 @@
           />
         </v-layer>
       </v-stage>
+
+      <!-- Remote User Cursors -->
+      <UserCursor
+        v-for="cursor in remoteCursors"
+        :key="cursor.userId"
+        :cursor="cursor"
+        :stage-attrs="stageConfig"
+      />
     </div>
   </div>
 </template>
@@ -60,15 +69,18 @@ import VueKonva from 'vue-konva'
 import ZoomControls from '../components/ZoomControls.vue'
 import Rectangle from '../components/Rectangle.vue'
 import SyncStatus from '../components/SyncStatus.vue'
+import UserCursor from '../components/UserCursor.vue'
 import { useRectangles } from '../composables/useRectangles'
 import { useAuth } from '../composables/useAuth'
+import { useCursors } from '../composables/useCursors'
 
 export default {
   name: 'CanvasView',
   components: {
     ZoomControls,
     Rectangle,
-    SyncStatus
+    SyncStatus,
+    UserCursor
   },
   setup() {
     // Composables
@@ -86,6 +98,14 @@ export default {
       isSyncing 
     } = useRectangles()
     const { user } = useAuth()
+    const {
+      cursors,
+      updateCursorPosition,
+      subscribeToCursors,
+      cleanup: cleanupCursors,
+      screenToCanvas,
+      getAllCursors
+    } = useCursors()
 
     // Refs
     const stage = ref(null)
@@ -115,6 +135,10 @@ export default {
 
     // Rectangle state
     const rectanglesList = computed(() => getAllRectangles())
+
+    // Cursor state
+    const remoteCursors = computed(() => getAllCursors())
+    const isMouseOverCanvas = ref(false)
 
     // Stage configuration
     const stageConfig = computed(() => ({
@@ -252,6 +276,35 @@ export default {
       lastPointerPosition.y = pointer.y
     }
 
+    // Handle cursor tracking when mouse moves over canvas
+    const handleCursorMove = (e) => {
+      if (!isMouseOverCanvas.value || !user.value) return
+
+      const pointer = stage.value.getNode().getPointerPosition()
+      if (!pointer) return
+
+      // Convert screen coordinates to canvas coordinates
+      const canvasCoords = screenToCanvas(pointer.x, pointer.y, stageConfig.value)
+      
+      // Get user info
+      const userId = user.value.uid
+      const userName = user.value.displayName || user.value.email?.split('@')[0] || 'Anonymous'
+      const cursorColor = '#667eea' // Will get from user profile later
+      
+      // Update cursor position in Firestore (throttled)
+      updateCursorPosition('default', userId, canvasCoords.x, canvasCoords.y, userName, cursorColor)
+    }
+
+    // Handle mouse entering canvas
+    const handleMouseEnter = () => {
+      isMouseOverCanvas.value = true
+    }
+
+    // Handle mouse leaving canvas
+    const handleMouseLeave = () => {
+      isMouseOverCanvas.value = false
+    }
+
     // Handle rectangle updates
     const handleRectangleUpdate = async (rectangleId, updates, isDragEnd = false) => {
       const userId = user.value?.uid || 'anonymous'
@@ -300,13 +353,36 @@ export default {
         // Still start real-time sync for new rectangles
         startRealtimeSync('default')
       }
+
+      // Start cursor tracking if user is authenticated
+      if (user.value) {
+        subscribeToCursors('default', user.value.uid)
+      }
+
+      // Add cursor tracking to mousemove
+      if (canvasWrapper.value) {
+        canvasWrapper.value.addEventListener('mousemove', handleCursorMove, { passive: true })
+        canvasWrapper.value.addEventListener('mouseenter', handleMouseEnter)
+        canvasWrapper.value.addEventListener('mouseleave', handleMouseLeave)
+      }
     })
 
     onUnmounted(() => {
       window.removeEventListener('resize', handleResize)
       
-      // Clean up real-time listener
+      // Clean up real-time listeners
       stopRealtimeSync()
+      
+      // Clean up cursor tracking
+      const userId = user.value?.uid
+      cleanupCursors('default', userId)
+      
+      // Remove cursor event listeners
+      if (canvasWrapper.value) {
+        canvasWrapper.value.removeEventListener('mousemove', handleCursorMove)
+        canvasWrapper.value.removeEventListener('mouseenter', handleMouseEnter)
+        canvasWrapper.value.removeEventListener('mouseleave', handleMouseLeave)
+      }
     })
 
     return {
@@ -319,6 +395,7 @@ export default {
       stageConfig,
       zoomLevel,
       rectanglesList,
+      remoteCursors,
       isLoading,
       error,
       isConnected,
@@ -329,6 +406,7 @@ export default {
       handleMouseDown,
       handleMouseMove,
       handleMouseUp,
+      handleMouseLeave,
       handleZoomIn,
       handleZoomOut,
       handleZoomReset,
