@@ -1,6 +1,7 @@
 <template>
   <v-circle
     :config="circleConfig"
+    @click="handleClick"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
     @dragstart="handleDragStart"
@@ -66,6 +67,10 @@ export default {
       }
     }
 
+    const handleClick = (e) => {
+      emit('select', props.circle.id, e.evt)
+    }
+
     const handleDragStart = (e) => {
       emit('select', props.circle.id, e.evt)
     }
@@ -101,6 +106,7 @@ export default {
       circleConfig,
       handleMouseEnter,
       handleMouseLeave,
+      handleClick,
       handleDragStart,
       handleDragMove,
       handleDragEnd

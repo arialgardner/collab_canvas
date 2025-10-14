@@ -167,6 +167,16 @@
         @close="handleCloseContextMenu"
       />
     </div>
+    
+    <!-- Confirmation Modal (outside canvas-wrapper for proper z-index) -->
+    <ConfirmModal
+      :is-visible="confirmModalVisible"
+      title="Delete Shapes"
+      :message="confirmModalMessage"
+      confirm-text="Delete"
+      @confirm="handleConfirmDelete"
+      @cancel="handleCancelDelete"
+    />
   </div>
 </template>
 
@@ -182,6 +192,7 @@ import TextShape from '../components/TextShape.vue'
 import TextEditor from '../components/TextEditor.vue'
 import TextFormatToolbar from '../components/TextFormatToolbar.vue'
 import ContextMenu from '../components/ContextMenu.vue'
+import ConfirmModal from '../components/ConfirmModal.vue'
 import SyncStatus from '../components/SyncStatus.vue'
 import UserCursor from '../components/UserCursor.vue'
 import PerformanceMonitor from '../components/PerformanceMonitor.vue'
@@ -189,10 +200,12 @@ import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TestingDashboard from '../components/TestingDashboard.vue'
 import { useShapes } from '../composables/useShapes'
+import { getMaxZIndex } from '../types/shapes'
 import { useAuth } from '../composables/useAuth'
 import { useCursors } from '../composables/useCursors'
 import { usePresence } from '../composables/usePresence'
 import { usePerformance } from '../composables/usePerformance'
+import { useUndoRedo } from '../composables/useUndoRedo'
 import { useBugFixes } from '../utils/bugFixUtils'
 
 export default {
@@ -207,6 +220,7 @@ export default {
     TextEditor,
     TextFormatToolbar,
     ContextMenu,
+    ConfirmModal,
     SyncStatus,
     UserCursor,
     PerformanceMonitor,
@@ -242,7 +256,11 @@ export default {
       bringToFront,
       sendToBack,
       bringForward,
-      sendBackward
+      sendBackward,
+      // Delete operations
+      deleteShapes,
+      // Duplicate operations
+      duplicateShapes
     } = useShapes()
     const { user } = useAuth()
     const {
@@ -264,6 +282,7 @@ export default {
     } = usePresence()
     
     const { measureRender, throttle, logPerformanceSummary } = usePerformance()
+    const { canUndo, canRedo, addAction, undo, redo, setUndoRedoFlag } = useUndoRedo()
 
     // Refs
     const stage = ref(null)
@@ -313,7 +332,15 @@ export default {
     // Context menu state
     const contextMenuVisible = ref(false)
     const contextMenuPosition = reactive({ x: 0, y: 0 })
-    const hasClipboard = ref(false) // Will implement copy/paste in PR #7
+    
+    // Confirmation modal state
+    const confirmModalVisible = ref(false)
+    const confirmModalMessage = ref('')
+    const pendingDeleteIds = ref([])
+    
+    // Clipboard state (local, not synchronized)
+    const clipboard = ref([])
+    const hasClipboard = computed(() => clipboard.value.length > 0)
 
     // Text editing state
     const editingTextId = ref(null)
@@ -622,21 +649,104 @@ export default {
       updateTransformer()
     }
 
-    // Placeholder handlers for PR #7
-    const handleContextDuplicate = () => {
-      console.log('Duplicate (will implement in PR #7)')
+    // Duplicate handler
+    const handleContextDuplicate = async () => {
+      if (selectedShapeIds.value.length > 0 && user.value) {
+        const duplicatedIds = await duplicateShapes(selectedShapeIds.value, user.value.uid, 'default')
+        // Select duplicated shapes
+        selectedShapeIds.value = duplicatedIds
+        updateTransformer()
+      }
     }
 
     const handleContextCopy = () => {
-      console.log('Copy (will implement in PR #7)')
+      if (selectedShapeIds.value.length > 0) {
+        // Copy selected shapes to clipboard
+        clipboard.value = selectedShapeIds.value.map(id => {
+          const shape = shapes.get(id)
+          return shape ? { ...shape } : null
+        }).filter(s => s !== null)
+        
+        console.log(`Copied ${clipboard.value.length} shape(s) to clipboard`)
+      }
     }
 
-    const handleContextPaste = () => {
-      console.log('Paste (will implement in PR #7)')
+    const handleContextPaste = async () => {
+      if (clipboard.value.length === 0 || !user.value) return
+      
+      const userId = user.value.uid
+      const maxZ = getMaxZIndex(Array.from(shapes.values()))
+      const pastedIds = []
+      
+      for (let i = 0; i < clipboard.value.length; i++) {
+        const copiedShape = clipboard.value[i]
+        
+        // Remove id from copied shape so createShape generates a new one
+        const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeData } = copiedShape
+        
+        const newShape = await createShape(
+          copiedShape.type,
+          {
+            ...shapeData,
+            x: copiedShape.x + 20,
+            y: copiedShape.y + 20,
+            zIndex: maxZ + i + 1
+          },
+          userId,
+          'default'
+        )
+        
+        if (newShape) {
+          pastedIds.push(newShape.id)
+        }
+      }
+      
+      // Select pasted shapes
+      selectedShapeIds.value = pastedIds
+      updateTransformer()
+      
+      console.log(`Pasted ${pastedIds.length} shape(s)`)
     }
 
     const handleContextDelete = () => {
-      console.log('Delete (will implement in PR #7)')
+      if (selectedShapeIds.value.length === 0) return
+      
+      // Show confirmation modal if >5 shapes are selected
+      if (selectedShapeIds.value.length > 5) {
+        pendingDeleteIds.value = [...selectedShapeIds.value]
+        confirmModalMessage.value = `Are you sure you want to delete ${selectedShapeIds.value.length} shapes? This action can be undone with Cmd+Z.`
+        confirmModalVisible.value = true
+      } else {
+        // Delete immediately if <=5 shapes
+        performDelete(selectedShapeIds.value)
+      }
+    }
+    
+    const performDelete = async (shapeIds) => {
+      // Track deletion for undo
+      shapeIds.forEach(id => {
+        const shape = shapes.get(id)
+        if (shape) {
+          addAction({
+            type: 'delete',
+            data: { ...shape }
+          })
+        }
+      })
+      
+      await deleteShapes(shapeIds, 'default')
+      clearSelection()
+    }
+    
+    const handleConfirmDelete = async () => {
+      await performDelete(pendingDeleteIds.value)
+      confirmModalVisible.value = false
+      pendingDeleteIds.value = []
+    }
+    
+    const handleCancelDelete = () => {
+      confirmModalVisible.value = false
+      pendingDeleteIds.value = []
     }
 
     const updateTransformer = () => {
@@ -1107,6 +1217,54 @@ export default {
       stageSize.height = window.innerHeight - 70 // Account for navbar
     }
 
+    // Undo/Redo handlers
+    const handleUndo = async () => {
+      const action = undo()
+      if (!action || !user.value) return
+      
+      setUndoRedoFlag(true) // Prevent tracking undo as a new action
+      
+      try {
+        if (action.type === 'create') {
+          // Undo create = delete
+          await deleteShapes([action.data.id], 'default')
+        } else if (action.type === 'delete') {
+          // Undo delete = recreate with original properties
+          const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
+          const recreatedShape = await createShape(action.data.type, shapeProps, user.value.uid, 'default')
+          // Note: recreated shape will have a new ID, not the original ID
+        } else if (action.type === 'update') {
+          // Undo update = restore old values
+          await updateShape(action.data.id, action.data.oldValues, user.value.uid, 'default', true)
+        }
+      } finally {
+        setUndoRedoFlag(false)
+      }
+    }
+
+    const handleRedo = async () => {
+      const action = redo()
+      if (!action || !user.value) return
+      
+      setUndoRedoFlag(true) // Prevent tracking redo as a new action
+      
+      try {
+        if (action.type === 'create') {
+          // Redo create with original properties
+          const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
+          await createShape(action.data.type, shapeProps, user.value.uid, 'default')
+        } else if (action.type === 'delete') {
+          // Redo delete
+          await deleteShapes([action.data.id], 'default')
+        } else if (action.type === 'update') {
+          // Redo update = reapply new values
+          await updateShape(action.data.id, action.data.newValues, user.value.uid, 'default', true)
+        }
+      } finally {
+        setUndoRedoFlag(false)
+      }
+    }
+
     // Keyboard handler for global shortcuts
     const handleKeyDown = async (e) => {
       // Detect platform (Mac uses Cmd, others use Ctrl)
@@ -1160,6 +1318,65 @@ export default {
         e.preventDefault()
         selectedShapeIds.value = getAllShapes().map(s => s.id)
         updateTransformer()
+        return
+      }
+      
+      // Cmd+Z or Ctrl+Z: Undo
+      if (modKey && e.key === 'z' && !e.shiftKey && canUndo.value) {
+        e.preventDefault()
+        await handleUndo()
+        return
+      }
+      
+      // Cmd+Y or Ctrl+Y or Cmd+Shift+Z: Redo
+      if ((modKey && e.key === 'y') || (modKey && e.shiftKey && e.key === 'z')) {
+        if (canRedo.value) {
+          e.preventDefault()
+          await handleRedo()
+          return
+        }
+      }
+      
+      // Cmd+C or Ctrl+C: Copy selected shapes
+      if (modKey && e.key === 'c' && selectedShapeIds.value.length > 0) {
+        e.preventDefault()
+        handleContextCopy()
+        return
+      }
+      
+      // Cmd+V or Ctrl+V: Paste from clipboard
+      if (modKey && e.key === 'v' && clipboard.value.length > 0) {
+        e.preventDefault()
+        await handleContextPaste()
+        return
+      }
+      
+      // Cmd+D or Ctrl+D: Duplicate selected shapes
+      if (modKey && e.key === 'd' && selectedShapeIds.value.length > 0) {
+        e.preventDefault()
+        
+        const userId = user.value?.uid || 'anonymous'
+        const duplicatedIds = await duplicateShapes(selectedShapeIds.value, userId, 'default')
+        
+        // Select duplicated shapes (deselect originals)
+        selectedShapeIds.value = duplicatedIds
+        updateTransformer()
+        return
+      }
+      
+      // Delete or Backspace: Delete selected shapes
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeIds.value.length > 0) {
+        e.preventDefault()
+        
+        // Show confirmation modal if >5 shapes are selected
+        if (selectedShapeIds.value.length > 5) {
+          pendingDeleteIds.value = [...selectedShapeIds.value]
+          confirmModalMessage.value = `Are you sure you want to delete ${selectedShapeIds.value.length} shapes? This action can be undone with Cmd+Z.`
+          confirmModalVisible.value = true
+        } else {
+          // Delete immediately if <=5 shapes
+          await performDelete(selectedShapeIds.value)
+        }
       }
     }
 
@@ -1289,6 +1506,9 @@ export default {
       contextMenuVisible,
       contextMenuPosition,
       hasClipboard,
+      // Confirmation modal state
+      confirmModalVisible,
+      confirmModalMessage,
       // Text editing state
       editingTextId,
       showTextEditor,
@@ -1325,6 +1545,9 @@ export default {
       handleContextPaste,
       handleContextDelete,
       handleContextSelectAll,
+      // Confirmation modal handlers
+      handleConfirmDelete,
+      handleCancelDelete,
       // Text handlers
       handleTextEdit,
       handleTextSave,

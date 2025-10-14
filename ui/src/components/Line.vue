@@ -1,6 +1,7 @@
 <template>
   <v-line
     :config="lineConfig"
+    @click="handleClick"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
     @dragstart="handleDragStart"
@@ -62,6 +63,10 @@ export default {
       }
     }
 
+    const handleClick = (e) => {
+      emit('select', props.line.id, e.evt)
+    }
+
     const handleDragStart = (e) => {
       emit('select', props.line.id, e.evt)
     }
@@ -97,6 +102,7 @@ export default {
       lineConfig,
       handleMouseEnter,
       handleMouseLeave,
+      handleClick,
       handleDragStart,
       handleDragMove,
       handleDragEnd

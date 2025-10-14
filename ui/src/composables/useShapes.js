@@ -14,7 +14,7 @@ import { usePerformance } from './usePerformance'
 
 export const useShapes = () => {
   // Firestore integration
-  const { saveShape, updateShape: updateShapeInFirestore, loadShapes, subscribeToShapes } = useFirestore()
+  const { saveShape, updateShape: updateShapeInFirestore, deleteShape: deleteShapeFromFirestore, loadShapes, subscribeToShapes } = useFirestore()
   const { measureRectangleSync, measureRender, trackListener } = usePerformance()
   
   // Store shapes in a reactive Map for O(1) lookups
@@ -209,6 +209,29 @@ export const useShapes = () => {
 
   const removeShape = (id) => {
     return shapes.delete(id)
+  }
+
+  // Delete shapes from both local state and Firestore
+  const deleteShapes = async (shapeIds, canvasId = 'default') => {
+    if (!Array.isArray(shapeIds)) shapeIds = [shapeIds]
+    
+    const deletePromises = []
+    
+    for (const shapeId of shapeIds) {
+      // Optimistic local removal
+      shapes.delete(shapeId)
+      
+      // Delete from Firestore
+      deletePromises.push(
+        deleteShapeFromFirestore(canvasId, shapeId).catch(err => {
+          console.error(`Failed to delete shape ${shapeId}:`, err)
+          // Don't re-add to local state on error - deletion is optimistic
+        })
+      )
+    }
+    
+    await Promise.all(deletePromises)
+    console.log(`Deleted ${shapeIds.length} shape(s)`)
   }
 
   // Clear all shapes (backward compatible)
@@ -517,6 +540,52 @@ export const useShapes = () => {
     }
   }
 
+  // Duplicate shapes with offset
+  const duplicateShapes = async (shapeIds, userId, canvasId = 'default') => {
+    if (!Array.isArray(shapeIds)) shapeIds = [shapeIds]
+    
+    const maxZ = getMaxZIndex(Array.from(shapes.values()))
+    const duplicatedIds = []
+    
+    for (let i = 0; i < shapeIds.length; i++) {
+      const originalShape = shapes.get(shapeIds[i])
+      if (!originalShape) continue
+      
+      // Create new shape data with offset and new metadata
+      const duplicateData = {
+        ...originalShape,
+        id: undefined, // Will be generated
+        x: originalShape.x + 20,
+        y: originalShape.y + 20,
+        zIndex: maxZ + i + 1,
+        createdBy: userId,
+        createdAt: new Date(),
+        lastModified: new Date(),
+        lastModifiedBy: userId
+      }
+      
+      // Remove id from duplicateData so createShape generates a new one
+      const { id, ...dataWithoutId } = originalShape
+      const newShape = await createShape(
+        originalShape.type,
+        {
+          ...dataWithoutId,
+          x: originalShape.x + 20,
+          y: originalShape.y + 20,
+          zIndex: maxZ + i + 1
+        },
+        userId,
+        canvasId
+      )
+      
+      if (newShape) {
+        duplicatedIds.push(newShape.id)
+      }
+    }
+    
+    return duplicatedIds
+  }
+
   return {
     // State
     shapes, // New primary state
@@ -532,6 +601,7 @@ export const useShapes = () => {
     getShape,
     getAllShapes,
     removeShape,
+    deleteShapes,
     clearShapes,
     getShapeCount,
     loadShapesFromFirestore,
@@ -562,6 +632,9 @@ export const useShapes = () => {
     sendToBack,
     bringForward,
     sendBackward,
-    normalizeZIndices
+    normalizeZIndices,
+
+    // Duplicate operations
+    duplicateShapes
   }
 }

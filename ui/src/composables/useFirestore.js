@@ -3,6 +3,7 @@ import {
   doc, 
   setDoc, 
   updateDoc, 
+  deleteDoc,
   getDocs, 
   onSnapshot,
   serverTimestamp,
@@ -85,6 +86,22 @@ export const useFirestore = () => {
       return true
     } catch (error) {
       console.error('Error updating shape:', error)
+      throw error
+    }
+  }
+
+  // Delete shape from Firestore
+  const deleteShape = async (canvasId, shapeId) => {
+    try {
+      trackFirestoreOperation()
+      
+      const docRef = getShapeDocRef(canvasId, shapeId)
+      await deleteDoc(docRef)
+      
+      console.log(`Shape ${shapeId} deleted from Firestore`)
+      return true
+    } catch (error) {
+      console.error('Error deleting shape:', error)
       throw error
     }
   }
@@ -202,6 +219,7 @@ export const useFirestore = () => {
     // New shape operations
     saveShape,
     updateShape,
+    deleteShape,
     loadShapes,
     subscribeToShapes,
 

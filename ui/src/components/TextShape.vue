@@ -1,6 +1,7 @@
 <template>
   <v-text
     :config="textConfig"
+    @click="handleClick"
     @mouseenter="handleMouseEnter"
     @mouseleave="handleMouseLeave"
     @dragstart="handleDragStart"
@@ -64,6 +65,10 @@ export default {
       }
     }
 
+    const handleClick = (e) => {
+      emit('select', props.text.id, e.evt)
+    }
+
     const handleDragStart = (e) => {
       emit('select', props.text.id, e.evt)
     }
@@ -104,6 +109,7 @@ export default {
       textConfig,
       handleMouseEnter,
       handleMouseLeave,
+      handleClick,
       handleDragStart,
       handleDragMove,
       handleDragEnd,

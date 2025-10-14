@@ -2,6 +2,7 @@
       <v-rect
         ref="rectNode"
         :config="rectConfig"
+        @click="handleClick"
         @mouseenter="handleMouseEnter"
         @mouseleave="handleMouseLeave"
         @dragstart="handleDragStart"
@@ -89,6 +90,11 @@ export default {
       }
     }
 
+    const handleClick = (e) => {
+      // Emit select event on click (pass native event for shift key detection)
+      emit('select', props.rectangle.id, e.evt)
+    }
+    
     const handleDragStart = (e) => {
       isDragging.value = true
       
@@ -144,6 +150,7 @@ export default {
       rectConfig,
       handleMouseEnter,
       handleMouseLeave,
+      handleClick,
       handleDragStart,
       handleDragMove,
       handleDragEnd
