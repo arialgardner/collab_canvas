@@ -1,0 +1,182 @@
+Description: CollabCanvas core project rules and patterns
+Globs: **/*.{ts,js,vue}
+
+# CollabCanvas Project Intelligence
+
+## Core Principles
+1. **Sync First:** Never compromise real-time collaboration - bulletproof synchronization is the top priority
+2. **Performance Matters:** Maintain 60 FPS at all times, no exceptions
+3. **Keep It Simple:** KISS principle - add complexity only when necessary
+4. **Preserve Patterns:** Follow existing architecture patterns, don't introduce new ones without discussion
+5. **TypeScript Throughout:** Use TypeScript for type safety wherever possible
+
+## Architecture Patterns
+
+### Composables-Based State Management
+- Use Vue 3 Composition API with composables for all business logic
+- Pattern: `useShapes`, `useFirestore`, `useAuth`, etc.
+- Composables return reactive state and methods
+- Keep components lean - logic belongs in composables
+
+### Reactive Map Pattern
+```javascript
+// ✅ Correct: Use reactive Map for O(1) lookups
+const shapes = reactive(new Map())
+shapes.set(id, shape)  // O(1)
+const shape = shapes.get(id)  // O(1)
+
+// ❌ Avoid: Arrays for frequently accessed data
+const shapes = ref([])
+const shape = shapes.value.find(s => s.id === id)  // O(n)
+```
+
+### Optimistic Updates Pattern
+All Firestore operations follow this pattern:
+1. Update local state immediately (optimistic)
+2. Broadcast to Firestore with serverTimestamp
+3. Reconcile with server on listener update (last write wins)
+
+```javascript
+// 1. Optimistic
+shapes.set(shapeId, updatedShape)
+
+// 2. Broadcast
+await updateDoc(docRef, {
+  ...updates,
+  lastModified: serverTimestamp()
+})
+
+// 3. Reconcile in listener
+if (serverShape.lastModified > localShape.lastModified) {
+  shapes.set(shapeId, serverShape)
+}
+```
+
+### Component Event Pattern
+Components emit events, parents handle persistence:
+```vue
+<Rectangle 
+  :rectangle="rect" 
+  @update="handleUpdate" 
+/>
+```
+
+## Code Style
+
+### Naming Conventions
+- Composables: `useXxx` (e.g., `useShapes`, `useFirestore`)
+- Components: PascalCase (e.g., `Rectangle.vue`, `CanvasView.vue`)
+- Events: kebab-case or camelCase (e.g., `@update`, `@drag-end`)
+- Firestore refs: `getXxxRef` (e.g., `getCanvasShapesRef`)
+
+### File Organization
+- `/composables` - Business logic, state management
+- `/components` - Reusable UI components
+- `/views` - Page-level components
+- `/types` - TypeScript interfaces
+- `/firebase` - Firebase configuration and helpers
+- `/utils` - Pure utility functions
+
+### Import Order
+1. Vue imports
+2. Third-party libraries
+3. Local composables
+4. Local components
+5. Local utilities/types
+
+## Firestore Patterns
+
+### Collection References
+```javascript
+// Pattern: function that returns collection ref
+const getCanvasShapesRef = (canvasId = 'default') => {
+  return collection(db, 'canvases', canvasId, 'shapes')
+}
+```
+
+### Error Handling
+- Always wrap Firestore operations in try/catch
+- Use retry logic for transient failures (3 attempts)
+- Log errors to console for debugging
+- Show user-friendly error messages
+
+### Timestamps
+- Always use `serverTimestamp()` for `lastModified` and `createdAt`
+- Compare timestamps for conflict resolution
+- Convert Firestore timestamps to milliseconds for local state
+
+## Performance Patterns
+
+### Throttling
+```javascript
+// Throttle rapid updates during continuous operations
+const throttledUpdate = throttle((shapeId, updates) => {
+  updateDoc(docRef, updates)
+}, 16) // 60 FPS
+```
+
+### Konva Optimizations
+```javascript
+// Always use these performance settings
+{
+  perfectDrawEnabled: false,
+  listening: true,
+  shadowForStrokeEnabled: false,
+  hitStrokeWidth: 0
+}
+
+// Use batchDraw instead of draw
+layer.batchDraw()
+```
+
+## Testing Approach
+- No automated tests required during Phase 2 development
+- Manual testing with multiple browsers/users
+- Performance testing with target shape counts
+- Document test scenarios in phase-2-tasks.md
+
+## Breaking Changes
+- Breaking changes acceptable during Phase 2 development
+- No backward compatibility required with MVP at this stage
+- Focus on clean implementation over migration paths
+
+## Coordination with User
+- Ask clarifying questions before implementing ambiguous requirements
+- Present options when multiple approaches are valid
+- Document decisions in Memory Bank (activeContext.md)
+- Update progress.md after completing significant work
+
+## Never Do
+- ❌ Don't introduce new architectural patterns without discussion
+- ❌ Don't compromise real-time sync for features
+- ❌ Don't sacrifice performance for convenience
+- ❌ Don't use Arrays where Maps provide better performance
+- ❌ Don't skip error handling on Firestore operations
+- ❌ Don't forget to clean up listeners in onUnmounted
+- ❌ Don't create automated tests (not required for Phase 2)
+- ❌ Don't optimize for mobile (desktop focus)
+
+## Always Do
+- ✅ Follow existing composables pattern
+- ✅ Use optimistic updates for all user actions
+- ✅ Implement proper cleanup in onUnmounted hooks
+- ✅ Use TypeScript interfaces for data models
+- ✅ Maintain 60 FPS during all interactions
+- ✅ Test with multiple users in separate browsers
+- ✅ Update Memory Bank when discovering new patterns
+- ✅ Preserve MVP functionality while extending
+
+## Memory Bank Usage
+- Read ALL memory bank files at start of every session
+- Update activeContext.md when focus changes
+- Update progress.md after completing PRs
+- Create new files for complex feature documentation
+- Keep documentation synchronized with code
+
+## Phase 2 Specific
+- Currently implementing: PR #1 (Enhanced Shape System Foundation)
+- Migration strategy: Fresh start (clear existing rectangles)
+- Z-index normalization: Periodic renumbering when gap >1000
+- Text editing: Lock-based with lockedBy/lockedAt fields
+- Permissions: Firestore security rules (server-side enforcement)
+- No mobile optimization in Phase 2
