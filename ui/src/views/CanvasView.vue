@@ -1,5 +1,19 @@
 <template>
   <div class="canvas-container">
+    <!-- Loading indicator -->
+    <div v-if="isLoading" class="loading-overlay">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p>Loading canvas...</p>
+      </div>
+    </div>
+
+    <!-- Error message -->
+    <div v-if="error && !isLoading" class="error-message">
+      <p>{{ error }}</p>
+      <button @click="error = null" class="dismiss-error">Dismiss</button>
+    </div>
+
     <!-- Zoom Controls -->
     <ZoomControls 
       :zoom="zoomLevel"
@@ -48,7 +62,7 @@ export default {
   },
   setup() {
     // Composables
-    const { rectangles, createRectangle, updateRectangle, getAllRectangles } = useRectangles()
+    const { rectangles, createRectangle, updateRectangle, getAllRectangles, loadRectanglesFromFirestore, isLoading, error } = useRectangles()
     const { user } = useAuth()
 
     // Refs
@@ -163,7 +177,7 @@ export default {
     }
 
     // Mouse events for canvas interaction
-    const handleMouseDown = (e) => {
+    const handleMouseDown = async (e) => {
       const clickedOnEmpty = e.target === stage.value.getNode()
       
       if (clickedOnEmpty) {
@@ -177,7 +191,7 @@ export default {
         
         // Create rectangle at click position
         const userId = user.value?.uid || 'anonymous'
-        createRectangle(canvasX, canvasY, userId)
+        await createRectangle(canvasX, canvasY, userId)
         
         // Don't start panning when creating rectangle
         return
@@ -217,13 +231,16 @@ export default {
     }
 
     // Handle rectangle updates
-    const handleRectangleUpdate = (rectangleId, updates, isDragEnd = false) => {
+    const handleRectangleUpdate = async (rectangleId, updates, isDragEnd = false) => {
       const userId = user.value?.uid || 'anonymous'
-      updateRectangle(rectangleId, updates, userId)
       
+      // Always update local state immediately for smooth dragging
+      await updateRectangle(rectangleId, updates, userId, 'default', false)
+      
+      // Save to Firestore only on drag end to avoid excessive writes
       if (isDragEnd) {
         console.log(`Rectangle ${rectangleId} moved to:`, updates)
-        // In PR #5, this is where we'll save to Firestore
+        await updateRectangle(rectangleId, updates, userId, 'default', true)
       }
     }
 
@@ -239,7 +256,7 @@ export default {
     }
 
     // Lifecycle
-    onMounted(() => {
+    onMounted(async () => {
       // Set initial canvas position
       centerCanvas()
       
@@ -248,6 +265,14 @@ export default {
       
       // Set initial cursor
       canvasWrapper.value.style.cursor = 'grab'
+      
+      // Load existing rectangles from Firestore
+      try {
+        await loadRectanglesFromFirestore('default')
+      } catch (err) {
+        console.error('Failed to load rectangles on mount:', err)
+        // Continue without rectangles - user can still create new ones
+      }
     })
 
     onUnmounted(() => {
@@ -264,6 +289,8 @@ export default {
       stageConfig,
       zoomLevel,
       rectanglesList,
+      isLoading,
+      error,
       
       // Event handlers
       handleWheel,
@@ -314,5 +341,78 @@ export default {
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(245, 245, 245, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner p {
+  color: #4a5568;
+  font-weight: 500;
+}
+
+/* Error message */
+.error-message {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fed7d7;
+  color: #c53030;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #fca5a5;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dismiss-error {
+  background: none;
+  border: 1px solid #c53030;
+  color: #c53030;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.dismiss-error:hover {
+  background: #c53030;
+  color: white;
 }
 </style>
