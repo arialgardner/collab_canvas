@@ -354,6 +354,9 @@ export const usePerformanceMonitoring = () => {
     metrics,
     performanceStats,
     TARGETS,
+    // expose internal metrics for UI consumers
+    get shapesInMemory() { return metrics.shapes.inMemory },
+    get shapesRendered() { return metrics.shapes.rendered },
     
     // Object Sync Tracking
     startObjectSyncMeasurement,

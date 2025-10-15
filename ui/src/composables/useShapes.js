@@ -34,6 +34,9 @@ export const useShapes = () => {
   const error = ref(null)
   const isConnected = ref(true)
   const isSyncing = ref(false)
+  // Track local editing state and queued remote updates
+  const currentlyEditing = reactive(new Set())
+  const pendingRemoteUpdates = new Map()
   
   // Real-time listener management
   let realtimeUnsubscribe = null
@@ -343,7 +346,12 @@ export const useShapes = () => {
             
             // Conflict resolution: Last write wins with server timestamp
             if (!localShape || shape.lastModified > localShape.lastModified) {
-              shapes.set(shapeId, shape)
+              // If user is editing locally, queue remote update to apply after finish
+              if (currentlyEditing.has(shapeId)) {
+                pendingRemoteUpdates.set(shapeId, shape)
+              } else {
+                shapes.set(shapeId, shape)
+              }
               console.log(`Real-time: Shape ${shapeId} (${shape.type}) updated`)
               // Visual feedback trigger: mark recent editor for UI highlights
               // Store a transient marker on the shape object for components to read

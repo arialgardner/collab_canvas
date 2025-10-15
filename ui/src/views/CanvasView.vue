@@ -203,7 +203,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
 import VueKonva from 'vue-konva'
 import Toolbar from '../components/Toolbar.vue'
 import ZoomControls from '../components/ZoomControls.vue'
@@ -231,6 +231,7 @@ import { useCanvases } from '../composables/useCanvases'
 import { useCursors } from '../composables/useCursors'
 import { usePresence } from '../composables/usePresence'
 import { usePerformance } from '../composables/usePerformance'
+import { usePerformanceMonitoring } from '../composables/usePerformanceMonitoring'
 import { useUndoRedo } from '../composables/useUndoRedo'
 import { useConnectionState } from '../composables/useConnectionState'
 import { useQueueProcessor } from '../composables/useQueueProcessor'
@@ -464,6 +465,14 @@ export default {
     })
     
     const activeUserCount = computed(() => getActiveUserCount())
+
+    // Performance metrics: update counts (rendered == total for now)
+    watch([shapesList], () => {
+      try {
+        const perf = usePerformanceMonitoring()
+        perf.updateShapeMetrics(shapesList.value.length, shapesList.value.length)
+      } catch {}
+    }, { immediate: true })
     const isMouseOverCanvas = ref(false)
 
     // Stage configuration
@@ -1126,6 +1135,7 @@ export default {
       
       // Final update with Firestore save (v3: isFinal=true for high priority)
       await updateShape(shapeId, updates, userId, canvasId.value, true, true)
+      // Note: pending remote updates are handled in useShapes after local edit ends
       
       // Force the layer to redraw to pick up rotation changes
       if (shapeLayer.value) {
