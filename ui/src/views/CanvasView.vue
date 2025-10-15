@@ -177,6 +177,18 @@
       @confirm="handleConfirmDelete"
       @cancel="handleCancelDelete"
     />
+
+    <!-- Properties Panel -->
+    <PropertiesPanel
+      :selected-shapes="selectedShapesData"
+      :canvas-width="canvasWidth"
+      :canvas-height="canvasHeight"
+      :total-shapes="shapesList.length"
+      :active-users="activeUserCount"
+      @update-property="handleUpdateProperty"
+      @update-canvas-size="handleUpdateCanvasSize"
+      @bulk-update="handleBulkUpdate"
+    />
   </div>
 </template>
 
@@ -199,6 +211,7 @@ import PerformanceMonitor from '../components/PerformanceMonitor.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TestingDashboard from '../components/TestingDashboard.vue'
+import PropertiesPanel from '../components/PropertiesPanel.vue'
 import { useShapes } from '../composables/useShapes'
 import { getMaxZIndex } from '../types/shapes'
 import { useAuth } from '../composables/useAuth'
@@ -221,6 +234,7 @@ export default {
     TextFormatToolbar,
     ContextMenu,
     ConfirmModal,
+    PropertiesPanel,
     SyncStatus,
     UserCursor,
     PerformanceMonitor,
@@ -1479,6 +1493,71 @@ export default {
       window.removeEventListener('beforeunload', handleUnload)
     })
 
+    // Computed properties for properties panel
+    const selectedShapesData = computed(() => {
+      return selectedShapeIds.value.map(id => shapes.value.get(id)).filter(Boolean)
+    })
+
+    const canvasWidth = ref(3000)
+    const canvasHeight = ref(3000)
+
+    // Properties panel handlers
+    const handleUpdateProperty = ({ shapeId, property, value }) => {
+      if (!shapeId) return
+      
+      // Validate value based on property
+      let validatedValue = value
+      
+      // Rotation wraparound
+      if (property === 'rotation') {
+        validatedValue = ((value % 360) + 360) % 360
+      }
+      
+      // Minimum constraints
+      if (property === 'width' && validatedValue < 10) validatedValue = 10
+      if (property === 'height' && validatedValue < 10) validatedValue = 10
+      if (property === 'radius' && validatedValue < 5) validatedValue = 5
+      
+      // Canvas bounds
+      if (property === 'x' && validatedValue < 0) validatedValue = 0
+      if (property === 'y' && validatedValue < 0) validatedValue = 0
+      if (property === 'x' && validatedValue > canvasWidth.value) validatedValue = canvasWidth.value
+      if (property === 'y' && validatedValue > canvasHeight.value) validatedValue = canvasHeight.value
+      
+      // Update the shape
+      updateShape(shapeId, { [property]: validatedValue })
+      
+      // Track undo/redo
+      const shape = shapes.value.get(shapeId)
+      if (shape) {
+        addAction({
+          type: 'property_change',
+          shapeId,
+          property,
+          oldValue: shape[property],
+          newValue: validatedValue,
+          timestamp: Date.now()
+        })
+      }
+    }
+
+    const handleUpdateCanvasSize = ({ width, height }) => {
+      if (width !== undefined) {
+        canvasWidth.value = Math.max(100, Math.min(10000, width))
+        stageConfig.width = canvasWidth.value
+      }
+      if (height !== undefined) {
+        canvasHeight.value = Math.max(100, Math.min(10000, height))
+        stageConfig.height = canvasHeight.value
+      }
+    }
+
+    const handleBulkUpdate = ({ shapeIds, property, value }) => {
+      shapeIds.forEach(shapeId => {
+        handleUpdateProperty({ shapeId, property, value })
+      })
+    }
+
     return {
       // Refs
       stage,
@@ -1552,7 +1631,14 @@ export default {
       handleTextEdit,
       handleTextSave,
       handleTextCancel,
-      handleFormatChange
+      handleFormatChange,
+      // Properties panel
+      selectedShapesData,
+      canvasWidth,
+      canvasHeight,
+      handleUpdateProperty,
+      handleUpdateCanvasSize,
+      handleBulkUpdate
     }
   }
 }
@@ -1568,7 +1654,7 @@ export default {
 }
 
 .canvas-wrapper {
-  width: 100%;
+  width: calc(100% - 300px); /* Account for properties panel */
   height: 100%;
   position: relative;
 }
