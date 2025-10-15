@@ -40,6 +40,15 @@
 
     <!-- Konva Canvas -->
     <div ref="canvasWrapper" class="canvas-wrapper" @click="handleCloseContextMenu">
+      <!-- Empty state when no shapes (outside Konva stage) -->
+      <EmptyState 
+        v-if="!isLoading && shapesList.length === 0"
+        type="canvas"
+        title="Welcome to CollabCanvas!"
+        message="Select a tool from the toolbar above and click on the canvas to create shapes"
+        style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; pointer-events: none;"
+      />
+
       <v-stage
         ref="stage"
         :config="stageConfig"
@@ -52,15 +61,6 @@
         @contextmenu="handleContextMenu"
       >
         <v-layer ref="shapeLayer">
-          <!-- Empty state when no shapes -->
-          <EmptyState 
-            v-if="!isLoading && shapesList.length === 0"
-            type="canvas"
-            title="Welcome to CollabCanvas!"
-            message="Select a tool from the toolbar above and click on the canvas to create shapes"
-            style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10;"
-          />
-          
           <!-- Render all shapes based on type -->
           <template v-for="shape in shapesList" :key="shape.id">
             <!-- Rectangles -->
@@ -215,11 +215,13 @@ import PropertiesPanel from '../components/PropertiesPanel.vue'
 import { useShapes } from '../composables/useShapes'
 import { getMaxZIndex } from '../types/shapes'
 import { useAuth } from '../composables/useAuth'
+import { useCanvases } from '../composables/useCanvases'
 import { useCursors } from '../composables/useCursors'
 import { usePresence } from '../composables/usePresence'
 import { usePerformance } from '../composables/usePerformance'
 import { useUndoRedo } from '../composables/useUndoRedo'
 import { useBugFixes } from '../utils/bugFixUtils'
+import { useRoute, useRouter } from 'vue-router'
 
 export default {
   name: 'CanvasView',
@@ -243,7 +245,26 @@ export default {
     TestingDashboard
   },
   setup() {
+    // Router
+    const route = useRoute()
+    const router = useRouter()
+    const canvasId = computed(() => route.params.canvasId || 'default')
+    
     // Composables
+    const { user } = useAuth()
+    const {
+      currentCanvas,
+      getCanvas,
+      subscribeToCanvas,
+      unsubscribeFromCanvas,
+      getUserRole,
+      canEdit: canEditCanvas,
+      canManagePermissions,
+      canDelete: canDeleteCanvas,
+      isLoading: canvasLoading,
+      error: canvasError
+    } = useCanvases()
+    
     const { 
       shapes,
       rectangles, // Backward compatible alias
@@ -276,7 +297,6 @@ export default {
       // Duplicate operations
       duplicateShapes
     } = useShapes()
-    const { user } = useAuth()
     const {
       cursors,
       updateCursorPosition,
@@ -328,6 +348,18 @@ export default {
     const activeTool = ref('select')
     const isCreatingLine = ref(false)
     const lineStartPoint = ref(null)
+    
+    // Viewer mode - computed based on canvas permissions
+    const isViewerMode = computed(() => {
+      if (!currentCanvas.value || !user.value) return false
+      const role = getUserRole(currentCanvas.value, user.value.uid)
+      return role === 'viewer'
+    })
+    
+    const canUserEdit = computed(() => {
+      if (!currentCanvas.value || !user.value) return false
+      return canEditCanvas(currentCanvas.value, user.value.uid)
+    })
 
     // Selection state
     const selectedShapeIds = ref([])
@@ -510,23 +542,29 @@ export default {
         
         const userId = user.value?.uid || 'anonymous'
         
+        // Prevent shape creation in viewer mode
+        if (isViewerMode.value && activeTool.value !== 'select') {
+          // Force select tool in viewer mode
+          activeTool.value = 'select'
+        }
+        
         // Route to appropriate shape creator based on active tool
-        if (activeTool.value === 'rectangle') {
-          await createShape('rectangle', { x: canvasX, y: canvasY }, userId)
+        if (activeTool.value === 'rectangle' && canUserEdit.value) {
+          await createShape('rectangle', { x: canvasX, y: canvasY }, userId, canvasId.value)
           return
-        } else if (activeTool.value === 'circle') {
-          await createShape('circle', { x: canvasX, y: canvasY }, userId)
+        } else if (activeTool.value === 'circle' && canUserEdit.value) {
+          await createShape('circle', { x: canvasX, y: canvasY }, userId, canvasId.value)
           return
-        } else if (activeTool.value === 'line') {
+        } else if (activeTool.value === 'line' && canUserEdit.value) {
           // Start line creation
           if (!isCreatingLine.value) {
             isCreatingLine.value = true
             lineStartPoint.value = { x: canvasX, y: canvasY }
             return
           }
-        } else if (activeTool.value === 'text') {
+        } else if (activeTool.value === 'text' && canUserEdit.value) {
           // Create text shape and immediately open editor
-          const newText = await createShape('text', { x: canvasX, y: canvasY }, userId)
+          const newText = await createShape('text', { x: canvasX, y: canvasY }, userId, canvasId.value)
           if (newText) {
             handleTextEdit(newText.id)
           }
@@ -618,6 +656,12 @@ export default {
     // Handle rectangle updates
     // Tool selection handler
     const handleToolSelected = (toolName) => {
+      // Prevent tool changes in viewer mode
+      if (isViewerMode.value) {
+        activeTool.value = 'select'
+        return
+      }
+      
       activeTool.value = toolName
       
       // Reset line creation if switching away from line tool
@@ -683,25 +727,25 @@ export default {
 
     const handleContextBringToFront = async () => {
       if (selectedShapeIds.value.length > 0 && user.value) {
-        await bringToFront(selectedShapeIds.value, user.value.uid, 'default')
+        await bringToFront(selectedShapeIds.value, user.value.uid, canvasId.value)
       }
     }
 
     const handleContextBringForward = async () => {
       if (selectedShapeIds.value.length > 0 && user.value) {
-        await bringForward(selectedShapeIds.value, user.value.uid, 'default')
+        await bringForward(selectedShapeIds.value, user.value.uid, canvasId.value)
       }
     }
 
     const handleContextSendBackward = async () => {
       if (selectedShapeIds.value.length > 0 && user.value) {
-        await sendBackward(selectedShapeIds.value, user.value.uid, 'default')
+        await sendBackward(selectedShapeIds.value, user.value.uid, canvasId.value)
       }
     }
 
     const handleContextSendToBack = async () => {
       if (selectedShapeIds.value.length > 0 && user.value) {
-        await sendToBack(selectedShapeIds.value, user.value.uid, 'default')
+        await sendToBack(selectedShapeIds.value, user.value.uid, canvasId.value)
       }
     }
 
@@ -713,7 +757,7 @@ export default {
     // Duplicate handler
     const handleContextDuplicate = async () => {
       if (selectedShapeIds.value.length > 0 && user.value) {
-        const duplicatedIds = await duplicateShapes(selectedShapeIds.value, user.value.uid, 'default')
+        const duplicatedIds = await duplicateShapes(selectedShapeIds.value, user.value.uid, canvasId.value)
         // Select duplicated shapes
         selectedShapeIds.value = duplicatedIds
         updateTransformer()
@@ -754,7 +798,7 @@ export default {
             zIndex: maxZ + i + 1
           },
           userId,
-          'default'
+          canvasId.value
         )
         
         if (newShape) {
@@ -795,7 +839,7 @@ export default {
         }
       })
       
-      await deleteShapes(shapeIds, 'default')
+      await deleteShapes(shapeIds, canvasId.value)
       clearSelection()
     }
     
@@ -934,7 +978,7 @@ export default {
     // Throttled transform update during drag (60 FPS = 16ms)
     const throttledTransformUpdate = throttle(async (shapeId, updates, userId) => {
       // Update local state only during transform (no Firestore save)
-      await updateShape(shapeId, updates, userId, 'default', false)
+      await updateShape(shapeId, updates, userId, canvasId.value, false)
     }, 16)
 
     // Handle transform changes during drag (throttled)
@@ -1055,7 +1099,7 @@ export default {
       }
       
       // Final update with Firestore save
-      await updateShape(shapeId, updates, userId, 'default', true)
+      await updateShape(shapeId, updates, userId, canvasId.value, true)
       
       // Force the layer to redraw to pick up rotation changes
       if (shapeLayer.value) {
@@ -1094,7 +1138,7 @@ export default {
       const userId = user.value?.uid || 'anonymous'
 
       // Update text content
-      await updateShape(editingTextId.value, { text: newText }, userId, 'default', true)
+      await updateShape(editingTextId.value, { text: newText }, userId, canvasId.value, true)
 
       // Release lock and close editor
       await releaseTextLock(editingTextId.value, userId)
@@ -1121,7 +1165,7 @@ export default {
       const userId = user.value?.uid || 'anonymous'
 
       // Update text formatting
-      await updateShape(editingTextId.value, format, userId, 'default', true)
+      await updateShape(editingTextId.value, format, userId, canvasId.value, true)
     }
 
     // Generic shape update handler
@@ -1130,12 +1174,12 @@ export default {
       const userId = user.value?.uid || 'anonymous'
       
       // Always update local state immediately for smooth dragging
-      await updateShape(id, updates, userId, 'default', false)
+      await updateShape(id, updates, userId, canvasId.value, false)
       
       // Save to Firestore only when saveToFirestore flag is true (e.g., on drag end)
       if (saveToFirestore) {
         console.log(`Shape ${id} updated:`, updates)
-        await updateShape(id, updates, userId, 'default', true)
+        await updateShape(id, updates, userId, canvasId.value, true)
       }
     }
 
@@ -1144,12 +1188,12 @@ export default {
       const userId = user.value?.uid || 'anonymous'
       
       // Always update local state immediately for smooth dragging
-      await updateRectangle(rectangleId, updates, userId, 'default', false)
+      await updateRectangle(rectangleId, updates, userId, canvasId.value, false)
       
       // Save to Firestore only on drag end to avoid excessive writes
       if (isDragEnd) {
         console.log(`Rectangle ${rectangleId} moved to:`, updates)
-        await updateRectangle(rectangleId, updates, userId, 'default', true)
+        await updateRectangle(rectangleId, updates, userId, canvasId.value, true)
       }
     }
 
@@ -1178,7 +1222,7 @@ export default {
               canvasX, 
               canvasY
             ] 
-          }, userId)
+          }, userId, canvasId.value)
         }
         
         // Reset line creation state
@@ -1267,7 +1311,7 @@ export default {
         const userId = user.value?.uid || 'anonymous'
         
         // Create text shape
-        const newText = await createShape('text', { x: canvasX, y: canvasY }, userId)
+        const newText = await createShape('text', { x: canvasX, y: canvasY }, userId, canvasId.value)
         
         // Immediately open editor for the new text
         if (newText) {
@@ -1299,15 +1343,15 @@ export default {
       try {
         if (action.type === 'create') {
           // Undo create = delete
-          await deleteShapes([action.data.id], 'default')
+          await deleteShapes([action.data.id], canvasId.value)
         } else if (action.type === 'delete') {
           // Undo delete = recreate with original properties
           const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
-          const recreatedShape = await createShape(action.data.type, shapeProps, user.value.uid, 'default')
+          const recreatedShape = await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value)
           // Note: recreated shape will have a new ID, not the original ID
         } else if (action.type === 'update') {
           // Undo update = restore old values
-          await updateShape(action.data.id, action.data.oldValues, user.value.uid, 'default', true)
+          await updateShape(action.data.id, action.data.oldValues, user.value.uid, canvasId.value, true)
         }
       } finally {
         setUndoRedoFlag(false)
@@ -1324,13 +1368,13 @@ export default {
         if (action.type === 'create') {
           // Redo create with original properties
           const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
-          await createShape(action.data.type, shapeProps, user.value.uid, 'default')
+          await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value)
         } else if (action.type === 'delete') {
           // Redo delete
-          await deleteShapes([action.data.id], 'default')
+          await deleteShapes([action.data.id], canvasId.value)
         } else if (action.type === 'update') {
           // Redo update = reapply new values
-          await updateShape(action.data.id, action.data.newValues, user.value.uid, 'default', true)
+          await updateShape(action.data.id, action.data.newValues, user.value.uid, canvasId.value, true)
         }
       } finally {
         setUndoRedoFlag(false)
@@ -1359,28 +1403,28 @@ export default {
         // Cmd+] or Ctrl+]: Bring to front
         if (modKey && e.key === ']' && !e.shiftKey) {
           e.preventDefault()
-          await bringToFront(selectedShapeIds.value, userId, 'default')
+          await bringToFront(selectedShapeIds.value, userId, canvasId.value)
           return
         }
         
         // Cmd+[ or Ctrl+[: Send to back
         if (modKey && e.key === '[' && !e.shiftKey) {
           e.preventDefault()
-          await sendToBack(selectedShapeIds.value, userId, 'default')
+          await sendToBack(selectedShapeIds.value, userId, canvasId.value)
           return
         }
         
         // Cmd+Shift+] or Ctrl+Shift+]: Bring forward
         if (modKey && e.shiftKey && e.key === ']') {
           e.preventDefault()
-          await bringForward(selectedShapeIds.value, userId, 'default')
+          await bringForward(selectedShapeIds.value, userId, canvasId.value)
           return
         }
         
         // Cmd+Shift+[ or Ctrl+Shift+[: Send backward
         if (modKey && e.shiftKey && e.key === '[') {
           e.preventDefault()
-          await sendBackward(selectedShapeIds.value, userId, 'default')
+          await sendBackward(selectedShapeIds.value, userId, canvasId.value)
           return
         }
       }
@@ -1428,7 +1472,7 @@ export default {
         e.preventDefault()
         
         const userId = user.value?.uid || 'anonymous'
-        const duplicatedIds = await duplicateShapes(selectedShapeIds.value, userId, 'default')
+        const duplicatedIds = await duplicateShapes(selectedShapeIds.value, userId, canvasId.value)
         
         // Select duplicated shapes (deselect originals)
         selectedShapeIds.value = duplicatedIds
@@ -1475,34 +1519,67 @@ export default {
         transformerNode.on('transformend', handleTransformEnd) // On transform end (save)
       }
       
-      // Load existing shapes from Firestore
+      // Load canvas metadata first
       try {
+        console.log(`🎨 Loading canvas: ${canvasId.value}`)
+        await getCanvas(canvasId.value)
+        console.log('✅ Canvas loaded:', currentCanvas.value)
+        
+        // Check if user has access
+        if (!currentCanvas.value) {
+          console.error('❌ Canvas not found')
+          router.push({ name: 'Dashboard' })
+          return
+        }
+        
+        const userRole = getUserRole(currentCanvas.value, user.value.uid)
+        if (!userRole) {
+          console.error('❌ User does not have access to this canvas')
+          router.push({ name: 'Dashboard' })
+          return
+        }
+        
+        console.log(`✅ User role: ${userRole}`)
+        
+        // Subscribe to canvas updates
+        subscribeToCanvas(canvasId.value)
+        
+        // Load existing shapes from Firestore
         console.log('🔄 Loading shapes from Firestore...')
-        await loadShapesFromFirestore('default')
+        await loadShapesFromFirestore(canvasId.value)
         console.log(`✅ Loaded ${shapesList.value.length} shapes successfully`)
         
         // Start real-time synchronization after initial load
         console.log('🔄 Starting real-time sync...')
-        startRealtimeSync('default')
+        startRealtimeSync(canvasId.value)
         console.log('✅ Real-time sync started')
       } catch (err) {
-        console.error('❌ Failed to load shapes on mount:', err)
+        console.error('❌ Failed to load canvas/shapes on mount:', err)
+        // Check if it's a permission error
+        if (err.message && (err.message.includes('not found') || err.message.includes('permission'))) {
+          router.push({ name: 'Dashboard' })
+          return
+        }
         // Continue without shapes - user can still create new ones
         // Still start real-time sync for new shapes
-        startRealtimeSync('default')
+        try {
+          startRealtimeSync(canvasId.value)
+        } catch (syncErr) {
+          console.error('❌ Failed to start sync:', syncErr)
+        }
       }
 
       // Start cursor tracking if user is authenticated
       if (user.value) {
-        subscribeToCursors('default', user.value.uid)
+        subscribeToCursors(canvasId.value, user.value.uid)
         
         // Set user online for presence
         const userName = user.value.displayName || user.value.email?.split('@')[0] || 'Anonymous'
         const cursorColor = '#667eea' // Will get from user profile later
-        await setUserOnline('default', user.value.uid, userName, cursorColor)
+        await setUserOnline(canvasId.value, user.value.uid, userName, cursorColor)
         
         // Subscribe to presence updates
-        subscribeToPresence('default', user.value.uid)
+        subscribeToPresence(canvasId.value, user.value.uid)
       }
 
       // Add cursor tracking to mousemove
@@ -1526,15 +1603,18 @@ export default {
       window.removeEventListener('resize', handleResize)
       window.removeEventListener('keydown', handleKeyDown)
       
+      // Clean up canvas subscription
+      unsubscribeFromCanvas()
+      
       // Clean up real-time listeners
       stopRealtimeSync()
       
       // Clean up cursor tracking
       const userId = user.value?.uid
-      cleanupCursors('default', userId)
+      cleanupCursors(canvasId.value, userId)
       
       // Clean up presence tracking
-      cleanupPresence('default', userId)
+      cleanupPresence(canvasId.value, userId)
       
       // Remove cursor event listeners
       if (canvasWrapper.value) {

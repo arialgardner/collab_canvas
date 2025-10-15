@@ -2,12 +2,13 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { getAuth, onAuthStateChanged } from 'firebase/auth'
 import AuthView from '../views/AuthView.vue'
 
-// Lazy load canvas view (we'll create this in PR #3)
+// Lazy load views
+const DashboardView = () => import('../views/DashboardView.vue')
 const CanvasView = () => import('../views/CanvasView.vue')
 
 const routes = [
   {
-    path: '/',
+    path: '/auth',
     name: 'Auth',
     component: AuthView,
     meta: {
@@ -15,7 +16,15 @@ const routes = [
     }
   },
   {
-    path: '/canvas',
+    path: '/',
+    name: 'Dashboard',
+    component: DashboardView,
+    meta: {
+      requiresAuth: true // Only accessible when logged in
+    }
+  },
+  {
+    path: '/canvas/:canvasId',
     name: 'Canvas', 
     component: CanvasView,
     meta: {
@@ -23,7 +32,7 @@ const routes = [
     }
   },
   {
-    // Redirect any unknown routes to auth
+    // Redirect any unknown routes to dashboard
     path: '/:pathMatch(.*)*',
     redirect: '/'
   }
@@ -63,8 +72,8 @@ router.beforeEach(async (to, _from, next) => {
     // Check if route requires guest (not authenticated)
     else if (to.meta.requiresGuest) {
       if (user) {
-        // User is authenticated, redirect to canvas
-        next({ name: 'Canvas' })
+        // User is authenticated, redirect to dashboard
+        next({ name: 'Dashboard' })
       } else {
         // User not authenticated, allow access to auth page
         next()

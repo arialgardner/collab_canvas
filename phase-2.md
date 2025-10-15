@@ -232,13 +232,13 @@ Standard 8-handle resize system:
 **Shape-Specific Behavior:**
 - Rectangle: Rotates around geometric center
 - Circle: Rotation property stored for consistency, but no rotation handle shown (circles are visually identical at all rotations)
-- Line: Rotates around midpoint between endpoints  
+- Line: Rotates around midpoint between endpoints
 - Text: Rotates around center of text bounding box
 
 ### Transform Handles Visual Design
 
 **Selection Indicators:**
-- Primary selection: Blue bounding box, 2px stroke  
+- Primary selection: Blue bounding box, 2px stroke
 - Multi-selection: Purple bounding box, 2px dashed stroke
 - Resize handles: 8x8px white squares, 1px blue border
 - Rotation handle: 12px circle, connected to bounding box by 20px line
@@ -317,7 +317,7 @@ Temporary state tracking selection area with start/end coordinates and selection
 
 **Visual Indicators:**
 - Show other users' selections with their cursor color
-- Dim outline around shapes selected by other users  
+- Dim outline around shapes selected by other users
 - Tooltip on hover: "Selected by [User Name]"
 
 **Canvas Sharing & Permissions:**
@@ -574,7 +574,7 @@ Toolbar with buttons for Rectangle, Circle, Line, Text, and Select modes.
 
 **Tools:**
 - R: Rectangle tool
-- C: Circle tool  
+- C: Circle tool
 - L: Line tool
 - T: Text tool
 - V: Select tool (default)
