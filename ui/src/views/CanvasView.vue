@@ -1120,7 +1120,7 @@ export default {
       }
 
       // Acquire lock
-      const lockResult = await acquireTextLock(textId, userId)
+      const lockResult = await acquireTextLock(textId, userId, canvasId.value)
       if (!lockResult.success) {
         alert(lockResult.message)
         return
@@ -1141,7 +1141,7 @@ export default {
       await updateShape(editingTextId.value, { text: newText }, userId, canvasId.value, true)
 
       // Release lock and close editor
-      await releaseTextLock(editingTextId.value, userId)
+      await releaseTextLock(editingTextId.value, userId, canvasId.value)
       editingTextId.value = null
       showTextEditor.value = false
       showFormatToolbar.value = false
@@ -1153,7 +1153,7 @@ export default {
       const userId = user.value?.uid || 'anonymous'
 
       // Release lock and close editor
-      await releaseTextLock(editingTextId.value, userId)
+      await releaseTextLock(editingTextId.value, userId, canvasId.value)
       editingTextId.value = null
       showTextEditor.value = false
       showFormatToolbar.value = false
