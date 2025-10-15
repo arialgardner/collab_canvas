@@ -220,6 +220,9 @@ import { useCursors } from '../composables/useCursors'
 import { usePresence } from '../composables/usePresence'
 import { usePerformance } from '../composables/usePerformance'
 import { useUndoRedo } from '../composables/useUndoRedo'
+import { useConnectionState } from '../composables/useConnectionState'
+import { useQueueProcessor } from '../composables/useQueueProcessor'
+import { useStateReconciliation } from '../composables/useStateReconciliation'
 import { useBugFixes } from '../utils/bugFixUtils'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -316,6 +319,9 @@ export default {
     } = usePresence()
     
     const { measureRender, throttle, logPerformanceSummary } = usePerformance()
+    const { state: connectionState, setSyncHandler } = useConnectionState()
+    const { processQueue } = useQueueProcessor()
+    const { reconcile, startPeriodic, stopPeriodic, triggerOnVisibilityChange } = useStateReconciliation()
     const { canUndo, canRedo, addAction, undo, redo, setUndoRedoFlag } = useUndoRedo()
 
     // Refs
@@ -1501,6 +1507,11 @@ export default {
 
     // Lifecycle
     onMounted(async () => {
+      // Register sync handler for ConnectionStatus "Sync Now"
+      setSyncHandler(async () => {
+        await processQueue()
+        await reconcile(canvasId.value, shapes)
+      })
       // Set initial canvas position
       centerCanvas()
       
@@ -1600,6 +1611,10 @@ export default {
         }
       }
       window.addEventListener('beforeunload', handleUnload)
+
+      // Start periodic reconciliation and tab-visibility reconciliation
+      startPeriodic(canvasId.value, shapes, () => [], 60000)
+      triggerOnVisibilityChange(canvasId.value, shapes, () => [])
     })
 
     onUnmounted(() => {
@@ -1634,6 +1649,7 @@ export default {
         }
       }
       window.removeEventListener('beforeunload', handleUnload)
+      stopPeriodic()
     })
 
     // Computed properties for properties panel

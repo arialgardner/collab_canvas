@@ -8,6 +8,8 @@
 
       <!-- User Info & Controls -->
       <div class="nav-controls">
+        <!-- Connection Status -->
+        <ConnectionStatus />
         <!-- Presence List -->
         <div v-if="user" class="presence-section">
           <!-- User Count -->
@@ -98,6 +100,7 @@ import { useAuth } from '../composables/useAuth'
 import { useRouter } from 'vue-router'
 import { usePresence } from '../composables/usePresence'
 import { useCursors } from '../composables/useCursors'
+import ConnectionStatus from './ConnectionStatus.vue'
 
 export default {
   name: 'NavBar',

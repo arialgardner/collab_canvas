@@ -18,6 +18,7 @@ import { usePerformance } from './usePerformance'
 import { usePerformanceMonitoring } from './usePerformanceMonitoring'
 import { useErrorHandling } from './useErrorHandling'
 import { getOperationQueue } from '../utils/operationQueue'
+import { useOperationQueue } from './useOperationQueue'
 import { isDuplicateOperation, markOperationProcessed } from '../utils/operationDeduplication'
 
 export const useFirestore = () => {
@@ -31,6 +32,7 @@ export const useFirestore = () => {
   
   // Operation queue for batching and prioritization (v3)
   const operationQueue = getOperationQueue()
+  const { bridgeEnqueue } = useOperationQueue()
   
   // Set up queue executor
   operationQueue.setExecutor(async (operation) => {
@@ -99,6 +101,11 @@ export const useFirestore = () => {
     }
   }
 
+  // Expose for queue processor (PR #6)
+  const processQueuedOperation = async (operation) => {
+    return executeQueuedOperation(operation)
+  }
+
   // Save shape to Firestore with error handling and retry (v3 enhanced with priority queue)
   const saveShape = async (canvasId = 'default', shape, options = {}) => {
     const { 
@@ -114,13 +121,15 @@ export const useFirestore = () => {
     
     // Use priority queue for v3 optimization
     if (usePriorityQueue) {
-      operationQueue.enqueue({
+      const op = {
         type: 'create',
         shapeId: shape.id,
         canvasId,
         data: shape,
-        userId: shape.createdBy
-      }, priority)
+        userId: shape.createdBy,
+        timestamp: Date.now()
+      }
+      await bridgeEnqueue(op, priority)
       
       console.log(`Shape ${shape.id} (${shape.type}) queued for save (${priority} priority)`)
       return true
@@ -177,13 +186,15 @@ export const useFirestore = () => {
     
     // Use priority queue for v3 optimization
     if (usePriorityQueue) {
-      operationQueue.enqueue({
+      const op = {
         type: 'update',
         shapeId,
         canvasId,
         data: updates,  // Delta updates only
-        userId
-      }, actualPriority)
+        userId,
+        timestamp: Date.now()
+      }
+      await bridgeEnqueue(op, actualPriority)
       
       console.log(`Shape ${shapeId} update queued (${actualPriority} priority, final: ${isFinal})`)
       return true
@@ -352,6 +363,7 @@ export const useFirestore = () => {
     deleteShape,
     loadShapes,
     subscribeToShapes,
+    processQueuedOperation,
 
     // Backward compatible rectangle operations
     saveRectangle,
