@@ -976,9 +976,11 @@ export default {
     }
 
     // Throttled transform update during drag (60 FPS = 16ms)
+    // v3: These are interim updates, will be batched as low priority
     const throttledTransformUpdate = throttle(async (shapeId, updates, userId) => {
       // Update local state only during transform (no Firestore save)
-      await updateShape(shapeId, updates, userId, canvasId.value, false)
+      // isFinal=false means this is an interim update (not used here since saveToFirestore=false)
+      await updateShape(shapeId, updates, userId, canvasId.value, false, false)
     }, 16)
 
     // Handle transform changes during drag (throttled)
@@ -1098,8 +1100,8 @@ export default {
         }
       }
       
-      // Final update with Firestore save
-      await updateShape(shapeId, updates, userId, canvasId.value, true)
+      // Final update with Firestore save (v3: isFinal=true for high priority)
+      await updateShape(shapeId, updates, userId, canvasId.value, true, true)
       
       // Force the layer to redraw to pick up rotation changes
       if (shapeLayer.value) {
@@ -1137,8 +1139,8 @@ export default {
 
       const userId = user.value?.uid || 'anonymous'
 
-      // Update text content
-      await updateShape(editingTextId.value, { text: newText }, userId, canvasId.value, true)
+      // Update text content (v3: isFinal=true for high priority)
+      await updateShape(editingTextId.value, { text: newText }, userId, canvasId.value, true, true)
 
       // Release lock and close editor
       await releaseTextLock(editingTextId.value, userId, canvasId.value)
@@ -1164,8 +1166,8 @@ export default {
 
       const userId = user.value?.uid || 'anonymous'
 
-      // Update text formatting
-      await updateShape(editingTextId.value, format, userId, canvasId.value, true)
+      // Update text formatting (v3: isFinal=true for high priority)
+      await updateShape(editingTextId.value, format, userId, canvasId.value, true, true)
     }
 
     // Generic shape update handler
@@ -1174,12 +1176,13 @@ export default {
       const userId = user.value?.uid || 'anonymous'
       
       // Always update local state immediately for smooth dragging
-      await updateShape(id, updates, userId, canvasId.value, false)
+      await updateShape(id, updates, userId, canvasId.value, false, false)
       
       // Save to Firestore only when saveToFirestore flag is true (e.g., on drag end)
+      // v3: isFinal=true for high priority when saveToFirestore is true
       if (saveToFirestore) {
         console.log(`Shape ${id} updated:`, updates)
-        await updateShape(id, updates, userId, canvasId.value, true)
+        await updateShape(id, updates, userId, canvasId.value, true, true)
       }
     }
 

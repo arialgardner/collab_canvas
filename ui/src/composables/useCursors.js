@@ -9,9 +9,13 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { usePerformance } from './usePerformance'
+import { usePerformanceMonitoring } from './usePerformanceMonitoring'
 
 export const useCursors = () => {
   const { measureCursorSync, trackFirestoreOperation, trackListener } = usePerformance()
+  
+  // v3 Performance monitoring
+  const { startCursorSyncMeasurement } = usePerformanceMonitoring()
   
   // Store cursors for other users (not including current user)
   const cursors = reactive(new Map())
@@ -19,7 +23,13 @@ export const useCursors = () => {
   
   // Throttling for cursor updates
   let lastUpdateTime = 0
-  const UPDATE_THROTTLE = 50 // 50ms = ~20fps
+  const BASE_MOVE_THROTTLE = 30 // 30ms ≈ 33fps for active movement
+  const IDLE_THROTTLE = 200     // 200ms when idle
+  const IDLE_THRESHOLD = 1000   // 1s without significant movement considered idle
+  const SMALL_MOVE_THRESHOLD = 5 // px; movements smaller than this are ignored
+  let lastSentX = null
+  let lastSentY = null
+  let lastSignificantMoveTime = 0
   let updateTimeout = null
   let cursorUnsubscribe = null
 
@@ -33,17 +43,38 @@ export const useCursors = () => {
     return doc(db, 'cursors', canvasId, 'positions', userId)
   }
 
-  // Update cursor position in Firestore (throttled)
+  // Helper: choose throttle interval based on recent movement
+  const getThrottleInterval = (now, x, y) => {
+    const isIdle = now - lastSignificantMoveTime > IDLE_THRESHOLD
+    return isIdle ? IDLE_THROTTLE : BASE_MOVE_THROTTLE
+  }
+
+  // Update cursor position in Firestore (adaptive throttled with small-move suppression)
   const updateCursorPosition = async (canvasId = 'default', userId, x, y, userName, cursorColor) => {
     if (!userId) return
 
     const now = Date.now()
     
-    // Start measuring cursor sync latency
+    // Start measuring cursor sync latency (old)
     const measurement = measureCursorSync()
+    // Start measuring cursor sync latency (v3)
+    const syncMeasurementV3 = startCursorSyncMeasurement()
     
+    // Small-movement suppression
+    if (lastSentX !== null && lastSentY !== null) {
+      const dx = Math.abs(Math.round(x) - lastSentX)
+      const dy = Math.abs(Math.round(y) - lastSentY)
+      const maxDelta = Math.max(dx, dy)
+      if (maxDelta < SMALL_MOVE_THRESHOLD && now - lastUpdateTime < IDLE_THROTTLE) {
+        // Ignore tiny moves if we've sent recently
+        return
+      }
+    }
+
+    const throttleInterval = getThrottleInterval(now, x, y)
+
     // Throttle updates to avoid excessive writes
-    if (now - lastUpdateTime < UPDATE_THROTTLE) {
+    if (now - lastUpdateTime < throttleInterval) {
       // Clear previous timeout and set new one
       if (updateTimeout) {
         clearTimeout(updateTimeout)
@@ -51,20 +82,24 @@ export const useCursors = () => {
       
       updateTimeout = setTimeout(() => {
         updateCursorPosition(canvasId, userId, x, y, userName, cursorColor)
-      }, UPDATE_THROTTLE)
+      }, throttleInterval)
       return
     }
 
     try {
       lastUpdateTime = now
+      lastSentX = Math.round(x)
+      lastSentY = Math.round(y)
+      // Mark significant movement
+      lastSignificantMoveTime = now
       trackFirestoreOperation()
       
       const cursorData = {
         userId,
         userName,
         cursorColor,
-        x: Math.round(x), // Round for smaller payloads
-        y: Math.round(y),
+        x: lastSentX, // Rounded for smaller payloads
+        y: lastSentY,
         timestamp: serverTimestamp(),
         lastSeen: serverTimestamp()
       }
@@ -72,12 +107,14 @@ export const useCursors = () => {
       const docRef = getCursorDocRef(canvasId, userId)
       await setDoc(docRef, cursorData)
       
-      // End measurement
+      // End measurements
       measurement.end()
+      syncMeasurementV3.end()
       
     } catch (error) {
       console.error('Error updating cursor position:', error)
       measurement.end()
+      syncMeasurementV3.end()
     }
   }
 

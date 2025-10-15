@@ -25,7 +25,7 @@
 </template>
 
 <script>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 
 export default {
   name: 'UserCursor',
@@ -41,34 +41,94 @@ export default {
   },
   setup(props) {
     const cursorElement = ref(null)
-    
-    // Convert canvas coordinates to screen coordinates for positioning
-    const screenPosition = computed(() => {
-      const canvasX = props.cursor.x || 0
-      const canvasY = props.cursor.y || 0
-      
+
+    // Interpolation state
+    const currentPos = ref({ x: 0, y: 0 })
+    const targetPos = ref({ x: 0, y: 0 })
+    const lastPos = ref({ x: 0, y: 0 })
+    const lastUpdateTs = ref(0)
+    let rafId = null
+
+    // Convert canvas -> screen
+    const toScreen = (canvasX, canvasY) => {
       const scaleX = props.stageAttrs.scaleX || 1
       const scaleY = props.stageAttrs.scaleY || 1
       const offsetX = props.stageAttrs.x || 0
       const offsetY = props.stageAttrs.y || 0
-      
-      const screenX = canvasX * scaleX + offsetX
-      const screenY = canvasY * scaleY + offsetY
-      
-      return { x: screenX, y: screenY }
+      return {
+        x: canvasX * scaleX + offsetX,
+        y: canvasY * scaleY + offsetY
+      }
+    }
+
+    // Update target when prop changes
+    const updateTargetFromProps = () => {
+      const canvasX = props.cursor.x || 0
+      const canvasY = props.cursor.y || 0
+      const screen = toScreen(canvasX, canvasY)
+      lastPos.value = { ...targetPos.value }
+      targetPos.value = screen
+      lastUpdateTs.value = performance.now()
+    }
+
+    watch(() => [props.cursor.x, props.cursor.y, props.stageAttrs.x, props.stageAttrs.y, props.stageAttrs.scaleX, props.stageAttrs.scaleY], () => {
+      updateTargetFromProps()
     })
-    
+
+    // rAF interpolation with light prediction
+    const TWEEN_DURATION = 80 // ms tween between updates
+    const MAX_PREDICT = 50    // ms max prediction window
+
+    const step = () => {
+      const now = performance.now()
+      const dt = now - lastUpdateTs.value
+
+      // Linear interpolation factor 0..1 over TWEEN_DURATION
+      const t = Math.max(0, Math.min(1, dt / TWEEN_DURATION))
+
+      // Basic velocity estimate from last segment
+      const vx = targetPos.value.x - lastPos.value.x
+      const vy = targetPos.value.y - lastPos.value.y
+
+      let predictedX = targetPos.value.x
+      let predictedY = targetPos.value.y
+
+      // Light prediction beyond last target for small dt overrun
+      if (dt > TWEEN_DURATION && dt < TWEEN_DURATION + MAX_PREDICT) {
+        const over = dt - TWEEN_DURATION
+        const k = over / MAX_PREDICT // 0..1
+        predictedX = targetPos.value.x + vx * k * 0.5
+        predictedY = targetPos.value.y + vy * k * 0.5
+      }
+
+      currentPos.value = {
+        x: lastPos.value.x + (predictedX - lastPos.value.x) * t,
+        y: lastPos.value.y + (predictedY - lastPos.value.y) * t
+      }
+
+      rafId = requestAnimationFrame(step)
+    }
+
+    onMounted(() => {
+      updateTargetFromProps()
+      currentPos.value = { ...targetPos.value }
+      rafId = requestAnimationFrame(step)
+    })
+
+    onUnmounted(() => {
+      if (rafId) cancelAnimationFrame(rafId)
+    })
+
     // Cursor positioning style
     const cursorStyle = computed(() => ({
       position: 'absolute',
-      left: `${screenPosition.value.x}px`,
-      top: `${screenPosition.value.y}px`,
+      left: `${currentPos.value.x}px`,
+      top: `${currentPos.value.y}px`,
       pointerEvents: 'none',
       zIndex: 1000,
-      transform: 'translate(-2px, -2px)', // Slight offset for better positioning
-      transition: 'left 0.1s ease-out, top 0.1s ease-out' // Smooth movement
+      transform: 'translate(-2px, -2px)'
     }))
-    
+
     return {
       cursorStyle,
       cursorElement

@@ -1,8 +1,10 @@
 {
   "dependencies": {
+    "@tailwindcss/vite": "^4.1.14",
     "firebase": "^12.4.0",
     "konva": "^10.0.2",
     "prettier": "^3.6.2",
+    "tailwindcss": "^4.1.14",
     "vue-konva": "^3.2.6"
   },
   "devDependencies": {

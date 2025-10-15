@@ -11,11 +11,20 @@ import {
 } from '../types/shapes'
 import { useFirestore } from './useFirestore'
 import { usePerformance } from './usePerformance'
+import { usePerformanceMonitoring } from './usePerformanceMonitoring'
 
 export const useShapes = () => {
   // Firestore integration
   const { saveShape, updateShape: updateShapeInFirestore, deleteShape: deleteShapeFromFirestore, loadShapes, subscribeToShapes } = useFirestore()
   const { measureRectangleSync, measureRender, trackListener } = usePerformance()
+  
+  // v3 Performance monitoring
+  const { 
+    startObjectSyncMeasurement, 
+    trackShapeCreation,
+    trackShapeDeletion,
+    updateShapeMetrics 
+  } = usePerformanceMonitoring()
   
   // Store shapes in a reactive Map for O(1) lookups
   const shapes = reactive(new Map())
@@ -35,6 +44,9 @@ export const useShapes = () => {
   // Generic create shape function
   const createShape = async (type = 'rectangle', properties = {}, userId = 'anonymous', canvasId = 'default') => {
     try {
+      // Start measuring sync latency for v3
+      const syncMeasurement = startObjectSyncMeasurement()
+      
       const shapeId = generateId(type)
       const currentMaxZ = getMaxZIndex(shapes)
       
@@ -111,6 +123,13 @@ export const useShapes = () => {
       // Save to Firestore
       await saveShape(canvasId, shape)
       
+      // End sync measurement and track creation for v3
+      syncMeasurement.end()
+      trackShapeCreation()
+      
+      // Update shape metrics
+      updateShapeMetrics(shapes.size, shapes.size)
+      
       return shape
     } catch (err) {
       console.error(`Error creating ${type}:`, err)
@@ -124,8 +143,8 @@ export const useShapes = () => {
     return updateShape(id, updates, userId, canvasId, saveToFirestore)
   }
 
-  // Generic update shape function
-  const updateShape = async (id, updates, userId = 'anonymous', canvasId = 'default', saveToFirestore = false) => {
+  // Generic update shape function (v3 enhanced with priority options)
+  const updateShape = async (id, updates, userId = 'anonymous', canvasId = 'default', saveToFirestore = false, isFinal = true) => {
     const shape = shapes.get(id)
     if (!shape) {
       console.warn(`Shape with id ${id} not found`)
@@ -174,7 +193,11 @@ export const useShapes = () => {
     // Save to Firestore if requested (e.g., on drag end)
     if (saveToFirestore) {
       try {
-        await updateShapeInFirestore(canvasId, id, updates, userId)
+        // v3: Pass isFinal flag to determine priority
+        await updateShapeInFirestore(canvasId, id, updates, userId, {
+          isFinal,  // High priority if final, low if interim
+          usePriorityQueue: true
+        })
       } catch (err) {
         console.error('Error updating shape in Firestore:', err)
         error.value = err.message
@@ -221,6 +244,9 @@ export const useShapes = () => {
       // Optimistic local removal
       shapes.delete(shapeId)
       
+      // Track deletion for v3
+      trackShapeDeletion()
+      
       // Delete from Firestore
       deletePromises.push(
         deleteShapeFromFirestore(canvasId, shapeId).catch(err => {
@@ -231,6 +257,10 @@ export const useShapes = () => {
     }
     
     await Promise.all(deletePromises)
+    
+    // Update shape metrics
+    updateShapeMetrics(shapes.size, shapes.size)
+    
     console.log(`Deleted ${shapeIds.length} shape(s)`)
   }
 

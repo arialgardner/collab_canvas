@@ -10,15 +10,32 @@ import {
   query,
   orderBy,
   enableNetwork,
-  disableNetwork
+  disableNetwork,
+  writeBatch
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 import { usePerformance } from './usePerformance'
+import { usePerformanceMonitoring } from './usePerformanceMonitoring'
 import { useErrorHandling } from './useErrorHandling'
+import { getOperationQueue } from '../utils/operationQueue'
+import { isDuplicateOperation, markOperationProcessed } from '../utils/operationDeduplication'
 
 export const useFirestore = () => {
   const { trackFirestoreOperation, trackListener, debounce } = usePerformance()
+  const { 
+    trackFirestoreOperation: trackFirestoreOpV3,
+    trackFirestoreListener,
+    trackFirestoreError 
+  } = usePerformanceMonitoring()
   const { handleFirebaseError, retry } = useErrorHandling()
+  
+  // Operation queue for batching and prioritization (v3)
+  const operationQueue = getOperationQueue()
+  
+  // Set up queue executor
+  operationQueue.setExecutor(async (operation) => {
+    return await executeQueuedOperation(operation)
+  })
   
   // Get reference to canvas shapes collection
   const getCanvasShapesRef = (canvasId = 'default') => {
@@ -39,10 +56,80 @@ export const useFirestore = () => {
     return getShapeDocRef(canvasId, rectangleId)
   }
 
-  // Save shape to Firestore with error handling and retry
-  const saveShape = async (canvasId = 'default', shape) => {
+  // Execute queued operation (v3)
+  const executeQueuedOperation = async (operation) => {
+    const { type, shapeId, canvasId, data, userId, sequenceNumber } = operation
+    
+    try {
+      trackFirestoreOperation()
+      trackFirestoreOpV3(type === 'create' ? 'write' : type)
+      
+      const docRef = getShapeDocRef(canvasId, shapeId)
+      
+      if (type === 'create') {
+        // Create operation
+        const shapeData = {
+          ...data,
+          sequenceNumber,  // Add sequence number for ordering
+          lastModified: serverTimestamp()
+        }
+        await setDoc(docRef, shapeData)
+      } else if (type === 'update') {
+        // Update operation - delta only
+        const updates = {
+          ...data,
+          sequenceNumber,  // Add sequence number
+          lastModified: serverTimestamp(),
+          lastModifiedBy: userId
+        }
+        await updateDoc(docRef, updates)
+      } else if (type === 'delete') {
+        // Delete operation
+        await deleteDoc(docRef)
+      }
+      
+      // Mark operation as processed for deduplication
+      markOperationProcessed(shapeId, operation.timestamp, userId, type)
+      
+      return true
+    } catch (error) {
+      console.error(`Error executing ${type} operation:`, error)
+      trackFirestoreError()
+      throw error
+    }
+  }
+
+  // Save shape to Firestore with error handling and retry (v3 enhanced with priority queue)
+  const saveShape = async (canvasId = 'default', shape, options = {}) => {
+    const { 
+      usePriorityQueue = true,  // Use priority queue by default
+      priority = 'high'          // Shape creation is high priority
+    } = options
+    
+    // Check for duplicates (v3)
+    if (isDuplicateOperation(shape.id, Date.now(), shape.createdBy, 'create')) {
+      console.log(`Skipping duplicate create for shape ${shape.id}`)
+      return true
+    }
+    
+    // Use priority queue for v3 optimization
+    if (usePriorityQueue) {
+      operationQueue.enqueue({
+        type: 'create',
+        shapeId: shape.id,
+        canvasId,
+        data: shape,
+        userId: shape.createdBy
+      }, priority)
+      
+      console.log(`Shape ${shape.id} (${shape.type}) queued for save (${priority} priority)`)
+      return true
+    }
+    
+    // Legacy direct save (backward compatible)
     const operation = async () => {
       trackFirestoreOperation()
+      trackFirestoreOpV3('write')
       
       const shapeData = {
         ...shape,
@@ -60,6 +147,7 @@ export const useFirestore = () => {
       return await retry(operation, 3, 1000)
     } catch (error) {
       console.error('Error saving shape:', error)
+      trackFirestoreError()
       handleFirebaseError(error, 'save shape')
       throw error
     }
@@ -70,10 +158,41 @@ export const useFirestore = () => {
     return saveShape(canvasId, rectangle)
   }
 
-  // Generic update shape method
-  const updateShape = async (canvasId = 'default', shapeId, updates, userId = 'anonymous') => {
+  // Generic update shape method (v3 enhanced with priority queue)
+  const updateShape = async (canvasId = 'default', shapeId, updates, userId = 'anonymous', options = {}) => {
+    const {
+      usePriorityQueue = true,  // Use priority queue by default
+      priority = 'high',         // Default to high priority
+      isFinal = true             // Is this a final update (dragend) or interim (dragging)?
+    } = options
+    
+    // Determine priority based on update type
+    const actualPriority = isFinal ? 'high' : 'low'
+    
+    // Check for duplicates (v3)
+    if (isDuplicateOperation(shapeId, Date.now(), userId, 'update')) {
+      console.log(`Skipping duplicate update for shape ${shapeId}`)
+      return true
+    }
+    
+    // Use priority queue for v3 optimization
+    if (usePriorityQueue) {
+      operationQueue.enqueue({
+        type: 'update',
+        shapeId,
+        canvasId,
+        data: updates,  // Delta updates only
+        userId
+      }, actualPriority)
+      
+      console.log(`Shape ${shapeId} update queued (${actualPriority} priority, final: ${isFinal})`)
+      return true
+    }
+    
+    // Legacy direct update (backward compatible)
     try {
       trackFirestoreOperation()
+      trackFirestoreOpV3('write')
       
       const docRef = getShapeDocRef(canvasId, shapeId)
       await updateDoc(docRef, {
@@ -86,6 +205,7 @@ export const useFirestore = () => {
       return true
     } catch (error) {
       console.error('Error updating shape:', error)
+      trackFirestoreError()
       throw error
     }
   }
@@ -94,6 +214,7 @@ export const useFirestore = () => {
   const deleteShape = async (canvasId, shapeId) => {
     try {
       trackFirestoreOperation()
+      trackFirestoreOpV3('delete')  // v3 tracking
       
       const docRef = getShapeDocRef(canvasId, shapeId)
       await deleteDoc(docRef)
@@ -102,6 +223,7 @@ export const useFirestore = () => {
       return true
     } catch (error) {
       console.error('Error deleting shape:', error)
+      trackFirestoreError()  // v3 error tracking
       throw error
     }
   }
@@ -136,6 +258,8 @@ export const useFirestore = () => {
   // Load all shapes from Firestore (one-time fetch)
   const loadShapes = async (canvasId = 'default') => {
     try {
+      trackFirestoreOpV3('read')  // v3 tracking
+      
       const shapesRef = getCanvasShapesRef(canvasId)
       const q = query(shapesRef, orderBy('createdAt', 'asc'))
       const querySnapshot = await getDocs(q)
@@ -156,6 +280,7 @@ export const useFirestore = () => {
       return shapes
     } catch (error) {
       console.error('Error loading shapes:', error)
+      trackFirestoreError()  // v3 error tracking
       throw error
     }
   }
@@ -169,6 +294,7 @@ export const useFirestore = () => {
   const subscribeToShapes = (canvasId = 'default', callback) => {
     try {
       trackListener('add')
+      trackFirestoreListener('add')  // v3 tracking
       
       const shapesRef = getCanvasShapesRef(canvasId)
       const q = query(shapesRef, orderBy('createdAt', 'asc'))
@@ -178,8 +304,10 @@ export const useFirestore = () => {
         callback(changes, snapshot)
       }, (error) => {
         console.error('Firestore listener error:', error)
+        trackFirestoreError()  // v3 error tracking
         handleFirebaseError(error, 'subscribe to shapes')
         trackListener('remove')
+        trackFirestoreListener('remove')  // v3 tracking
       })
       
       console.log(`Subscribed to shape changes for canvas: ${canvasId}`)
@@ -188,9 +316,11 @@ export const useFirestore = () => {
       return () => {
         unsubscribe()
         trackListener('remove')
+        trackFirestoreListener('remove')  // v3 tracking
       }
     } catch (error) {
       console.error('Error subscribing to shapes:', error)
+      trackFirestoreError()  // v3 error tracking
       handleFirebaseError(error, 'subscribe to shapes')
       throw error
     }

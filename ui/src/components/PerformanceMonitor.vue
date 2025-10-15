@@ -1,126 +1,237 @@
 <template>
-  <div class="performance-monitor" v-show="showMonitor">
+  <div class="performance-monitor" v-show="isVisible">
     <div class="monitor-header">
-      <h4>🎯 Performance Monitor</h4>
-      <button @click="toggleMonitor" class="toggle-btn">{{ showMonitor ? '−' : '+' }}</button>
+      <h4>🎯 Performance Monitor (v3)</h4>
+      <div class="header-actions">
+        <button @click="toggleCollapsed" class="toggle-btn">{{ isCollapsed ? '+' : '−' }}</button>
+        <button @click="closeMonitor" class="close-btn">×</button>
+      </div>
     </div>
     
-    <div class="monitor-content" v-if="showMonitor">
+    <div class="monitor-content" v-if="!isCollapsed">
+      <!-- Object Sync Section -->
       <div class="metric-section">
-        <h5>Rectangle Sync</h5>
+        <h5>📦 Object Sync (Target: &lt;100ms)</h5>
         <div class="metric">
           <span class="label">Average:</span>
-          <span :class="['value', stats.rectangleSync.average > stats.rectangleSync.target ? 'warning' : 'good']">
-            {{ stats.rectangleSync.average }}ms
+          <span :class="['value', `status-${stats.objectSync.status}`]">
+            {{ stats.objectSync.avg }}ms
           </span>
-          <span class="target">(target: {{ stats.rectangleSync.target }}ms)</span>
         </div>
         <div class="metric">
-          <span class="label">Latest:</span>
-          <span :class="['value', stats.rectangleSync.latest > stats.rectangleSync.target ? 'warning' : 'good']">
-            {{ stats.rectangleSync.latest }}ms
-          </span>
+          <span class="label">Min / Max:</span>
+          <span class="value">{{ stats.objectSync.min }}ms / {{ stats.objectSync.max }}ms</span>
+        </div>
+        <div class="metric">
+          <span class="label">Samples:</span>
+          <span class="value">{{ stats.objectSync.count }}</span>
+        </div>
+        <div class="metric" v-if="stats.objectSync.violations > 0">
+          <span class="label">Violations:</span>
+          <span class="value status-red">{{ stats.objectSync.violations }}</span>
         </div>
       </div>
 
+      <!-- Cursor Sync Section -->
       <div class="metric-section">
-        <h5>Cursor Sync</h5>
+        <h5>🖱️ Cursor Sync (Target: &lt;50ms)</h5>
         <div class="metric">
           <span class="label">Average:</span>
-          <span :class="['value', stats.cursorSync.average > stats.cursorSync.target ? 'warning' : 'good']">
-            {{ stats.cursorSync.average }}ms
+          <span :class="['value', `status-${stats.cursorSync.status}`]">
+            {{ stats.cursorSync.avg }}ms
           </span>
-          <span class="target">(target: {{ stats.cursorSync.target }}ms)</span>
         </div>
         <div class="metric">
-          <span class="label">Latest:</span>
-          <span :class="['value', stats.cursorSync.latest > stats.cursorSync.target ? 'warning' : 'good']">
-            {{ stats.cursorSync.latest }}ms
-          </span>
+          <span class="label">Min / Max:</span>
+          <span class="value">{{ stats.cursorSync.min }}ms / {{ stats.cursorSync.max }}ms</span>
+        </div>
+        <div class="metric">
+          <span class="label">Samples:</span>
+          <span class="value">{{ stats.cursorSync.count }}</span>
+        </div>
+        <div class="metric" v-if="stats.cursorSync.violations > 0">
+          <span class="label">Violations:</span>
+          <span class="value status-red">{{ stats.cursorSync.violations }}</span>
         </div>
       </div>
 
+      <!-- FPS Section -->
       <div class="metric-section">
-        <h5>Rendering</h5>
+        <h5>🖥️ FPS (Target: 60 FPS)</h5>
+        <div class="metric">
+          <span class="label">Current:</span>
+          <span :class="['value', `status-${stats.fps.status}`]">
+            {{ stats.fps.current }} FPS
+          </span>
+        </div>
         <div class="metric">
           <span class="label">Average:</span>
-          <span :class="['value', stats.rendering.average > stats.rendering.target ? 'warning' : 'good']">
-            {{ stats.rendering.average }}ms
-          </span>
-          <span class="target">(target: {{ stats.rendering.target }}ms)</span>
+          <span class="value">{{ stats.fps.avg }} FPS</span>
+        </div>
+        <div class="metric" v-if="stats.fps.violations > 0">
+          <span class="label">Drops &lt;30:</span>
+          <span class="value status-red">{{ stats.fps.violations }}</span>
         </div>
       </div>
 
+      <!-- Firestore Section -->
       <div class="metric-section">
-        <h5>System</h5>
+        <h5>🔥 Firestore Operations</h5>
         <div class="metric">
-          <span class="label">Firestore Ops:</span>
-          <span class="value">{{ stats.system.firestoreOperations }}</span>
+          <span class="label">Total Ops:</span>
+          <span class="value">{{ stats.firestore.operations }}</span>
+        </div>
+        <div class="metric">
+          <span class="label">Reads:</span>
+          <span class="value">{{ stats.firestore.reads }}</span>
+        </div>
+        <div class="metric">
+          <span class="label">Writes:</span>
+          <span class="value">{{ stats.firestore.writes }}</span>
+        </div>
+        <div class="metric">
+          <span class="label">Deletes:</span>
+          <span class="value">{{ stats.firestore.deletes }}</span>
         </div>
         <div class="metric">
           <span class="label">Listeners:</span>
-          <span class="value">{{ stats.system.activeListeners }}</span>
+          <span class="value">{{ stats.firestore.listeners }}</span>
+        </div>
+        <div class="metric" v-if="stats.firestore.errors > 0">
+          <span class="label">Errors:</span>
+          <span class="value status-red">{{ stats.firestore.errors }}</span>
         </div>
       </div>
 
-      <div class="actions">
-        <button @click="logSummary" class="action-btn">Log Summary</button>
-        <button @click="resetMetrics" class="action-btn">Reset</button>
+      <!-- Shapes Section -->
+      <div class="metric-section">
+        <h5>📐 Shapes</h5>
+        <div class="metric">
+          <span class="label">In Memory:</span>
+          <span class="value">{{ stats.shapes.inMemory }}</span>
+        </div>
+        <div class="metric">
+          <span class="label">Rendered:</span>
+          <span class="value">{{ stats.shapes.rendered }}</span>
+        </div>
+        <div class="metric">
+          <span class="label">Created:</span>
+          <span class="value">{{ stats.shapes.created }}</span>
+        </div>
+        <div class="metric">
+          <span class="label">Deleted:</span>
+          <span class="value">{{ stats.shapes.deleted }}</span>
+        </div>
       </div>
+
+      <!-- Network Section -->
+      <div class="metric-section">
+        <h5>🌐 Network</h5>
+        <div class="metric">
+          <span class="label">Est. RTT:</span>
+          <span class="value">{{ stats.network.estimatedRTT }}ms</span>
+        </div>
+        <div class="metric" v-if="stats.network.lastPingTime">
+          <span class="label">Last Ping:</span>
+          <span class="value">{{ formatTime(stats.network.lastPingTime) }}</span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button @click="logSummary" class="action-btn">📊 Log Summary</button>
+        <button @click="handleReset" class="action-btn">🔄 Reset</button>
+      </div>
+      
+      <div class="hint">Press Shift+P to toggle</div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { usePerformance } from '../composables/usePerformance'
+import { usePerformanceMonitoring } from '../composables/usePerformanceMonitoring'
 
-const { getPerformanceStats, logPerformanceSummary } = usePerformance()
+const { 
+  performanceStats, 
+  logPerformanceSummary, 
+  resetMetrics,
+  startFPSTracking,
+  stopFPSTracking
+} = usePerformanceMonitoring()
 
-const showMonitor = ref(false)
-const stats = ref({
-  rectangleSync: { average: 0, latest: 0, target: 100, samples: 0 },
-  cursorSync: { average: 0, latest: 0, target: 50, samples: 0 },
-  rendering: { average: 0, latest: 0, target: 16, samples: 0 },
-  system: { firestoreOperations: 0, activeListeners: 0 }
-})
+const isVisible = ref(false)
+const isCollapsed = ref(false)
+const stats = computed(() => performanceStats.value)
 
 // Update stats every second
 let updateInterval = null
 
-const updateStats = () => {
-  stats.value = getPerformanceStats()
+const toggleMonitor = () => {
+  isVisible.value = !isVisible.value
 }
 
-const toggleMonitor = () => {
-  showMonitor.value = !showMonitor.value
+const toggleCollapsed = () => {
+  isCollapsed.value = !isCollapsed.value
+}
+
+const closeMonitor = () => {
+  isVisible.value = false
 }
 
 const logSummary = () => {
   logPerformanceSummary()
 }
 
-const resetMetrics = () => {
-  // This would require adding reset functionality to usePerformance
-  console.log('Reset metrics functionality would go here')
+const handleReset = () => {
+  if (confirm('Reset all performance metrics?')) {
+    resetMetrics()
+  }
+}
+
+// Format timestamp
+const formatTime = (timestamp) => {
+  if (!timestamp) return 'N/A'
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString()
 }
 
 // Check for performance debug mode
 const checkDebugMode = () => {
-  // Show monitor if ?debug=performance is in URL
   const urlParams = new URLSearchParams(window.location.search)
   if (urlParams.get('debug') === 'performance') {
-    showMonitor.value = true
+    isVisible.value = true
+  }
+}
+
+// Keyboard shortcut handler
+const handleKeyDown = (e) => {
+  // Shift+P to toggle monitor
+  if (e.shiftKey && e.key === 'P') {
+    e.preventDefault()
+    toggleMonitor()
   }
 }
 
 onMounted(() => {
   checkDebugMode()
-  updateInterval = setInterval(updateStats, 1000)
-  updateStats() // Initial update
+  
+  // Start FPS tracking
+  startFPSTracking()
+  
+  // Add keyboard listener
+  window.addEventListener('keydown', handleKeyDown)
+  
+  console.log('💡 Performance Monitor loaded - Press Shift+P to toggle')
 })
 
 onUnmounted(() => {
+  // Stop FPS tracking
+  stopFPSTracking()
+  
+  // Remove keyboard listener
+  window.removeEventListener('keydown', handleKeyDown)
+  
   if (updateInterval) {
     clearInterval(updateInterval)
   }
@@ -132,48 +243,64 @@ onUnmounted(() => {
   position: fixed;
   top: 80px;
   right: 20px;
-  background: rgba(0, 0, 0, 0.9);
+  background: rgba(0, 0, 0, 0.92);
   color: white;
   padding: 16px;
   border-radius: 8px;
-  font-family: 'Monaco', 'Menlo', monospace;
-  font-size: 12px;
-  min-width: 280px;
-  z-index: 1000;
+  font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+  font-size: 11px;
+  min-width: 320px;
+  max-width: 380px;
+  max-height: 80vh;
+  overflow-y: auto;
+  z-index: 9999;
   backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .monitor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #333;
 }
 
 .monitor-header h4 {
   margin: 0;
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
-.toggle-btn {
-  background: none;
-  border: 1px solid #333;
+.header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.toggle-btn, .close-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   color: white;
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.2s;
 }
 
-.toggle-btn:hover {
-  background: #333;
+.toggle-btn:hover, .close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
 .metric-section {
-  margin-bottom: 16px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #333;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .metric-section:last-of-type {
@@ -181,62 +308,103 @@ onUnmounted(() => {
 }
 
 .metric-section h5 {
-  margin: 0 0 8px 0;
-  font-size: 12px;
-  color: #ccc;
-  font-weight: 500;
+  margin: 0 0 10px 0;
+  font-size: 11px;
+  color: #bbb;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .metric {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  padding: 2px 0;
 }
 
 .label {
-  color: #aaa;
-  min-width: 80px;
+  color: #999;
+  font-size: 11px;
+  flex: 1;
 }
 
 .value {
   font-weight: 600;
-  min-width: 50px;
+  font-size: 12px;
   text-align: right;
+  font-family: 'Monaco', 'Menlo', monospace;
 }
 
-.value.good {
+/* Status Colors */
+.value.status-green {
   color: #4ade80;
 }
 
-.value.warning {
-  color: #f97316;
+.value.status-yellow {
+  color: #fbbf24;
 }
 
-.target {
-  color: #666;
-  font-size: 10px;
-  margin-left: 8px;
+.value.status-red {
+  color: #f87171;
+}
+
+.value.status-gray {
+  color: #6b7280;
 }
 
 .actions {
   display: flex;
   gap: 8px;
   margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .action-btn {
-  background: #333;
-  border: 1px solid #555;
-  color: white;
-  padding: 6px 12px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+  padding: 8px 12px;
   border-radius: 4px;
   cursor: pointer;
   font-size: 11px;
   flex: 1;
+  font-weight: 600;
+  transition: all 0.2s;
 }
 
 .action-btn:hover {
-  background: #444;
+  background: rgba(59, 130, 246, 0.3);
+  border-color: rgba(59, 130, 246, 0.6);
+  color: #bfdbfe;
+}
+
+.hint {
+  text-align: center;
+  color: #666;
+  font-size: 10px;
+  margin-top: 12px;
+  font-style: italic;
+}
+
+/* Scrollbar Styling */
+.performance-monitor::-webkit-scrollbar {
+  width: 6px;
+}
+
+.performance-monitor::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.performance-monitor::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.performance-monitor::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 </style>
