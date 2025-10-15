@@ -665,14 +665,14 @@ const handleBulkPropertyChange = (property, value) => {
 .properties-panel {
   position: fixed;
   right: 0;
-  top: 60px; /* Below toolbar */
+  top: 0;
   bottom: 0;
   width: 300px;
   background: #fff;
   border-left: 1px solid #e5e7eb;
   overflow-y: auto;
-  padding: 20px;
-  z-index: 100;
+  padding: 100px 20px 20px 20px; /* Top padding clears navbar + margin */
+  z-index: 99; /* Below navbar to avoid covering it */
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
 }
 
@@ -896,6 +896,13 @@ const handleBulkPropertyChange = (property, value) => {
 @media (max-width: 1200px) {
   .properties-panel {
     width: 250px;
+  }
+}
+
+@media (max-width: 768px) {
+  .properties-panel {
+    width: 250px;
+    padding-top: 90px; /* Adjusted for mobile navbar height */
   }
 }
 </style>

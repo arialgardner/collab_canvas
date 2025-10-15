@@ -70,14 +70,14 @@ export default {
 <style scoped>
 .sync-status {
   position: fixed;
-  top: 5rem;
-  right: 1rem;
+  top: 90px;
+  left: 1rem;
   background: white;
   border-radius: 8px;
   padding: 0.75rem;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   border: 1px solid #e2e8f0;
-  z-index: 1000;
+  z-index: 900;
   min-width: 120px;
 }
 
@@ -157,8 +157,8 @@ export default {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .sync-status {
-    top: 4rem;
-    right: 0.5rem;
+    top: 80px;
+    left: 0.5rem;
     padding: 0.5rem;
   }
   

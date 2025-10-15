@@ -370,7 +370,43 @@ export default {
     const rectanglesList = computed(() => getAllRectangles()) // Backward compatible
 
     // Cursor state
-    const remoteCursors = computed(() => getAllCursors())
+    const allRemoteCursors = computed(() => getAllCursors())
+    
+    // Filter cursors to only show those within canvas bounds
+    const remoteCursors = computed(() => {
+      const cursors = allRemoteCursors.value
+      
+      // Get actual canvas wrapper dimensions from DOM element
+      if (!canvasWrapper.value) {
+        return [] // No cursors if canvas wrapper not mounted yet
+      }
+      
+      const wrapperRect = canvasWrapper.value.getBoundingClientRect()
+      const canvasWrapperWidth = wrapperRect.width
+      const canvasWrapperHeight = wrapperRect.height
+      
+      return cursors.filter(cursor => {
+        // Convert canvas coordinates to screen coordinates
+        const canvasX = cursor.x || 0
+        const canvasY = cursor.y || 0
+        
+        const scaleX = stageConfig.value.scaleX || 1
+        const scaleY = stageConfig.value.scaleY || 1
+        const offsetX = stageConfig.value.x || 0
+        const offsetY = stageConfig.value.y || 0
+        
+        const screenX = canvasX * scaleX + offsetX
+        const screenY = canvasY * scaleY + offsetY
+        
+        // Check if cursor is within canvas wrapper bounds
+        // Use tighter bounds (20px margin) to prevent overflow onto properties panel
+        return screenX >= -20 && 
+               screenX <= canvasWrapperWidth - 20 && 
+               screenY >= -20 && 
+               screenY <= canvasWrapperHeight + 20
+      })
+    })
+    
     const activeUserCount = computed(() => getActiveUserCount())
     const isMouseOverCanvas = ref(false)
 
@@ -488,6 +524,13 @@ export default {
             lineStartPoint.value = { x: canvasX, y: canvasY }
             return
           }
+        } else if (activeTool.value === 'text') {
+          // Create text shape and immediately open editor
+          const newText = await createShape('text', { x: canvasX, y: canvasY }, userId)
+          if (newText) {
+            handleTextEdit(newText.id)
+          }
+          return
         } else if (activeTool.value === 'select') {
           // Check if Shift key is held for marquee selection
           if (e.evt && e.evt.shiftKey) {
@@ -583,11 +626,15 @@ export default {
         lineStartPoint.value = null
       }
       
-      // Update cursor
-      if (toolName === 'select') {
-        canvasWrapper.value.style.cursor = 'grab'
-      } else {
-        canvasWrapper.value.style.cursor = 'crosshair'
+      // Update cursor - add null check to prevent errors during mount
+      if (canvasWrapper.value) {
+        if (toolName === 'select') {
+          canvasWrapper.value.style.cursor = 'grab'
+        } else if (toolName === 'text') {
+          canvasWrapper.value.style.cursor = 'text'
+        } else {
+          canvasWrapper.value.style.cursor = 'crosshair'
+        }
       }
     }
 
@@ -1193,10 +1240,14 @@ export default {
       
       // Handle panning end
       isDragging.value = false
-      if (activeTool.value === 'select') {
-        canvasWrapper.value.style.cursor = 'grab'
-      } else {
-        canvasWrapper.value.style.cursor = 'crosshair'
+      if (canvasWrapper.value) {
+        if (activeTool.value === 'select') {
+          canvasWrapper.value.style.cursor = 'grab'
+        } else if (activeTool.value === 'text') {
+          canvasWrapper.value.style.cursor = 'text'
+        } else {
+          canvasWrapper.value.style.cursor = 'crosshair'
+        }
       }
     }
 
@@ -1229,6 +1280,13 @@ export default {
     const handleResize = () => {
       stageSize.width = window.innerWidth
       stageSize.height = window.innerHeight - 70 // Account for navbar
+      
+      // Force re-computation of cursor filtering by triggering reactive updates
+      // This ensures cursors are properly filtered after resize
+      if (remoteCursors.value) {
+        // Access remoteCursors to trigger recomputation
+        remoteCursors.value.length
+      }
     }
 
     // Undo/Redo handlers
@@ -1405,8 +1463,10 @@ export default {
       // Add keyboard listener
       window.addEventListener('keydown', handleKeyDown)
       
-      // Set initial cursor
-      canvasWrapper.value.style.cursor = 'grab'
+      // Set initial cursor - add null check
+      if (canvasWrapper.value) {
+        canvasWrapper.value.style.cursor = 'grab'
+      }
       
       // Set up transformer event listeners
       if (transformer.value) {
@@ -1495,7 +1555,7 @@ export default {
 
     // Computed properties for properties panel
     const selectedShapesData = computed(() => {
-      return selectedShapeIds.value.map(id => shapes.value.get(id)).filter(Boolean)
+      return selectedShapeIds.value.map(id => shapes.get(id)).filter(Boolean)
     })
 
     const canvasWidth = ref(3000)
@@ -1528,7 +1588,7 @@ export default {
       updateShape(shapeId, { [property]: validatedValue })
       
       // Track undo/redo
-      const shape = shapes.value.get(shapeId)
+      const shape = shapes.get(shapeId)
       if (shape) {
         addAction({
           type: 'property_change',
@@ -1657,6 +1717,14 @@ export default {
   width: calc(100% - 300px); /* Account for properties panel */
   height: 100%;
   position: relative;
+  overflow: hidden; /* Clip any overflow content including cursors */
+}
+
+/* Responsive canvas width for smaller screens */
+@media (max-width: 1200px) {
+  .canvas-wrapper {
+    width: calc(100% - 250px); /* Account for narrower properties panel */
+  }
 }
 
 /* Canvas background with subtle grid pattern */

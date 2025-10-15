@@ -29,7 +29,8 @@ export default {
       { name: 'select', label: 'Select', icon: '↖', shortcut: 'V' },
       { name: 'rectangle', label: 'Rectangle', icon: '▭', shortcut: 'R' },
       { name: 'circle', label: 'Circle', icon: '○', shortcut: 'C' },
-      { name: 'line', label: 'Line', icon: '╱', shortcut: 'L' }
+      { name: 'line', label: 'Line', icon: '╱', shortcut: 'L' },
+      { name: 'text', label: 'Text', icon: 'T', shortcut: 'T' }
     ]
 
     const selectTool = (toolName) => {
@@ -56,7 +57,8 @@ export default {
         'V': 'select',
         'R': 'rectangle',
         'C': 'circle',
-        'L': 'line'
+        'L': 'line',
+        'T': 'text'
       }
 
       if (toolMap[key]) {
@@ -84,7 +86,7 @@ export default {
 <style scoped>
 .toolbar {
   position: fixed;
-  top: 20px;
+  top: 80px;
   left: 50%;
   transform: translateX(-50%);
   background: white;
@@ -93,7 +95,7 @@ export default {
   padding: 8px;
   display: flex;
   gap: 8px;
-  z-index: 1000;
+  z-index: 1001;
 }
 
 .toolbar-group {
@@ -151,7 +153,7 @@ export default {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .toolbar {
-    top: 10px;
+    top: 70px;
     padding: 6px;
   }
 

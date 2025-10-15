@@ -60,7 +60,7 @@ export default {
     
     // Cursor positioning style
     const cursorStyle = computed(() => ({
-      position: 'fixed',
+      position: 'absolute',
       left: `${screenPosition.value.x}px`,
       top: `${screenPosition.value.y}px`,
       pointerEvents: 'none',
@@ -79,7 +79,7 @@ export default {
 
 <style scoped>
 .user-cursor {
-  position: fixed;
+  position: absolute;
   pointer-events: none;
   user-select: none;
 }
