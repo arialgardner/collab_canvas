@@ -62,8 +62,10 @@ export default {
       
       // Visual feedback
       opacity: isDragging.value ? 0.8 : 1,
-      stroke: isHovered.value ? '#333' : 'transparent',
-      strokeWidth: isHovered.value ? 2 : 0,
+      stroke: (props.rectangle.__highlightUntil && Date.now() < props.rectangle.__highlightUntil)
+        ? '#f59e0b'
+        : (isHovered.value ? '#333' : 'transparent'),
+      strokeWidth: (props.rectangle.__highlightUntil && Date.now() < props.rectangle.__highlightUntil) ? 3 : (isHovered.value ? 2 : 0),
       
       // Performance optimizations
       listening: true, // Keep listening for interactions

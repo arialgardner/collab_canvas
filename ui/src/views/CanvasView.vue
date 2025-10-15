@@ -189,6 +189,16 @@
       @update-canvas-size="handleUpdateCanvasSize"
       @bulk-update="handleBulkUpdate"
     />
+
+    <!-- Recovery Modal -->
+    <RecoveryModal
+      :is-visible="showRecoveryModal"
+      :recovery-age="recoveryMeta.age"
+      :timestamp="recoveryMeta.ts"
+      :is-restoring="false"
+      @restore="handleRecover"
+      @discard="handleDiscardRecovery"
+    />
   </div>
 </template>
 
@@ -208,10 +218,12 @@ import ConfirmModal from '../components/ConfirmModal.vue'
 import SyncStatus from '../components/SyncStatus.vue'
 import UserCursor from '../components/UserCursor.vue'
 import PerformanceMonitor from '../components/PerformanceMonitor.vue'
+import Notifications from '../components/Notifications.vue'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
 import TestingDashboard from '../components/TestingDashboard.vue'
 import PropertiesPanel from '../components/PropertiesPanel.vue'
+import RecoveryModal from '../components/RecoveryModal.vue'
 import { useShapes } from '../composables/useShapes'
 import { getMaxZIndex } from '../types/shapes'
 import { useAuth } from '../composables/useAuth'
@@ -223,6 +235,7 @@ import { useUndoRedo } from '../composables/useUndoRedo'
 import { useConnectionState } from '../composables/useConnectionState'
 import { useQueueProcessor } from '../composables/useQueueProcessor'
 import { useStateReconciliation } from '../composables/useStateReconciliation'
+import { useCrashRecovery } from '../composables/useCrashRecovery'
 import { useBugFixes } from '../utils/bugFixUtils'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -240,9 +253,11 @@ export default {
     ContextMenu,
     ConfirmModal,
     PropertiesPanel,
+    RecoveryModal,
     SyncStatus,
     UserCursor,
     PerformanceMonitor,
+    Notifications,
     LoadingSpinner,
     EmptyState,
     TestingDashboard
@@ -322,6 +337,7 @@ export default {
     const { state: connectionState, setSyncHandler } = useConnectionState()
     const { processQueue } = useQueueProcessor()
     const { reconcile, startPeriodic, stopPeriodic, triggerOnVisibilityChange } = useStateReconciliation()
+    const { saveSnapshot, loadSnapshot, clearSnapshot } = useCrashRecovery()
     const { canUndo, canRedo, addAction, undo, redo, setUndoRedoFlag } = useUndoRedo()
 
     // Refs
@@ -392,6 +408,8 @@ export default {
     
     // Clipboard state (local, not synchronized)
     const clipboard = ref([])
+    const showRecoveryModal = ref(false)
+    const recoveryMeta = ref({ age: '', ts: 0 })
     const hasClipboard = computed(() => clipboard.value.length > 0)
 
     // Text editing state
@@ -1615,6 +1633,18 @@ export default {
       // Start periodic reconciliation and tab-visibility reconciliation
       startPeriodic(canvasId.value, shapes, () => [], 60000)
       triggerOnVisibilityChange(canvasId.value, shapes, () => [])
+
+      // Crash recovery detection on mount
+      const rec = loadSnapshot(canvasId.value)
+      if (rec && rec.timestamp && Date.now() - rec.timestamp < 5 * 60 * 1000) {
+        // Offer recovery if < 5 minutes old
+        const ageMin = Math.max(1, Math.round((Date.now() - rec.timestamp) / 60000))
+        recoveryMeta.value = { age: `${ageMin} minute(s) ago`, ts: rec.timestamp }
+        showRecoveryModal.value = true
+      } else if (rec) {
+        // Stale, clear
+        clearSnapshot(canvasId.value)
+      }
     })
 
     onUnmounted(() => {
@@ -1717,6 +1747,30 @@ export default {
       })
     }
 
+    // Recovery actions
+    const handleRecover = async () => {
+      const rec = loadSnapshot(canvasId.value)
+      if (!rec) { showRecoveryModal.value = false; return }
+      // Merge recovered shapes by timestamp
+      const remoteIds = new Set(Array.from(shapes.keys()))
+      rec.shapes.forEach(s => {
+        const local = shapes.get(s.id)
+        if (!local) {
+          shapes.set(s.id, s)
+        } else if ((s.lastModified || 0) > (local.lastModified || 0)) {
+          shapes.set(s.id, s)
+        }
+      })
+      // Close and clear
+      clearSnapshot(canvasId.value)
+      showRecoveryModal.value = false
+    }
+
+    const handleDiscardRecovery = () => {
+      clearSnapshot(canvasId.value)
+      showRecoveryModal.value = false
+    }
+
     return {
       // Refs
       stage,
@@ -1797,7 +1851,12 @@ export default {
       canvasHeight,
       handleUpdateProperty,
       handleUpdateCanvasSize,
-      handleBulkUpdate
+      handleBulkUpdate,
+      // Recovery modal
+      showRecoveryModal,
+      recoveryMeta,
+      handleRecover,
+      handleDiscardRecovery
     }
   }
 }

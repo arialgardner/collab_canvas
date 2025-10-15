@@ -45,6 +45,12 @@
     <!-- Single Shape Selection -->
     <div v-else-if="selectedShapes.length === 1" class="panel-section">
       <h3 class="panel-title">{{ shapeTypeLabel }}</h3>
+      <div class="property-group">
+        <div class="info-row">
+          <span class="info-label">Last Edited By</span>
+          <span class="info-value">{{ lastEditedBy }}</span>
+        </div>
+      </div>
       
       <!-- Rectangle Properties -->
       <template v-if="selectedShapes[0].type === 'rectangle'">
@@ -584,6 +590,13 @@ const shapeTypeLabel = computed(() => {
   const type = props.selectedShapes[0].type;
   return type.charAt(0).toUpperCase() + type.slice(1);
 });
+
+const lastEditedBy = computed(() => {
+  if (props.selectedShapes.length !== 1) return ''
+  const s = props.selectedShapes[0]
+  if (!s.lastModifiedBy) return 'Unknown'
+  return s.lastModifiedBy
+})
 
 const uniqueShapeTypes = computed(() => {
   const types = [...new Set(props.selectedShapes.map(s => s.type))];

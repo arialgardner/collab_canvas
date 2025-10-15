@@ -11,6 +11,7 @@ import {
 } from '../types/shapes'
 import { useFirestore } from './useFirestore'
 import { usePerformance } from './usePerformance'
+import { useNotifications } from './useNotifications'
 import { usePerformanceMonitoring } from './usePerformanceMonitoring'
 
 export const useShapes = () => {
@@ -25,6 +26,7 @@ export const useShapes = () => {
     trackShapeDeletion,
     updateShapeMetrics 
   } = usePerformanceMonitoring()
+  const { info, warning } = useNotifications()
   
   // Store shapes in a reactive Map for O(1) lookups
   const shapes = reactive(new Map())
@@ -343,8 +345,19 @@ export const useShapes = () => {
             if (!localShape || shape.lastModified > localShape.lastModified) {
               shapes.set(shapeId, shape)
               console.log(`Real-time: Shape ${shapeId} (${shape.type}) updated`)
+              // Visual feedback trigger: mark recent editor for UI highlights
+              // Store a transient marker on the shape object for components to read
+              const marked = { ...shape, __highlightUntil: Date.now() + 2000 }
+              shapes.set(shapeId, marked)
+              // Basic notification for awareness (optional, lightweight)
+              // info(`Edited by ${shape.lastModifiedBy || 'someone'}`)
             } else {
               console.log(`Real-time: Ignoring older update for shape ${shapeId}`)
+              // If local is newer within 2s window, show conflict note
+              const dt = Math.abs((localShape.lastModified || 0) - (shape.lastModified || 0))
+              if (dt < 2000) {
+                warning(`Another user also edited ${shape.type}`)
+              }
             }
           }
           

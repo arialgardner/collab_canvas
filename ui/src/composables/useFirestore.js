@@ -19,6 +19,7 @@ import { usePerformanceMonitoring } from './usePerformanceMonitoring'
 import { useErrorHandling } from './useErrorHandling'
 import { getOperationQueue } from '../utils/operationQueue'
 import { useOperationQueue } from './useOperationQueue'
+import { useNotifications } from './useNotifications'
 import { isDuplicateOperation, markOperationProcessed } from '../utils/operationDeduplication'
 
 export const useFirestore = () => {
@@ -29,6 +30,7 @@ export const useFirestore = () => {
     trackFirestoreError 
   } = usePerformanceMonitoring()
   const { handleFirebaseError, retry } = useErrorHandling()
+  const { error: notifyError, warning: notifyWarning } = useNotifications()
   
   // Operation queue for batching and prioritization (v3)
   const operationQueue = getOperationQueue()
@@ -156,6 +158,7 @@ export const useFirestore = () => {
       return await retry(operation, 3, 1000)
     } catch (error) {
       console.error('Error saving shape:', error)
+      notifyError('Failed to save shape - will retry')
       trackFirestoreError()
       handleFirebaseError(error, 'save shape')
       throw error
@@ -216,6 +219,7 @@ export const useFirestore = () => {
       return true
     } catch (error) {
       console.error('Error updating shape:', error)
+      notifyWarning('Update failed - queued for retry')
       trackFirestoreError()
       throw error
     }
@@ -234,7 +238,8 @@ export const useFirestore = () => {
       return true
     } catch (error) {
       console.error('Error deleting shape:', error)
-      trackFirestoreError()  // v3 error tracking
+      notifyWarning('Delete failed - will retry')
+      trackFirestoreError()
       throw error
     }
   }

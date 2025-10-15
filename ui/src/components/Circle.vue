@@ -44,10 +44,10 @@ export default {
       // Offset so transformer treats circle like a rectangle (top-left origin)
       offsetX: props.circle.radius,
       offsetY: props.circle.radius,
-      // Visual feedback for selection
-      shadowBlur: props.isSelected ? 10 : 0,
-      shadowColor: props.isSelected ? '#3b82f6' : 'transparent',
-      shadowOpacity: props.isSelected ? 0.5 : 0,
+      // Visual feedback for selection / remote edit highlight
+      shadowBlur: (props.isSelected || (props.circle.__highlightUntil && Date.now() < props.circle.__highlightUntil)) ? 10 : 0,
+      shadowColor: (props.circle.__highlightUntil && Date.now() < props.circle.__highlightUntil) ? '#f59e0b' : (props.isSelected ? '#3b82f6' : 'transparent'),
+      shadowOpacity: (props.isSelected || (props.circle.__highlightUntil && Date.now() < props.circle.__highlightUntil)) ? 0.6 : 0,
       // Performance optimization
       listening: true,
       perfectDrawEnabled: false
