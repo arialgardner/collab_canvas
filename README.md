@@ -13,12 +13,6 @@ A real-time collaborative canvas application where multiple users can create, mo
 - **Error Handling**: Graceful offline/online transitions and comprehensive error recovery
 - **Authentication**: Secure sign-in with email/password or Google OAuth
 
-## 🚀 Live Demo
-
-**[Try CollabCanvas Live →](https://collab-canvas-a3e9e.web.app)**
-
-*Sign in and share the link with others to collaborate in real-time!*
-
 ## 🛠️ Technology Stack
 
 - **Frontend**: Vue 3 + Vite + TypeScript
