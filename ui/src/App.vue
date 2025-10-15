@@ -4,7 +4,7 @@
     <ErrorHandler />
     
     <!-- Navigation Bar (only show on canvas route) -->
-    <NavBar v-if="showNavBar" />
+    <NavBar v-if="showNavBar" @toggle-versions="handleToggleVersions" @save-version="handleSaveVersion" />
     
     <!-- Router View -->
     <router-view />
@@ -13,7 +13,7 @@
 
 <script>
 import { computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import ErrorHandler from './components/ErrorHandler.vue'
 import { useErrorHandling } from './composables/useErrorHandling'
@@ -26,6 +26,7 @@ export default {
   },
   setup() {
     const route = useRoute()
+    const router = useRouter()
     const { setupNetworkMonitoring } = useErrorHandling()
     
     // Only show navbar on canvas route (not on auth page)
@@ -38,8 +39,22 @@ export default {
       setupNetworkMonitoring()
     })
     
+    const handleToggleVersions = () => {
+      const q = { ...route.query }
+      q.history = q.history ? undefined : '1'
+      router.replace({ name: route.name, params: route.params, query: q })
+    }
+
+    const handleSaveVersion = () => {
+      const q = { ...route.query }
+      q.save = '1'
+      router.replace({ name: route.name, params: route.params, query: q })
+    }
+
     return {
-      showNavBar
+      showNavBar,
+      handleToggleVersions,
+      handleSaveVersion
     }
   }
 }

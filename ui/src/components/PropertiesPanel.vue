@@ -110,12 +110,17 @@
 
         <div class="property-group">
           <label class="property-label">Fill Color</label>
-          <input
-            type="color"
-            :value="selectedShapes[0].fill"
-            @input="handlePropertyChange('fill', $event.target.value)"
-            class="property-color"
-          />
+          <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
+            <input
+              type="color"
+              :value="selectedShapes[0].fill"
+              @input="onFillInput($event.target.value)"
+              class="property-color"
+            />
+            <div class="mru-row" v-if="mruFill.length">
+              <button v-for="c in mruFill" :key="'fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+            </div>
+          </div>
         </div>
 
         <div class="property-group">
@@ -186,12 +191,17 @@
 
         <div class="property-group">
           <label class="property-label">Fill Color</label>
-          <input
-            type="color"
-            :value="selectedShapes[0].fill"
-            @input="handlePropertyChange('fill', $event.target.value)"
-            class="property-color"
-          />
+          <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
+            <input
+              type="color"
+              :value="selectedShapes[0].fill"
+              @input="onFillInput($event.target.value)"
+              class="property-color"
+            />
+            <div class="mru-row" v-if="mruFill.length">
+              <button v-for="c in mruFill" :key="'text-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+            </div>
+          </div>
         </div>
 
         <div class="property-group">
@@ -506,25 +516,35 @@
       <!-- Only show properties that are common to all selected shapes -->
       <div v-if="hasCommonProperty('fill')" class="property-group">
         <label class="property-label">Fill Color</label>
-        <input
-          type="color"
-          :value="getCommonValue('fill')"
-          @input="handleBulkPropertyChange('fill', $event.target.value)"
-          :class="{ mixed: !isValueConsistent('fill') }"
-          class="property-color"
-        />
+        <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
+          <input
+            type="color"
+            :value="getCommonValue('fill')"
+            @input="onBulkFillInput($event.target.value)"
+            :class="{ mixed: !isValueConsistent('fill') }"
+            class="property-color"
+          />
+          <div class="mru-row" v-if="mruFill.length">
+            <button v-for="c in mruFill" :key="'bulk-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyBulkFill(c)"></button>
+          </div>
+        </div>
         <span v-if="!isValueConsistent('fill')" class="mixed-label">Mixed</span>
       </div>
 
       <div v-if="hasCommonProperty('stroke')" class="property-group">
         <label class="property-label">Stroke Color</label>
-        <input
-          type="color"
-          :value="getCommonValue('stroke')"
-          @input="handleBulkPropertyChange('stroke', $event.target.value)"
-          :class="{ mixed: !isValueConsistent('stroke') }"
-          class="property-color"
-        />
+        <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
+          <input
+            type="color"
+            :value="getCommonValue('stroke')"
+            @input="onBulkStrokeInput($event.target.value)"
+            :class="{ mixed: !isValueConsistent('stroke') }"
+            class="property-color"
+          />
+          <div class="mru-row" v-if="mruStroke.length">
+            <button v-for="c in mruStroke" :key="'bulk-stroke-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyBulkStroke(c)"></button>
+          </div>
+        </div>
         <span v-if="!isValueConsistent('stroke')" class="mixed-label">Mixed</span>
       </div>
 
@@ -554,7 +574,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref, onMounted } from 'vue';
+import { mruColors } from '../utils/mruColors'
 
 const props = defineProps({
   selectedShapes: {
@@ -580,6 +601,44 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update-property', 'update-canvas-size', 'bulk-update']);
+// MRU state
+const mruFill = ref([])
+const mruStroke = ref([])
+
+onMounted(() => {
+  mruFill.value = mruColors.getFill()
+  mruStroke.value = mruColors.getStroke()
+})
+
+const onFillInput = (value) => {
+  handlePropertyChange('fill', value)
+  mruFill.value = mruColors.addFill(value)
+}
+
+const applyFill = (color) => {
+  handlePropertyChange('fill', color)
+  mruFill.value = mruColors.addFill(color)
+}
+
+const onBulkFillInput = (value) => {
+  handleBulkPropertyChange('fill', value)
+  mruFill.value = mruColors.addFill(value)
+}
+
+const applyBulkFill = (color) => {
+  handleBulkPropertyChange('fill', color)
+  mruFill.value = mruColors.addFill(color)
+}
+
+const onBulkStrokeInput = (value) => {
+  handleBulkPropertyChange('stroke', value)
+  mruStroke.value = mruColors.addStroke(value)
+}
+
+const applyBulkStroke = (color) => {
+  handleBulkPropertyChange('stroke', color)
+  mruStroke.value = mruColors.addStroke(color)
+}
 
 const isVisible = computed(() => true); // Always visible for now
 
@@ -773,6 +832,19 @@ const handleBulkPropertyChange = (property, value) => {
 
 .property-color:hover {
   border-color: #3b82f6;
+}
+
+.mru-row {
+  display: flex;
+  gap: 6px;
+}
+
+.mru-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .property-select {

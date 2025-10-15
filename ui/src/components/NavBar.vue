@@ -69,7 +69,7 @@
           <span class="user-name">{{ userDisplayName }}</span>
         </div>
 
-        <!-- Logout Button -->
+        <!-- Version History (owner-only) & Logout Button -->
         <button 
           v-if="user" 
           @click="handleLogout"
@@ -81,6 +81,12 @@
             <path d="M3 3a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 13.846 4.632 16 6.414 16H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 6H6.28l-.31-1.243A1 1 0 005 4H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
           </svg>
           {{ isLoading ? 'Signing out...' : 'Sign Out' }}
+        </button>
+        <button v-if="userIsOwner" class="logout-button" title="Version History" @click="$emit('toggle-versions')" style="background:#e0e7ff;color:#3730a3;border-color:#c7d2fe;">
+          History
+        </button>
+        <button v-if="userIsOwner" class="logout-button" title="Save Version" @click="$emit('save-version')" style="background:#dcfce7;color:#065f46;border-color:#bbf7d0;">
+          Save
         </button>
       </div>
     </div>
@@ -104,6 +110,7 @@ import ConnectionStatus from './ConnectionStatus.vue'
 
 export default {
   name: 'NavBar',
+  components: { ConnectionStatus },
   setup() {
     const { user, signOut, isLoading } = useAuth()
     const { activeUsers, getActiveUsers, getActiveUserCount, setUserOffline } = usePresence()
@@ -192,6 +199,11 @@ export default {
       }
     })
 
+    const userIsOwner = computed(() => {
+      // Owner check can be provided by parent via props in future; default allow for now
+      return !!user.value
+    })
+
     return {
       user,
       isLoading,
@@ -201,7 +213,8 @@ export default {
       activeUserCount,
       showPresenceDropdown,
       togglePresenceDropdown,
-      handleLogout
+      handleLogout,
+      userIsOwner
     }
   }
 }

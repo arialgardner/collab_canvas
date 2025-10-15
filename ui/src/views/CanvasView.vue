@@ -14,7 +14,7 @@
     </div>
 
     <!-- Toolbar -->
-    <Toolbar @tool-selected="handleToolSelected" />
+      <Toolbar @tool-selected="handleToolSelected" :can-undo="canUndo" :can-redo="canRedo" @undo="handleUndo" @redo="handleRedo" />
 
     <!-- Sync Status -->
     <SyncStatus
@@ -199,6 +199,16 @@
       @restore="handleRecover"
       @discard="handleDiscardRecovery"
     />
+
+    <!-- Version History Modal (owner-only visibility handled by NavBar button) -->
+    <VersionHistory
+      :is-visible="showVersionHistory"
+      :versions="versionsList"
+      :is-loading="versionsLoading"
+      :can-restore="canRestoreVersions"
+      @close="showVersionHistory = false"
+      @restore="handleRestoreVersion"
+    />
   </div>
 </template>
 
@@ -224,6 +234,7 @@ import EmptyState from '../components/EmptyState.vue'
 import TestingDashboard from '../components/TestingDashboard.vue'
 import PropertiesPanel from '../components/PropertiesPanel.vue'
 import RecoveryModal from '../components/RecoveryModal.vue'
+import VersionHistory from '../components/VersionHistory.vue'
 import { useShapes } from '../composables/useShapes'
 import { getMaxZIndex } from '../types/shapes'
 import { useAuth } from '../composables/useAuth'
@@ -237,6 +248,7 @@ import { useConnectionState } from '../composables/useConnectionState'
 import { useQueueProcessor } from '../composables/useQueueProcessor'
 import { useStateReconciliation } from '../composables/useStateReconciliation'
 import { useCrashRecovery } from '../composables/useCrashRecovery'
+import { useVersions } from '../composables/useVersions'
 import { useBugFixes } from '../utils/bugFixUtils'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -255,6 +267,7 @@ export default {
     ConfirmModal,
     PropertiesPanel,
     RecoveryModal,
+    VersionHistory,
     SyncStatus,
     UserCursor,
     PerformanceMonitor,
@@ -339,7 +352,8 @@ export default {
     const { processQueue } = useQueueProcessor()
     const { reconcile, startPeriodic, stopPeriodic, triggerOnVisibilityChange } = useStateReconciliation()
     const { saveSnapshot, loadSnapshot, clearSnapshot } = useCrashRecovery()
-    const { canUndo, canRedo, addAction, undo, redo, setUndoRedoFlag } = useUndoRedo()
+    const { isLoading: versionsLoading, versions: versionsList, listVersions, createVersion } = useVersions()
+    const { canUndo, canRedo, addAction, undo, redo, setUndoRedoFlag, beginGroup, endGroup, clear } = useUndoRedo()
 
     // Refs
     const stage = ref(null)
@@ -366,6 +380,12 @@ export default {
     const zoomLevel = ref(1)
     const isDragging = ref(false)
     const lastPointerPosition = reactive({ x: 0, y: 0 })
+    const showVersionHistory = ref(false)
+    const canRestoreVersions = computed(() => true) // owner-only checked via NavBar button visibility
+
+    // Grouping state for arrow-key nudges
+    const nudgeGroupActive = ref(false)
+    let nudgeGroupTimer = null
 
     // Tool state management
     const activeTool = ref('select')
@@ -1378,7 +1398,23 @@ export default {
       setUndoRedoFlag(true) // Prevent tracking undo as a new action
       
       try {
-        if (action.type === 'create') {
+        if (action.type === 'group') {
+          // Undo grouped actions in reverse order
+          for (let i = action.actions.length - 1; i >= 0; i--) {
+            const a = action.actions[i]
+            if (a.type === 'create') {
+              await deleteShapes([a.data.id], canvasId.value)
+            } else if (a.type === 'delete') {
+              const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = a.data
+              await createShape(a.data.type, shapeProps, user.value.uid, canvasId.value)
+            } else if (a.type === 'update') {
+              await updateShape(a.data.id, a.data.oldValues, user.value.uid, canvasId.value, true)
+            } else if (a.type === 'property_change') {
+              const { shapeId, property, oldValue } = a
+              await updateShape(shapeId, { [property]: oldValue }, user.value.uid, canvasId.value, true)
+            }
+          }
+        } else if (action.type === 'create') {
           // Undo create = delete
           await deleteShapes([action.data.id], canvasId.value)
         } else if (action.type === 'delete') {
@@ -1389,6 +1425,9 @@ export default {
         } else if (action.type === 'update') {
           // Undo update = restore old values
           await updateShape(action.data.id, action.data.oldValues, user.value.uid, canvasId.value, true)
+        } else if (action.type === 'property_change') {
+          const { shapeId, property, oldValue } = action
+          await updateShape(shapeId, { [property]: oldValue }, user.value.uid, canvasId.value, true)
         }
       } finally {
         setUndoRedoFlag(false)
@@ -1402,7 +1441,23 @@ export default {
       setUndoRedoFlag(true) // Prevent tracking redo as a new action
       
       try {
-        if (action.type === 'create') {
+        if (action.type === 'group') {
+          // Redo grouped actions in recorded order
+          for (let i = 0; i < action.actions.length; i++) {
+            const a = action.actions[i]
+            if (a.type === 'create') {
+              const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = a.data
+              await createShape(a.data.type, shapeProps, user.value.uid, canvasId.value)
+            } else if (a.type === 'delete') {
+              await deleteShapes([a.data.id], canvasId.value)
+            } else if (a.type === 'update') {
+              await updateShape(a.data.id, a.data.newValues, user.value.uid, canvasId.value, true)
+            } else if (a.type === 'property_change') {
+              const { shapeId, property, newValue } = a
+              await updateShape(shapeId, { [property]: newValue }, user.value.uid, canvasId.value, true)
+            }
+          }
+        } else if (action.type === 'create') {
           // Redo create with original properties
           const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
           await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value)
@@ -1412,6 +1467,9 @@ export default {
         } else if (action.type === 'update') {
           // Redo update = reapply new values
           await updateShape(action.data.id, action.data.newValues, user.value.uid, canvasId.value, true)
+        } else if (action.type === 'property_change') {
+          const { shapeId, property, newValue } = action
+          await updateShape(shapeId, { [property]: newValue }, user.value.uid, canvasId.value, true)
         }
       } finally {
         setUndoRedoFlag(false)
@@ -1437,31 +1495,60 @@ export default {
       if (selectedShapeIds.value.length > 0 && user.value) {
         const userId = user.value.uid
         
-        // Cmd+] or Ctrl+]: Bring to front
+        // Cmd+] or Ctrl+]: Bring to front (grouped)
         if (modKey && e.key === ']' && !e.shiftKey) {
           e.preventDefault()
+          beginGroup()
           await bringToFront(selectedShapeIds.value, userId, canvasId.value)
+          // Track as updates
+          for (const id of selectedShapeIds.value) {
+            const shape = shapes.get(id)
+            if (!shape) continue
+            addAction({ type: 'update', data: { id, oldValues: { zIndex: shape.zIndex - 1 }, newValues: { zIndex: shape.zIndex } } })
+          }
+          endGroup()
           return
         }
         
-        // Cmd+[ or Ctrl+[: Send to back
+        // Cmd+[ or Ctrl+[: Send to back (grouped)
         if (modKey && e.key === '[' && !e.shiftKey) {
           e.preventDefault()
+          beginGroup()
           await sendToBack(selectedShapeIds.value, userId, canvasId.value)
+          for (const id of selectedShapeIds.value) {
+            const shape = shapes.get(id)
+            if (!shape) continue
+            addAction({ type: 'update', data: { id, oldValues: { zIndex: shape.zIndex + 1 }, newValues: { zIndex: shape.zIndex } } })
+          }
+          endGroup()
           return
         }
         
-        // Cmd+Shift+] or Ctrl+Shift+]: Bring forward
+        // Cmd+Shift+] or Ctrl+Shift+]: Bring forward (grouped)
         if (modKey && e.shiftKey && e.key === ']') {
           e.preventDefault()
+          beginGroup()
           await bringForward(selectedShapeIds.value, userId, canvasId.value)
+          for (const id of selectedShapeIds.value) {
+            const shape = shapes.get(id)
+            if (!shape) continue
+            addAction({ type: 'update', data: { id, oldValues: { zIndex: (shape.zIndex || 0) - 1 }, newValues: { zIndex: (shape.zIndex || 0) } } })
+          }
+          endGroup()
           return
         }
         
-        // Cmd+Shift+[ or Ctrl+Shift+[: Send backward
+        // Cmd+Shift+[ or Ctrl+Shift+[: Send backward (grouped)
         if (modKey && e.shiftKey && e.key === '[') {
           e.preventDefault()
+          beginGroup()
           await sendBackward(selectedShapeIds.value, userId, canvasId.value)
+          for (const id of selectedShapeIds.value) {
+            const shape = shapes.get(id)
+            if (!shape) continue
+            addAction({ type: 'update', data: { id, oldValues: { zIndex: (shape.zIndex || 0) + 1 }, newValues: { zIndex: (shape.zIndex || 0) } } })
+          }
+          endGroup()
           return
         }
       }
@@ -1505,11 +1592,19 @@ export default {
       }
       
       // Cmd+D or Ctrl+D: Duplicate selected shapes
-      if (modKey && e.key === 'd' && selectedShapeIds.value.length > 0) {
+      if (modKey && e.key === 'd' && selectedShapeIds.value.length > 0 && !showTextEditor.value) {
         e.preventDefault()
-        
+        beginGroup()
         const userId = user.value?.uid || 'anonymous'
         const duplicatedIds = await duplicateShapes(selectedShapeIds.value, userId, canvasId.value)
+        // Track as create actions so undo deletes them
+        for (const id of duplicatedIds) {
+          const shape = shapes.get(id)
+          if (shape) {
+            addAction({ type: 'create', data: { ...shape } })
+          }
+        }
+        endGroup()
         
         // Select duplicated shapes (deselect originals)
         selectedShapeIds.value = duplicatedIds
@@ -1518,7 +1613,7 @@ export default {
       }
       
       // Delete or Backspace: Delete selected shapes
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeIds.value.length > 0) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeIds.value.length > 0 && !showTextEditor.value) {
         e.preventDefault()
         
         // Show confirmation modal if >5 shapes are selected
@@ -1528,12 +1623,84 @@ export default {
           confirmModalVisible.value = true
         } else {
           // Delete immediately if <=5 shapes
+          beginGroup()
           await performDelete(selectedShapeIds.value)
+          endGroup()
+        }
+      }
+
+      // Arrow keys: Nudge selected shapes (1px, or 10px with Shift)
+      if (!modKey && selectedShapeIds.value.length > 0 && !showTextEditor.value) {
+        const step = e.shiftKey ? 10 : 1
+        let dx = 0, dy = 0
+        if (e.key === 'ArrowLeft') dx = -step
+        if (e.key === 'ArrowRight') dx = step
+        if (e.key === 'ArrowUp') dy = -step
+        if (e.key === 'ArrowDown') dy = step
+        if (dx !== 0 || dy !== 0) {
+          e.preventDefault()
+          if (!nudgeGroupActive.value) {
+            nudgeGroupActive.value = true
+            beginGroup()
+          }
+          clearTimeout(nudgeGroupTimer)
+          const userId = user.value?.uid || 'anonymous'
+          for (const id of selectedShapeIds.value) {
+            const shape = shapes.get(id)
+            if (!shape) continue
+            const oldValues = { x: shape.x || 0, y: shape.y || 0 }
+            const updates = { x: (shape.x || 0) + dx, y: (shape.y || 0) + dy }
+            await updateShape(id, updates, userId, canvasId.value, true, true)
+            addAction({ type: 'update', data: { id, oldValues, newValues: updates } })
+          }
+          // Increment version ops counter and snapshot after >=10 ops
+          try {
+            versionOpsCounter += selectedShapeIds.value.length
+            if (versionOpsCounter >= 10 && user.value?.uid) {
+              const shapesArray = Array.from(shapes.values())
+              if (shapesArray.length > 0) {
+                await createVersion(canvasId.value, user.value.uid, shapesArray, 'threshold')
+                versionOpsCounter = 0
+              }
+            }
+          } catch {}
+          nudgeGroupTimer = setTimeout(() => {
+            if (nudgeGroupActive.value) {
+              endGroup()
+              nudgeGroupActive.value = false
+            }
+          }, 300)
+          return
         }
       }
     }
 
     // Lifecycle
+    const updateHistoryFromRoute = async () => {
+      if (route.query.history) {
+        showVersionHistory.value = true
+        try {
+          await listVersions(canvasId.value)
+        } catch (e) {
+          console.error('Failed to load versions:', e)
+        }
+      } else {
+        showVersionHistory.value = false
+      }
+      // Manual save trigger via ?save=1
+      if (route.query.save && user.value?.uid) {
+        try {
+          const shapesArray = Array.from(shapes.values())
+          if (shapesArray.length > 0) {
+            await createVersion(canvasId.value, user.value.uid, shapesArray, 'manual')
+            await listVersions(canvasId.value)
+          }
+        } catch (e) {
+          console.error('Manual version save failed:', e)
+        }
+      }
+    }
+
     onMounted(async () => {
       // Register sync handler for ConnectionStatus "Sync Now"
       setSyncHandler(async () => {
@@ -1548,6 +1715,17 @@ export default {
       
       // Add keyboard listener
       window.addEventListener('keydown', handleKeyDown)
+
+      await updateHistoryFromRoute()
+      // Initial snapshot on open
+      try {
+        const shapesArray = Array.from(shapes.values())
+        if (shapesArray.length > 0 && user.value?.uid) {
+          await createVersion(canvasId.value, user.value.uid, shapesArray, 'initial')
+        }
+      } catch (e) {
+        console.error('Initial version save failed:', e)
+      }
       
       // Set initial cursor - add null check
       if (canvasWrapper.value) {
@@ -1643,6 +1821,18 @@ export default {
       // Start periodic reconciliation and tab-visibility reconciliation
       startPeriodic(canvasId.value, shapes, () => [], 60000)
       triggerOnVisibilityChange(canvasId.value, shapes, () => [])
+      // Periodic version save every 5 minutes
+      const savePeriodic = async () => {
+        try {
+          const shapesArray = Array.from(shapes.values())
+          if (shapesArray.length > 0 && user.value?.uid) {
+            await createVersion(canvasId.value, user.value.uid, shapesArray, 'periodic')
+          }
+        } catch (e) {
+          console.error('Periodic version save failed:', e)
+        }
+      }
+      const periodicTimer = window.setInterval(savePeriodic, 5 * 60 * 1000)
 
       // Crash recovery detection on mount
       const rec = loadSnapshot(canvasId.value)
@@ -1654,6 +1844,16 @@ export default {
       } else if (rec) {
         // Stale, clear
         clearSnapshot(canvasId.value)
+      }
+    })
+
+    watch(() => [route.query.history, route.query.save], async () => {
+      await updateHistoryFromRoute()
+      // Clear the save flag after processing so subsequent clicks work
+      if (route.query.save) {
+        const q = { ...route.query }
+        delete q.save
+        router.replace({ name: route.name, params: route.params, query: q })
       }
     })
 
@@ -1690,6 +1890,8 @@ export default {
       }
       window.removeEventListener('beforeunload', handleUnload)
       stopPeriodic()
+      // Clear periodic timer
+      try { window.clearInterval(periodicTimer) } catch {}
     })
 
     // Computed properties for properties panel
@@ -1781,6 +1983,18 @@ export default {
       showRecoveryModal.value = false
     }
 
+    // Version restore
+    const handleRestoreVersion = async (version) => {
+      if (!version || !Array.isArray(version.shapes)) return
+      // Replace local shapes with snapshot
+      shapes.clear()
+      for (const s of version.shapes) {
+        shapes.set(s.id, { ...s })
+      }
+      showVersionHistory.value = false
+      // TODO: Persist snapshot restore to Firestore if owner-only action required
+    }
+
     return {
       // Refs
       stage,
@@ -1866,7 +2080,18 @@ export default {
       showRecoveryModal,
       recoveryMeta,
       handleRecover,
-      handleDiscardRecovery
+      handleDiscardRecovery,
+      // Version history
+      showVersionHistory,
+      versionsList,
+      versionsLoading,
+      canRestoreVersions,
+      handleRestoreVersion,
+      // Undo/Redo exposure for Toolbar
+      handleUndo,
+      handleRedo,
+      canUndo,
+      canRedo
     }
   }
 }

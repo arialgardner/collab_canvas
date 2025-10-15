@@ -6,15 +6,20 @@ export const useUndoRedo = () => {
   const undoStack = ref([])
   const redoStack = ref([])
   let isUndoRedoAction = false // Flag to prevent tracking undo/redo actions themselves
+  let currentGroup = null // When active, actions are buffered here
 
   const canUndo = computed(() => undoStack.value.length > 0)
   const canRedo = computed(() => redoStack.value.length > 0)
 
-  // Add an action to the undo stack
-  // Action format: { type, data }
-  // Types: 'create', 'delete', 'update'
+  // Add an action to the undo stack or current group
+  // Action format: { type, data } or grouped: { type: 'group', actions: Action[] }
+  // Types: 'create', 'delete', 'update', 'property_change'
   const addAction = (action) => {
     if (isUndoRedoAction) return // Don't track undo/redo actions
+    if (currentGroup) {
+      currentGroup.push(action)
+      return
+    }
     
     undoStack.value.push(action)
     
@@ -52,6 +57,27 @@ export const useUndoRedo = () => {
     isUndoRedoAction = value
   }
 
+  // Grouping API
+  const beginGroup = () => {
+    if (!currentGroup) currentGroup = []
+  }
+  const endGroup = () => {
+    if (!currentGroup) return
+    const buffered = currentGroup
+    currentGroup = null
+    if (buffered.length === 0) return
+    if (buffered.length === 1) {
+      addAction(buffered[0])
+      return
+    }
+    // Push grouped action
+    undoStack.value.push({ type: 'group', actions: buffered })
+    if (undoStack.value.length > MAX_STACK_SIZE) {
+      undoStack.value.shift()
+    }
+    redoStack.value = []
+  }
+
   // Clear all stacks
   const clear = () => {
     undoStack.value = []
@@ -68,7 +94,9 @@ export const useUndoRedo = () => {
     undo,
     redo,
     setUndoRedoFlag,
-    clear
+    clear,
+    beginGroup,
+    endGroup
   }
 }
 

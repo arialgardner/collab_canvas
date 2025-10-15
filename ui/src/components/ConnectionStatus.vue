@@ -41,6 +41,7 @@ import QueueViewer from './QueueViewer.vue'
 
 export default {
   name: 'ConnectionStatus',
+  components: { QueueViewer },
   setup() {
     const { state, syncNow, retryConnection } = useConnectionState()
     const expanded = ref(false)

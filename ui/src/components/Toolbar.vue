@@ -13,6 +13,28 @@
         <span class="tool-shortcut">{{ tool.shortcut }}</span>
       </button>
     </div>
+    <div class="toolbar-group">
+      <button
+        class="tool-button"
+        :disabled="!canUndo"
+        title="Undo (Cmd/Ctrl+Z)"
+        @click="$emit('undo')"
+      >
+        <span class="tool-icon">↶</span>
+        <span class="tool-label">Undo</span>
+        <span class="tool-shortcut">⌘Z</span>
+      </button>
+      <button
+        class="tool-button"
+        :disabled="!canRedo"
+        title="Redo (Cmd/Ctrl+Shift+Z)"
+        @click="$emit('redo')"
+      >
+        <span class="tool-icon">↷</span>
+        <span class="tool-label">Redo</span>
+        <span class="tool-shortcut">⇧⌘Z</span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -21,7 +43,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 
 export default {
   name: 'Toolbar',
-  emits: ['tool-selected'],
+  props: {
+    canUndo: { type: Boolean, default: false },
+    canRedo: { type: Boolean, default: false }
+  },
+  emits: ['tool-selected', 'undo', 'redo'],
   setup(props, { emit }) {
     const activeTool = ref('select')
     
