@@ -507,20 +507,27 @@ const formatDate = (timestamp) => {
 <style scoped>
 .dashboard-container {
   min-height: 100vh;
+  height: 100vh;
   background: #f9fafb;
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
 }
 
 .dashboard-header {
-  max-width: 1400px;
-  margin: 0 auto 40px;
+  width: 100%;
+  flex-shrink: 0;
+  margin-bottom: 24px;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 0;
+  padding: 0;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 .dashboard-title {
@@ -530,16 +537,36 @@ const formatDate = (timestamp) => {
   margin: 0;
 }
 
+@media (max-width: 768px) {
+  .dashboard-title {
+    font-size: 24px;
+  }
+}
+
 .header-actions {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .user-menu {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .user-menu {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  
+  .create-button {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .user-info {
@@ -602,11 +629,32 @@ const formatDate = (timestamp) => {
 }
 
 .canvas-grid {
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  flex: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  align-content: start;
+  padding-bottom: 20px;
+}
+
+@media (min-width: 768px) {
+  .canvas-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 24px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .canvas-grid {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  }
+}
+
+@media (min-width: 1600px) {
+  .canvas-grid {
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  }
 }
 
 .canvas-card {

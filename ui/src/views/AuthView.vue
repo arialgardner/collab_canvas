@@ -30,9 +30,9 @@
       </div>
 
       <!-- Auth Form -->
-      <form @submit.prevent="handleSubmit" class="auth-form">
+      <form @submit.prevent="handleSubmit" class="auth-form" :class="{ 'login-mode': !isSignupMode }">
         <!-- Display Name Field (Signup only) -->
-        <div v-if="isSignupMode" class="form-group">
+        <div v-if="isSignupMode" class="form-group display-name-group">
           <label for="displayName">Display Name</label>
           <input
             id="displayName"
@@ -257,11 +257,14 @@ export default {
 <style scoped>
 .auth-container {
   min-height: 100vh;
+  height: 100vh;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
+  overflow: hidden;
 }
 
 .auth-card {
@@ -271,7 +274,18 @@ export default {
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
-  min-width: 320px; /* Prevent card from shrinking too much */
+  min-width: 280px;
+  margin: auto 0;
+}
+
+@media (max-width: 400px) {
+  .auth-card {
+    padding: 1.5rem;
+  }
+  
+  .auth-header h1 {
+    font-size: 1.5rem;
+  }
 }
 
 .auth-header {
@@ -327,6 +341,13 @@ export default {
 
 .auth-form {
   margin-bottom: 1.5rem;
+}
+
+.auth-form.login-mode {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 280px;
 }
 
 .form-group {
@@ -437,23 +458,22 @@ export default {
 .divider {
   text-align: center;
   margin: 1.5rem 0;
-  position: relative;
   color: #666;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
-.divider::before {
+.divider::before,
+.divider::after {
   content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
+  flex: 1;
   height: 1px;
   background: #ddd;
 }
 
 .divider span {
-  background: white;
-  padding: 0 1rem;
+  padding: 0;
 }
 
 .google-icon {
