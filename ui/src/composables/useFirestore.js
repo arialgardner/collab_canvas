@@ -1,6 +1,7 @@
 import { 
   collection, 
   doc, 
+  getDoc,
   setDoc, 
   updateDoc, 
   deleteDoc,
@@ -368,6 +369,194 @@ export const useFirestore = () => {
     }
   }
 
+  // Batch write operations for bulk shape creation (PR #1 v5)
+  const saveShapesBatch = async (canvasId, shapes, options = {}) => {
+    const { onProgress } = options
+    
+    try {
+      console.log(`📦 Starting batch save of ${shapes.length} shapes`)
+      trackFirestoreOpV3('batch_write')
+      
+      // Split into 500-operation chunks (Firestore batch limit)
+      const chunks = []
+      for (let i = 0; i < shapes.length; i += 500) {
+        chunks.push(shapes.slice(i, i + 500))
+      }
+      
+      console.log(`Split into ${chunks.length} batches`)
+      
+      // Execute batches in parallel
+      let processedCount = 0
+      await Promise.all(chunks.map(async (chunk, chunkIndex) => {
+        const batch = writeBatch(db)
+        
+        chunk.forEach(shape => {
+          const ref = getShapeDocRef(canvasId, shape.id)
+          // Prepare shape data with server timestamp
+          const shapeData = {
+            ...shape,
+            lastModified: serverTimestamp()
+          }
+          batch.set(ref, shapeData, { merge: true })
+        })
+        
+        await batch.commit()
+        processedCount += chunk.length
+        
+        // Report progress if callback provided
+        if (onProgress) {
+          onProgress(processedCount, shapes.length)
+        }
+        
+        console.log(`✅ Batch ${chunkIndex + 1}/${chunks.length} committed (${chunk.length} shapes)`)
+      }))
+      
+      console.log(`✅ Batch save complete: ${shapes.length} shapes saved`)
+      return true
+    } catch (error) {
+      console.error('Error in batch save:', error)
+      trackFirestoreError()
+      throw error
+    }
+  }
+
+  // Batch delete operations for bulk shape deletion (PR #1 v5)
+  const deleteShapesBatch = async (canvasId, shapeIds, options = {}) => {
+    const { onProgress } = options
+    
+    try {
+      console.log(`🗑️ Starting batch delete of ${shapeIds.length} shapes`)
+      trackFirestoreOpV3('batch_delete')
+      
+      // Split into 500-operation chunks (Firestore batch limit)
+      const chunks = []
+      for (let i = 0; i < shapeIds.length; i += 500) {
+        chunks.push(shapeIds.slice(i, i + 500))
+      }
+      
+      console.log(`Split into ${chunks.length} batches`)
+      
+      // Execute batches in parallel
+      let processedCount = 0
+      await Promise.all(chunks.map(async (chunk, chunkIndex) => {
+        const batch = writeBatch(db)
+        
+        chunk.forEach(shapeId => {
+          const ref = getShapeDocRef(canvasId, shapeId)
+          batch.delete(ref)
+        })
+        
+        await batch.commit()
+        processedCount += chunk.length
+        
+        // Report progress if callback provided
+        if (onProgress) {
+          onProgress(processedCount, shapeIds.length)
+        }
+        
+        console.log(`✅ Delete batch ${chunkIndex + 1}/${chunks.length} committed (${chunk.length} shapes)`)
+      }))
+      
+      console.log(`✅ Batch delete complete: ${shapeIds.length} shapes deleted`)
+      return true
+    } catch (error) {
+      console.error('Error in batch delete:', error)
+      trackFirestoreError()
+      throw error
+    }
+  }
+
+  // Canvas snapshot operations for fast bulk loading (PR #3 v5)
+  // Import compression utilities at the top level (will add to imports)
+  
+  /**
+   * Update or create canvas snapshot document
+   * @param {string} canvasId - Canvas ID
+   * @param {Array} shapes - Array of shape objects (uncompressed)
+   * @returns {Promise<boolean>} - Success status
+   */
+  const updateCanvasSnapshot = async (canvasId, shapes) => {
+    try {
+      // Import compression utility dynamically to avoid circular dependency
+      const { compressShapes, canFitInSnapshot } = await import('../utils/compression.js')
+      
+      console.log(`📸 Creating snapshot for ${shapes.length} shapes`)
+      
+      // Check if shapes will fit within Firestore 1MB limit
+      if (!canFitInSnapshot(shapes)) {
+        console.warn('⚠️ Shapes exceed Firestore document limit - snapshot will not be created')
+        return false
+      }
+      
+      // Compress shapes
+      const compressed = compressShapes(shapes)
+      
+      // Create snapshot document
+      const snapshotRef = doc(db, 'canvases', canvasId, 'snapshot')
+      const snapshotData = {
+        shapes: compressed,
+        shapeCount: shapes.length,
+        lastUpdated: serverTimestamp(),
+        version: 1 // Can be incremented for future schema changes
+      }
+      
+      await setDoc(snapshotRef, snapshotData)
+      
+      console.log(`✅ Snapshot created successfully (${shapes.length} shapes)`)
+      trackFirestoreOpV3('snapshot_write')
+      
+      return true
+    } catch (error) {
+      console.error('Error creating canvas snapshot:', error)
+      trackFirestoreError()
+      // Don't throw - snapshot creation is optional optimization
+      return false
+    }
+  }
+  
+  /**
+   * Load canvas snapshot document
+   * @param {string} canvasId - Canvas ID
+   * @returns {Promise<Array|null>} - Array of shapes or null if no snapshot exists
+   */
+  const loadCanvasSnapshot = async (canvasId) => {
+    try {
+      // Import compression utility dynamically
+      const { decompressShapes } = await import('../utils/compression.js')
+      
+      console.log(`📸 Loading snapshot for canvas ${canvasId}`)
+      
+      const snapshotRef = doc(db, 'canvases', canvasId, 'snapshot')
+      const snapshotDoc = await getDoc(snapshotRef)
+      
+      if (!snapshotDoc.exists()) {
+        console.log('No snapshot found for canvas')
+        return null
+      }
+      
+      const data = snapshotDoc.data()
+      
+      // Validate snapshot data
+      if (!data.shapes || typeof data.shapes !== 'string') {
+        console.warn('Invalid snapshot data - missing or invalid shapes field')
+        return null
+      }
+      
+      // Decompress shapes
+      const shapes = decompressShapes(data.shapes)
+      
+      console.log(`✅ Snapshot loaded successfully (${shapes.length} shapes)`)
+      trackFirestoreOpV3('snapshot_read')
+      
+      return shapes
+    } catch (error) {
+      console.error('Error loading canvas snapshot:', error)
+      trackFirestoreError()
+      // Return null to allow graceful fallback
+      return null
+    }
+  }
+
   return {
     // New shape operations
     saveShape,
@@ -376,6 +565,14 @@ export const useFirestore = () => {
     loadShapes,
     subscribeToShapes,
     processQueuedOperation,
+    
+    // Batch operations (v5)
+    saveShapesBatch,
+    deleteShapesBatch,
+    
+    // Snapshot operations (v5)
+    updateCanvasSnapshot,
+    loadCanvasSnapshot,
 
     // Backward compatible rectangle operations
     saveRectangle,

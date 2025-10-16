@@ -118,6 +118,10 @@ export default {
   name: 'NavBar',
   components: { ConnectionStatus },
   props: {
+    canvasId: {
+      type: String,
+      default: 'default'
+    },
     canUserEdit: {
       type: Boolean,
       default: false
@@ -179,9 +183,10 @@ export default {
         
         if (userId) {
           // Clean up presence and cursor before signing out
+          // Use the actual canvasId prop instead of hardcoded 'default'
           await Promise.all([
-            setUserOffline('default', userId),
-            removeCursor('default', userId)
+            setUserOffline(props.canvasId, userId),
+            removeCursor(props.canvasId, userId)
           ])
         }
         

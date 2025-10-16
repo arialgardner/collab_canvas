@@ -6,6 +6,7 @@
     <!-- Navigation Bar (only show on canvas route) -->
     <NavBar 
       v-if="showNavBar" 
+      :canvasId="currentCanvasId"
       :canUserEdit="canUserEdit"
       :isOwner="isCanvasOwner"
       @toggle-versions="handleToggleVersions" 
@@ -44,6 +45,11 @@ export default {
       return route.name === 'Canvas'
     })
     
+    // Get current canvas ID from route
+    const currentCanvasId = computed(() => {
+      return route.params.canvasId || 'default'
+    })
+    
     // Check if user can edit the current canvas (owner or editor)
     const canUserEdit = computed(() => {
       if (!user.value || !currentCanvas.value) return false
@@ -76,6 +82,7 @@ export default {
 
     return {
       showNavBar,
+      currentCanvasId,
       canUserEdit,
       isCanvasOwner,
       handleToggleVersions,

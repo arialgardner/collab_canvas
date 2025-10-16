@@ -26,14 +26,30 @@ export function useVersions() {
       isLoading.value = true
       error.value = null
 
+      // v5: Compress shapes for storage efficiency
+      const { compressShapes } = await import('../utils/compression.js')
+      const compressed = compressShapes(shapesArray)
+
       const payload = {
         createdAt: serverTimestamp(),
         createdBy: userId,
         createdByName: userName,
         summary,
-        shapes: shapesArray
+        shapeCount: shapesArray.length, // v5: Track count
+        compressed: compressed, // v5: Compressed shapes
+        shapes: shapesArray // Keep for backward compatibility (can remove in v6)
       }
       await addDoc(getVersionsRef(canvasId), payload)
+
+      // v5: Also update canvas snapshot for fast restore
+      try {
+        const { updateCanvasSnapshot } = await import('./useFirestore.js')
+        const { updateCanvasSnapshot: updateSnapshot } = updateCanvasSnapshot()
+        await updateSnapshot(canvasId, shapesArray)
+      } catch (snapshotError) {
+        console.warn('Failed to update canvas snapshot:', snapshotError)
+        // Continue - snapshot is optional
+      }
 
       // Retention: prune oldest beyond max
       await pruneOld(canvasId)

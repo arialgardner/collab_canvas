@@ -33,6 +33,7 @@ export const useShapes = () => {
   const error = ref(null)
   const isConnected = ref(true)
   const isSyncing = ref(false)
+  const syncPaused = ref(false) // v5: Pause sync during bulk operations
   // Track local editing state and queued remote updates
   const currentlyEditing = reactive(new Set())
   const pendingRemoteUpdates = new Map()
@@ -294,6 +295,12 @@ export const useShapes = () => {
       
       realtimeUnsubscribe = subscribeToShapes(canvasId, (changes, snapshot) => {
         isConnected.value = true
+        
+        // v5: Ignore updates during bulk operations
+        if (syncPaused.value) {
+          console.log('📴 Sync paused - ignoring real-time updates')
+          return
+        }
         
         changes.forEach((change) => {
           const shapeData = change.doc.data()
@@ -614,6 +621,27 @@ export const useShapes = () => {
     return duplicatedIds
   }
 
+  // v5: Pause sync during bulk operations
+  const pauseSync = () => {
+    syncPaused.value = true
+    console.log('📴 Real-time sync paused for bulk operation')
+  }
+
+  // v5: Resume sync after bulk operations
+  const resumeSync = async (canvasId) => {
+    syncPaused.value = false
+    console.log('📡 Real-time sync resuming...')
+    
+    // Force full reload from Firestore to ensure sync
+    try {
+      await loadShapesFromFirestore(canvasId)
+      console.log('📡 Real-time sync resumed and state reloaded')
+    } catch (err) {
+      console.error('Error reloading shapes after resuming sync:', err)
+      // Still resume sync even if reload fails
+    }
+  }
+
   return {
     // State
     shapes, // New primary state
@@ -648,6 +676,8 @@ export const useShapes = () => {
     startRealtimeSync,
     stopRealtimeSync,
     handleConnectionError,
+    pauseSync, // v5: Bulk operation support
+    resumeSync, // v5: Bulk operation support
 
     // Text lock management
     isTextLocked,

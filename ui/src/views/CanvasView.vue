@@ -53,8 +53,8 @@
         @contextmenu="handleContextMenu"
       >
         <v-layer ref="shapeLayer">
-          <!-- Render all shapes based on type -->
-          <template v-for="shape in shapesList" :key="shape.id">
+          <!-- Render visible shapes only (v5: viewport culling optimization) -->
+          <template v-for="shape in visibleShapesList" :key="shape.id">
             <!-- Rectangles -->
             <Rectangle
               v-if="shape.type === 'rectangle'"
@@ -226,6 +226,7 @@ import PropertiesPanel from '../components/PropertiesPanel.vue'
 import RecoveryModal from '../components/RecoveryModal.vue'
 import VersionHistory from '../components/VersionHistory.vue'
 import { useShapes } from '../composables/useShapes'
+import { useFirestore } from '../composables/useFirestore' // v5: Batch operations
 import { getMaxZIndex } from '../types/shapes'
 import { useAuth } from '../composables/useAuth'
 import { useCanvases } from '../composables/useCanvases'
@@ -240,6 +241,7 @@ import { useStateReconciliation } from '../composables/useStateReconciliation'
 import { useCrashRecovery } from '../composables/useCrashRecovery'
 import { useVersions } from '../composables/useVersions'
 import { useInactivityLogout } from '../composables/useInactivityLogout'
+import { useViewportCulling } from '../composables/useViewportCulling' // v5: Rendering optimization
 import { useBugFixes } from '../utils/bugFixUtils'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -309,6 +311,8 @@ export default {
       loadRectanglesFromFirestore, // Backward compatible
       startRealtimeSync, 
       stopRealtimeSync,
+      pauseSync, // v5: Bulk operation support
+      resumeSync, // v5: Bulk operation support
       isLoading, 
       error,
       isConnected,
@@ -328,6 +332,10 @@ export default {
       // Duplicate operations
       duplicateShapes
     } = useShapes()
+    
+    // v5: Batch operations and snapshot support for version restore
+    const { saveShapesBatch, deleteShapesBatch, loadCanvasSnapshot, updateCanvasSnapshot } = useFirestore()
+    
     const {
       cursors,
       updateCursorPosition,
@@ -447,6 +455,34 @@ export default {
     const shapesList = computed(() => getAllShapes())
     const rectanglesList = computed(() => getAllRectangles()) // Backward compatible
 
+    // v5: Viewport culling for rendering optimization
+    const { 
+      visibleShapeIds, 
+      updateVisibleShapes, 
+      isVisible: isShapeVisible,
+      getVisibilityRatio 
+    } = useViewportCulling(stage)
+    
+    // Computed list of shapes to render (with culling for large canvases)
+    const visibleShapesList = computed(() => {
+      const allShapes = shapesList.value
+      
+      // Only apply culling if we have 100+ shapes
+      if (allShapes.length < 100) {
+        return allShapes
+      }
+      
+      // Filter to only visible shapes
+      return allShapes.filter(shape => isShapeVisible(shape.id))
+    })
+    
+    // v5 Bug fix: Update viewport culling when shapes are added/removed
+    watch(shapesList, (newShapes) => {
+      if (newShapes.length >= 100) {
+        updateVisibleShapes(newShapes)
+      }
+    })
+
     // Cursor state
     const allRemoteCursors = computed(() => getAllCursors())
     
@@ -544,6 +580,11 @@ export default {
 
       stagePosition.x = newPos.x
       stagePosition.y = newPos.y
+      
+      // v5: Update viewport culling after zoom
+      if (shapesList.value.length >= 100) {
+        updateVisibleShapes(shapesList.value)
+      }
     }
 
     // Zoom control handlers
@@ -680,6 +721,11 @@ export default {
 
       lastPointerPosition.x = pointer.x
       lastPointerPosition.y = pointer.y
+      
+      // v5: Update viewport culling after pan
+      if (shapesList.value.length >= 100) {
+        updateVisibleShapes(shapesList.value)
+      }
     }
 
     // Handle cursor tracking when mouse moves over canvas
@@ -2128,49 +2174,106 @@ export default {
       showRecoveryModal.value = false
     }
 
-    // Version restore
+    // Version restore (v5: Optimized with snapshots and batch operations)
     const handleRestoreVersion = async (version) => {
-      if (!version || !Array.isArray(version.shapes)) return
+      if (!version) return
+      
+      const startTime = Date.now()
+      let shapesToRestore = null
+      let restoreMethod = 'unknown'
       
       try {
-        console.log('🔄 Restoring version with', version.shapes.length, 'shapes')
+        // Step 1: Determine restore strategy based on available data
+        console.log('🔄 Determining restore strategy...')
         
-        // Step 1: Delete all current shapes from Firestore
-        // This will trigger real-time listeners for all users
+        // Try 1: Load from canvas snapshot (fastest - single document read)
+        try {
+          shapesToRestore = await loadCanvasSnapshot(canvasId.value)
+          if (shapesToRestore && shapesToRestore.length > 0) {
+            restoreMethod = 'snapshot'
+            console.log(`✅ Using snapshot (${shapesToRestore.length} shapes)`)
+          }
+        } catch (snapshotError) {
+          console.warn('Snapshot load failed:', snapshotError)
+        }
+        
+        // Try 2: Decompress from version.compressed (fallback)
+        if (!shapesToRestore && version.compressed) {
+          try {
+            const { decompressShapes } = await import('../utils/compression.js')
+            shapesToRestore = decompressShapes(version.compressed)
+            restoreMethod = 'compressed'
+            console.log(`✅ Using compressed version data (${shapesToRestore.length} shapes)`)
+          } catch (decompressError) {
+            console.warn('Decompression failed:', decompressError)
+          }
+        }
+        
+        // Try 3: Use uncompressed shapes array (backward compatibility)
+        if (!shapesToRestore && version.shapes && Array.isArray(version.shapes)) {
+          shapesToRestore = version.shapes
+          restoreMethod = 'legacy'
+          console.log(`✅ Using legacy shapes array (${shapesToRestore.length} shapes)`)
+        }
+        
+        // Validate we have shapes to restore
+        if (!shapesToRestore || shapesToRestore.length === 0) {
+          throw new Error('No valid shape data found in version')
+        }
+        
+        console.log(`🔄 Restoring ${shapesToRestore.length} shapes using ${restoreMethod} method`)
+        
+        // Step 2: Pause real-time sync to prevent listener spam during bulk operation
+        pauseSync()
+        
+        // Step 3: Batch delete all current shapes from Firestore
         const currentShapes = Array.from(shapes.values())
-        console.log('Deleting', currentShapes.length, 'current shapes from Firestore')
+        console.log('Batch deleting', currentShapes.length, 'current shapes')
         
-        // Use deleteShapes which takes (shapeIds, canvasId)
         const shapeIds = currentShapes.map(s => s.id)
         if (shapeIds.length > 0) {
-          await deleteShapes(shapeIds, canvasId.value)
+          await deleteShapesBatch(canvasId.value, shapeIds)
         }
         
-        // Step 2: Clear local shapes (will be repopulated by real-time sync)
+        // Step 4: Clear local shapes immediately
         shapes.clear()
         
-        // Step 3: Create all version shapes in Firestore
-        // Real-time listeners will sync these to all users
-        console.log('Creating', version.shapes.length, 'shapes from version in Firestore')
+        // Step 5: Batch create all version shapes in Firestore
+        console.log('Batch creating', shapesToRestore.length, 'shapes from version')
         
-        for (const versionShape of version.shapes) {
-          // Extract properties for createShape - it needs (type, properties, userId, canvasId)
-          const { type, id, createdBy, createdAt, lastModified, lastModifiedBy, ...properties } = versionShape
-          
-          // Create shape in Firestore with all its properties
-          await createShape(
-            type,
-            { ...properties, id },  // Pass id to preserve original shape IDs
-            user.value.uid,
-            canvasId.value,
-            userName.value
-          )
+        // Prepare shapes for batch write (preserve IDs and metadata)
+        const shapesToCreate = shapesToRestore.map(versionShape => ({
+          ...versionShape,
+          // Update metadata to current restore operation
+          lastModifiedBy: user.value.uid,
+          lastModifiedByName: userName.value
+        }))
+        
+        await saveShapesBatch(canvasId.value, shapesToCreate)
+        
+        // Step 6: Update canvas snapshot for future fast restores
+        if (restoreMethod !== 'snapshot') {
+          console.log('📸 Updating canvas snapshot...')
+          await updateCanvasSnapshot(canvasId.value, shapesToRestore)
         }
         
+        // Step 7: Resume real-time sync (will reload shapes from Firestore)
+        await resumeSync(canvasId.value)
+        
+        const duration = Date.now() - startTime
+        console.log(`✅ Version restored successfully in ${duration}ms (${shapesToRestore.length} shapes, ${restoreMethod} method)`)
+        
         showVersionHistory.value = false
-        console.log('✅ Version restored successfully - all users will receive updates via real-time sync')
       } catch (error) {
         console.error('❌ Error restoring version:', error)
+        
+        // Ensure sync resumes even on error
+        try {
+          await resumeSync(canvasId.value)
+        } catch (resumeError) {
+          console.error('Error resuming sync after failure:', resumeError)
+        }
+        
         alert('Failed to restore version. Please try again.')
       }
     }
@@ -2195,6 +2298,7 @@ export default {
       zoomLevel,
       activeTool,
       shapesList,
+      visibleShapesList, // v5: Viewport-culled shapes for rendering
       rectanglesList, // Backward compatible
       remoteCursors,
       activeUserCount,
