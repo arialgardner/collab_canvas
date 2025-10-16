@@ -15,6 +15,8 @@ const activeUsers = reactive(new Map())
 const isOnline = ref(false)
 let presenceUnsubscribe = null
 let heartbeatInterval = null
+let cleanupInterval = null
+let beforeUnloadHandler = null
 
 export const usePresence = () => {
 
@@ -51,6 +53,9 @@ export const usePresence = () => {
       
       // Start heartbeat to keep presence alive
       startHeartbeat(canvasId, userId)
+      
+      // Setup beforeunload handler for browser close
+      setupBeforeUnloadHandler(canvasId, userId)
       
     } catch (error) {
       console.error('Error setting user online:', error)
@@ -113,11 +118,46 @@ export const usePresence = () => {
     }
   }
 
+  // Clean up stale presence entries (users who haven't sent heartbeat in 60+ seconds)
+  const cleanupStalePresence = () => {
+    const now = Date.now()
+    const STALE_THRESHOLD = 60000 // 60 seconds (2x heartbeat interval)
+    
+    for (const [userId, presence] of activeUsers.entries()) {
+      if (presence.lastSeen && (now - presence.lastSeen > STALE_THRESHOLD)) {
+        console.log(`Removing stale presence for user: ${presence.userName || userId}`)
+        activeUsers.delete(userId)
+      }
+    }
+  }
+
+  // Start periodic cleanup of stale presence
+  const startPresenceCleanup = () => {
+    // Clear any existing cleanup interval
+    stopPresenceCleanup()
+    
+    // Check for stale presence every 30 seconds
+    cleanupInterval = setInterval(cleanupStalePresence, 30000)
+    console.log('Started periodic presence cleanup')
+  }
+
+  // Stop periodic cleanup
+  const stopPresenceCleanup = () => {
+    if (cleanupInterval) {
+      clearInterval(cleanupInterval)
+      cleanupInterval = null
+    }
+  }
+
   // Subscribe to presence updates
   const subscribeToPresence = (canvasId = 'default', currentUserId) => {
+    // If there's an existing subscription, unsubscribe first
     if (presenceUnsubscribe) {
-      console.warn('Presence subscription already active')
-      return presenceUnsubscribe
+      console.log('Unsubscribing from previous presence subscription')
+      presenceUnsubscribe()
+      presenceUnsubscribe = null
+      // Clear old users when switching canvases
+      activeUsers.clear()
     }
 
     try {
@@ -131,6 +171,9 @@ export const usePresence = () => {
           // Don't include current user in active users list
           if (userId === currentUserId) return
           
+          // Only process users for this specific canvas
+          if (presenceData.canvasId !== canvasId) return
+          
           // Convert Firestore timestamps
           const presence = {
             ...presenceData,
@@ -142,18 +185,21 @@ export const usePresence = () => {
             // Only add users who are marked as online
             if (presence.online) {
               activeUsers.set(userId, presence)
-              console.log(`User ${presence.userName} joined`)
+              console.log(`User ${presence.userName} joined canvas ${canvasId}`)
             }
           }
           
           if (change.type === 'removed') {
             activeUsers.delete(userId)
-            console.log(`User ${presenceData.userName || userId} left`)
+            console.log(`User ${presenceData.userName || userId} left canvas ${canvasId}`)
           }
         })
       })
       
-      console.log('Presence subscription started')
+      // Start periodic cleanup of stale presence
+      startPresenceCleanup()
+      
+      console.log(`Presence subscription started for canvas: ${canvasId}`)
       return presenceUnsubscribe
       
     } catch (error) {
@@ -177,16 +223,39 @@ export const usePresence = () => {
     return activeUsers.has(userId)
   }
 
-  // Handle browser close/refresh
-  const handleBeforeUnload = (canvasId, userId) => {
-    // Try to set offline before page unload
-    // Note: This is best effort, may not always execute
-    if (userId) {
-      navigator.sendBeacon('/api/offline', JSON.stringify({ canvasId, userId }))
-      // Also try direct call
-      setUserOffline(canvasId, userId).catch(() => {
-        // Ignore errors during unload
-      })
+  // Setup beforeunload handler to cleanup on browser close
+  const setupBeforeUnloadHandler = (canvasId, userId) => {
+    // Remove existing handler if any
+    if (beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', beforeUnloadHandler)
+    }
+    
+    // Create new handler
+    beforeUnloadHandler = () => {
+      if (userId) {
+        // Use synchronous approach with navigator.sendBeacon for more reliability
+        const docRef = getPresenceDocRef(canvasId, userId)
+        const deleteUrl = `https://firestore.googleapis.com/v1/${docRef.path}`
+        
+        try {
+          // Try to delete the presence document
+          setUserOffline(canvasId, userId).catch(() => {})
+        } catch (error) {
+          // Ignore errors during unload
+        }
+      }
+    }
+    
+    // Add the event listener
+    window.addEventListener('beforeunload', beforeUnloadHandler)
+    console.log('Setup beforeunload handler for presence cleanup')
+  }
+
+  // Remove beforeunload handler
+  const removeBeforeUnloadHandler = () => {
+    if (beforeUnloadHandler) {
+      window.removeEventListener('beforeunload', beforeUnloadHandler)
+      beforeUnloadHandler = null
     }
   }
 
@@ -194,6 +263,12 @@ export const usePresence = () => {
   const cleanup = async (canvasId = 'default', userId) => {
     // Stop heartbeat
     stopHeartbeat()
+    
+    // Stop presence cleanup
+    stopPresenceCleanup()
+    
+    // Remove beforeunload handler
+    removeBeforeUnloadHandler()
     
     // Unsubscribe from presence updates
     if (presenceUnsubscribe) {
@@ -231,7 +306,9 @@ export const usePresence = () => {
     getActiveUserCount,
     isUserOnline,
     updateLastSeen,
-    handleBeforeUnload,
+    cleanupStalePresence,
+    setupBeforeUnloadHandler,
+    removeBeforeUnloadHandler,
     cleanup
   }
 }

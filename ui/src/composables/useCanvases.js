@@ -15,11 +15,14 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase/config'
 
+// Singleton state - shared across all component instances
+const canvases = ref(new Map())
+const currentCanvas = ref(null)
+const isLoading = ref(false)
+const error = ref(null)
+let unsubscribeCanvas = null
+
 export function useCanvases() {
-  const canvases = ref(new Map())
-  const currentCanvas = ref(null)
-  const isLoading = ref(false)
-  const error = ref(null)
 
   // Canvas CRUD operations
   const createCanvas = async (userId, userName, options = {}) => {
@@ -241,9 +244,23 @@ export function useCanvases() {
     return role === 'owner'
   }
 
-  // Real-time canvas subscription
-  let unsubscribeCanvas = null
+  // Grant access from shared link
+  const grantAccessFromLink = async (canvasId, userId) => {
+    try {
+      console.log(`🔗 Granting editor access to user ${userId} for canvas ${canvasId}`)
+      await updatePermissions(canvasId, userId, 'editor')
+      
+      // Reload canvas to get updated permissions
+      const updatedCanvas = await getCanvas(canvasId)
+      return updatedCanvas
+    } catch (err) {
+      console.error('Error granting access from link:', err)
+      error.value = err.message
+      throw err
+    }
+  }
 
+  // Real-time canvas subscription
   const subscribeToCanvas = (canvasId, callback) => {
     try {
       const docRef = doc(db, 'canvases', canvasId)
@@ -297,6 +314,7 @@ export function useCanvases() {
     canEdit,
     canManagePermissions,
     canDelete,
+    grantAccessFromLink,
 
     // Real-time
     subscribeToCanvas,

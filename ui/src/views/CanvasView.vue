@@ -213,7 +213,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, onBeforeUnmount, computed, watch } from 'vue'
 import VueKonva from 'vue-konva'
 import Toolbar from '../components/Toolbar.vue'
 import ZoomControls from '../components/ZoomControls.vue'
@@ -249,6 +249,7 @@ import { useQueueProcessor } from '../composables/useQueueProcessor'
 import { useStateReconciliation } from '../composables/useStateReconciliation'
 import { useCrashRecovery } from '../composables/useCrashRecovery'
 import { useVersions } from '../composables/useVersions'
+import { useInactivityLogout } from '../composables/useInactivityLogout'
 import { useBugFixes } from '../utils/bugFixUtils'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -294,6 +295,7 @@ export default {
       canEdit: canEditCanvas,
       canManagePermissions,
       canDelete: canDeleteCanvas,
+      grantAccessFromLink,
       isLoading: canvasLoading,
       error: canvasError
     } = useCanvases()
@@ -344,8 +346,7 @@ export default {
       setUserOffline,
       subscribeToPresence,
       getActiveUserCount,
-      cleanup: cleanupPresence,
-      handleBeforeUnload
+      cleanup: cleanupPresence
     } = usePresence()
     
     const { measureRender, throttle, logPerformanceSummary } = usePerformance()
@@ -355,6 +356,9 @@ export default {
     const { saveSnapshot, loadSnapshot, clearSnapshot } = useCrashRecovery()
     const { isLoading: versionsLoading, versions: versionsList, listVersions, createVersion } = useVersions()
     const { canUndo, canRedo, addAction, undo, redo, setUndoRedoFlag, beginGroup, endGroup, clear } = useUndoRedo()
+
+    // Inactivity tracking - auto logout after 10 minutes
+    useInactivityLogout(canvasId)
 
     // Refs
     const stage = ref(null)
@@ -694,7 +698,7 @@ export default {
       const cursorColor = '#667eea' // Will get from user profile later
       
       // Update cursor position in Firestore (throttled)
-      updateCursorPosition('default', userId, canvasCoords.x, canvasCoords.y, userName, cursorColor)
+      updateCursorPosition(canvasId.value, userId, canvasCoords.x, canvasCoords.y, userName, cursorColor)
     }
 
     // Handle mouse entering canvas
@@ -1767,11 +1771,21 @@ export default {
           return
         }
         
-        const userRole = getUserRole(currentCanvas.value, user.value.uid)
+        let userRole = getUserRole(currentCanvas.value, user.value.uid)
+        
+        // If user doesn't have access, grant editor permissions via shared link
         if (!userRole) {
-          console.error('❌ User does not have access to this canvas')
-          router.push({ name: 'Dashboard' })
-          return
+          console.log('🔗 User accessing canvas via shared link - granting editor access')
+          try {
+            await grantAccessFromLink(canvasId.value, user.value.uid)
+            userRole = 'editor'
+            console.log(`✅ Granted editor access to user ${user.value.uid}`)
+          } catch (error) {
+            console.error('❌ Failed to grant access from link:', error)
+            alert('Unable to access this canvas. Please check the link and try again.')
+            router.push({ name: 'Dashboard' })
+            return
+          }
         }
         
         console.log(`✅ User role: ${userRole}`)
@@ -1824,15 +1838,6 @@ export default {
         canvasWrapper.value.addEventListener('mouseleave', handleMouseLeave)
       }
 
-      // Add beforeunload handler for presence cleanup
-      const handleUnload = () => {
-        const userId = user.value?.uid
-        if (userId) {
-          handleBeforeUnload('default', userId)
-        }
-      }
-      window.addEventListener('beforeunload', handleUnload)
-
       // Start periodic reconciliation and tab-visibility reconciliation
       startPeriodic(canvasId.value, shapes, () => [], 60000)
       triggerOnVisibilityChange(canvasId.value, shapes, () => [])
@@ -1872,6 +1877,26 @@ export default {
       }
     })
 
+    // Cleanup before component unmounts (e.g., when navigating away)
+    onBeforeUnmount(async () => {
+      const userId = user.value?.uid
+      
+      if (userId) {
+        console.log('🚪 User leaving canvas - cleaning up presence and cursor')
+        
+        // Remove presence and cursor BEFORE unmounting
+        // This ensures other users see the user leave immediately
+        try {
+          await Promise.all([
+            setUserOffline(canvasId.value, userId),
+            removeCursor(canvasId.value, userId)
+          ])
+        } catch (error) {
+          console.error('Error during beforeUnmount cleanup:', error)
+        }
+      }
+    })
+
     onUnmounted(() => {
       window.removeEventListener('resize', handleResize)
       window.removeEventListener('keydown', handleKeyDown)
@@ -1896,14 +1921,6 @@ export default {
         canvasWrapper.value.removeEventListener('mouseleave', handleMouseLeave)
       }
 
-      // Remove beforeunload handler
-      const handleUnload = () => {
-        const userId = user.value?.uid
-        if (userId) {
-          handleBeforeUnload('default', userId)
-        }
-      }
-      window.removeEventListener('beforeunload', handleUnload)
       stopPeriodic()
       // Clear periodic timer
       try { window.clearInterval(periodicTimer) } catch {}
@@ -1924,6 +1941,29 @@ export default {
         canvasHeight.value = newCanvas.height || 3000
       }
     }, { immediate: true })
+
+    // Watch for canvas ID changes (when switching between canvases)
+    // Clean up old canvas presence/cursor before loading new canvas
+    watch(canvasId, async (newCanvasId, oldCanvasId) => {
+      const userId = user.value?.uid
+      
+      if (userId && oldCanvasId && oldCanvasId !== newCanvasId) {
+        console.log(`🔄 Switching from canvas ${oldCanvasId} to ${newCanvasId}`)
+        
+        try {
+          // Clean up presence and cursor from old canvas
+          await Promise.all([
+            setUserOffline(oldCanvasId, userId),
+            removeCursor(oldCanvasId, userId)
+          ])
+          
+          // The new canvas will set up presence/cursor in onMounted
+          console.log(`✅ Cleaned up old canvas: ${oldCanvasId}`)
+        } catch (error) {
+          console.error('Error cleaning up old canvas:', error)
+        }
+      }
+    })
 
     // Properties panel handlers
     const handleUpdateProperty = ({ shapeId, property, value }) => {
@@ -2024,13 +2064,47 @@ export default {
     // Version restore
     const handleRestoreVersion = async (version) => {
       if (!version || !Array.isArray(version.shapes)) return
-      // Replace local shapes with snapshot
-      shapes.clear()
-      for (const s of version.shapes) {
-        shapes.set(s.id, { ...s })
+      
+      try {
+        console.log('🔄 Restoring version with', version.shapes.length, 'shapes')
+        
+        // Step 1: Delete all current shapes from Firestore
+        // This will trigger real-time listeners for all users
+        const currentShapes = Array.from(shapes.values())
+        console.log('Deleting', currentShapes.length, 'current shapes from Firestore')
+        
+        // Use deleteShapes which takes (shapeIds, canvasId)
+        const shapeIds = currentShapes.map(s => s.id)
+        if (shapeIds.length > 0) {
+          await deleteShapes(shapeIds, canvasId.value)
+        }
+        
+        // Step 2: Clear local shapes (will be repopulated by real-time sync)
+        shapes.clear()
+        
+        // Step 3: Create all version shapes in Firestore
+        // Real-time listeners will sync these to all users
+        console.log('Creating', version.shapes.length, 'shapes from version in Firestore')
+        
+        for (const versionShape of version.shapes) {
+          // Extract properties for createShape - it needs (type, properties, userId, canvasId)
+          const { type, id, createdBy, createdAt, lastModified, lastModifiedBy, ...properties } = versionShape
+          
+          // Create shape in Firestore with all its properties
+          await createShape(
+            type,
+            { ...properties, id },  // Pass id to preserve original shape IDs
+            user.value.uid,
+            canvasId.value
+          )
+        }
+        
+        showVersionHistory.value = false
+        console.log('✅ Version restored successfully - all users will receive updates via real-time sync')
+      } catch (error) {
+        console.error('❌ Error restoring version:', error)
+        alert('Failed to restore version. Please try again.')
       }
-      showVersionHistory.value = false
-      // TODO: Persist snapshot restore to Firestore if owner-only action required
     }
 
     return {

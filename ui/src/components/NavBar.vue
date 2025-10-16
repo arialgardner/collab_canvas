@@ -82,10 +82,10 @@
           </svg>
           {{ isLoading ? 'Signing out...' : 'Sign Out' }}
         </button>
-        <button v-if="userIsOwner" class="logout-button" title="Version History" @click="$emit('toggle-versions')" style="background:#e0e7ff;color:#3730a3;border-color:#c7d2fe;">
+        <button v-if="isOwner" class="logout-button" title="Version History" @click="$emit('toggle-versions')" style="background:#e0e7ff;color:#3730a3;border-color:#c7d2fe;">
           History
         </button>
-        <button v-if="userIsOwner" class="logout-button" title="Save Version" @click="$emit('save-version')" style="background:#dcfce7;color:#065f46;border-color:#bbf7d0;">
+        <button v-if="isOwner" class="logout-button" title="Save Version" @click="$emit('save-version')" style="background:#dcfce7;color:#065f46;border-color:#bbf7d0;">
           Save
         </button>
       </div>
@@ -111,7 +111,17 @@ import ConnectionStatus from './ConnectionStatus.vue'
 export default {
   name: 'NavBar',
   components: { ConnectionStatus },
-  setup() {
+  props: {
+    canUserEdit: {
+      type: Boolean,
+      default: false
+    },
+    isOwner: {
+      type: Boolean,
+      default: false
+    }
+  },
+  setup(props) {
     const { user, signOut, isLoading } = useAuth()
     const { activeUsers, getActiveUsers, getActiveUserCount, setUserOffline } = usePresence()
     const { removeCursor } = useCursors()
@@ -199,11 +209,6 @@ export default {
       }
     })
 
-    const userIsOwner = computed(() => {
-      // Owner check can be provided by parent via props in future; default allow for now
-      return !!user.value
-    })
-
     return {
       user,
       isLoading,
@@ -213,8 +218,7 @@ export default {
       activeUserCount,
       showPresenceDropdown,
       togglePresenceDropdown,
-      handleLogout,
-      userIsOwner
+      handleLogout
     }
   }
 }

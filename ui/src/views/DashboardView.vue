@@ -301,6 +301,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useCanvases } from '../composables/useCanvases'
 import { useAuth } from '../composables/useAuth'
+import { useInactivityLogout } from '../composables/useInactivityLogout'
 import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
 
@@ -315,6 +316,9 @@ const {
   deleteCanvas: deleteCanvasFromDb,
   getUserRole
 } = useCanvases()
+
+// Inactivity tracking - auto logout after 10 minutes
+useInactivityLogout('dashboard')
 
 // Canvas list
 const canvasesList = computed(() => {

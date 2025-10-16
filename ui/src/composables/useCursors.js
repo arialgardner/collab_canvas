@@ -120,9 +120,14 @@ export const useCursors = () => {
 
   // Subscribe to cursor updates from other users
   const subscribeToCursors = (canvasId = 'default', currentUserId) => {
+    // If there's an existing subscription, unsubscribe first
     if (cursorUnsubscribe) {
-      console.warn('Cursor subscription already active')
-      return
+      console.log('Unsubscribing from previous cursor subscription')
+      cursorUnsubscribe()
+      cursorUnsubscribe = null
+      trackListener('remove')
+      // Clear old cursors when switching canvases
+      cursors.clear()
     }
 
     try {
@@ -161,7 +166,7 @@ export const useCursors = () => {
       // Set up periodic cleanup of stale cursors
       const cleanupInterval = setInterval(cleanupStaleCursors, 10000) // Every 10 seconds
       
-      console.log('Cursor subscription started')
+      console.log(`Cursor subscription started for canvas: ${canvasId}`)
       
       // Return wrapped unsubscribe that tracks listener removal
       return () => {

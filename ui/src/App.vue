@@ -4,7 +4,13 @@
     <ErrorHandler />
     
     <!-- Navigation Bar (only show on canvas route) -->
-    <NavBar v-if="showNavBar" @toggle-versions="handleToggleVersions" @save-version="handleSaveVersion" />
+    <NavBar 
+      v-if="showNavBar" 
+      :canUserEdit="canUserEdit"
+      :isOwner="isCanvasOwner"
+      @toggle-versions="handleToggleVersions" 
+      @save-version="handleSaveVersion" 
+    />
     
     <!-- Router View -->
     <router-view />
@@ -17,6 +23,8 @@ import { useRoute, useRouter } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import ErrorHandler from './components/ErrorHandler.vue'
 import { useErrorHandling } from './composables/useErrorHandling'
+import { useCanvases } from './composables/useCanvases'
+import { useAuth } from './composables/useAuth'
 
 export default {
   name: 'App',
@@ -28,10 +36,25 @@ export default {
     const route = useRoute()
     const router = useRouter()
     const { setupNetworkMonitoring } = useErrorHandling()
+    const { currentCanvas, canEdit, getUserRole } = useCanvases()
+    const { user } = useAuth()
     
     // Only show navbar on canvas route (not on auth page)
     const showNavBar = computed(() => {
       return route.name === 'Canvas'
+    })
+    
+    // Check if user can edit the current canvas (owner or editor)
+    const canUserEdit = computed(() => {
+      if (!user.value || !currentCanvas.value) return false
+      return canEdit(currentCanvas.value, user.value.uid)
+    })
+    
+    // Check if user is the canvas owner
+    const isCanvasOwner = computed(() => {
+      if (!user.value || !currentCanvas.value) return false
+      const role = getUserRole(currentCanvas.value, user.value.uid)
+      return role === 'owner'
     })
     
     // Set up global error handling
@@ -53,6 +76,8 @@ export default {
 
     return {
       showNavBar,
+      canUserEdit,
+      isCanvasOwner,
       handleToggleVersions,
       handleSaveVersion
     }
