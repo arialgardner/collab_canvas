@@ -21,7 +21,7 @@ export function useVersions() {
 
   const getVersionsRef = (canvasId) => collection(db, 'canvases', canvasId, 'versions')
 
-  const createVersion = async (canvasId, userId, shapesArray, summary = 'auto') => {
+  const createVersion = async (canvasId, userId, userName, shapesArray, summary = 'auto') => {
     try {
       isLoading.value = true
       error.value = null
@@ -29,6 +29,7 @@ export function useVersions() {
       const payload = {
         createdAt: serverTimestamp(),
         createdBy: userId,
+        createdByName: userName,
         summary,
         shapes: shapesArray
       }

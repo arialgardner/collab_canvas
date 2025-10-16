@@ -145,7 +145,7 @@ export default {
 
 .btn-secondary {
   background: white;
-  color: #374151;
+  color: #000000;
   border: 1px solid #d1d5db;
 }
 

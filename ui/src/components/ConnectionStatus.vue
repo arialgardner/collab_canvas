@@ -1,20 +1,29 @@
 <template>
-  <div class="connection-status" @click="toggleExpanded" :title="tooltip">
-    <span :class="['dot', statusClass]"></span>
-    <span class="text">{{ label }}</span>
-    <svg class="chevron" viewBox="0 0 20 20" :class="{ rotated: expanded }">
-      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
-    </svg>
+  <div>
+    <div class="connection-status" @click="toggleExpanded" :title="tooltip">
+      <span :class="['dot', statusClass]"></span>
+      <span class="text">{{ label }}</span>
+      <svg class="chevron" viewBox="0 0 20 20" :class="{ rotated: expanded }">
+        <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/>
+      </svg>
 
-    <div v-if="expanded" class="panel">
-      <div class="row actions">
-        <button class="btn" @click.stop="syncNow">Sync Now</button>
-        <button class="btn" @click.stop="retryConnection">Retry</button>
-        <button class="btn" @click.stop="toggleQueue">View Queue</button>
+      <div v-if="expanded" class="panel">
+        <div class="row actions">
+          <button class="btn" @click.stop="syncNow">Sync Now</button>
+          <button class="btn" @click.stop="retryConnection">Retry</button>
+          <button class="btn" @click.stop="toggleQueue">View Queue</button>
+        </div>
+        <div v-if="state.error" class="error">{{ state.error }}</div>
+        <QueueViewer :is-visible="showQueue" @close="showQueue = false" />
       </div>
-      <div v-if="state.error" class="error">{{ state.error }}</div>
-      <QueueViewer :is-visible="showQueue" @close="showQueue = false" />
     </div>
+
+    <!-- Click outside to close -->
+    <div 
+      v-if="expanded" 
+      @click="expanded = false"
+      class="dropdown-overlay"
+    ></div>
   </div>
 </template>
 
@@ -133,15 +142,24 @@ export default {
 }
 .row.actions { gap: 6px; }
 .btn {
-  background: #edf2f7;
-  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: 4px;
   padding: 4px 6px;
   font-size: 12px;
   cursor: pointer;
+  color: #000000;
 }
-.btn:hover { background: #e2e8f0; }
+.btn:hover { background: #f3f4f6; }
 .error { color: #ef4444; font-size: 11px; margin-top: 6px; }
+.dropdown-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+}
 </style>
 
 

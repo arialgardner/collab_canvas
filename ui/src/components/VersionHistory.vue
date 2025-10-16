@@ -12,7 +12,7 @@
           <div class="vh-item" v-for="ver in versions" :key="ver.id">
             <div class="vh-meta">
               <div class="vh-title">{{ formatWhen(ver.createdAt) }}</div>
-              <div class="vh-sub">by {{ ver.createdBy || 'unknown' }} • {{ (ver.shapes || []).length }} shapes • {{ ver.summary || 'auto' }}</div>
+              <div class="vh-sub">by {{ ver.createdByName || ver.createdBy || 'unknown' }} • {{ (ver.shapes || []).length }} shapes • {{ ver.summary || 'auto' }}</div>
             </div>
             <div class="vh-actions">
               <button class="vh-btn" :disabled="!canRestore" @click="$emit('restore', ver)">Restore</button>
@@ -85,6 +85,13 @@ export default {
   width: 28px;
   height: 28px;
   cursor: pointer;
+  color: #6b7280;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
 }
 .vh-content { max-height: 60vh; overflow: auto; }
 .vh-empty { padding: 16px; color: #64748b; text-align: center; font-size: 14px; }

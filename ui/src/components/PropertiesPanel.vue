@@ -874,6 +874,8 @@ const handleBulkPropertyChange = (property, value) => {
   border-radius: 4px;
   font-size: 14px;
   transition: border-color 0.2s;
+  color: #000000;
+  background: #ffffff;
 }
 
 .property-input:focus {
@@ -885,6 +887,7 @@ const handleBulkPropertyChange = (property, value) => {
 .property-input.readonly {
   background: #f3f4f6;
   cursor: not-allowed;
+  color: #000000;
 }
 
 .property-input.mixed {
@@ -927,6 +930,7 @@ const handleBulkPropertyChange = (property, value) => {
   background: white;
   cursor: pointer;
   transition: border-color 0.2s;
+  color: #000000;
 }
 
 .property-select:focus {
@@ -945,6 +949,7 @@ const handleBulkPropertyChange = (property, value) => {
   resize: vertical;
   min-height: 60px;
   transition: border-color 0.2s;
+  color: #000000;
 }
 
 .property-textarea:focus {
@@ -979,6 +984,7 @@ const handleBulkPropertyChange = (property, value) => {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.2s;
+  color: #000000;
 }
 
 .style-button:hover {

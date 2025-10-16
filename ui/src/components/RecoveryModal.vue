@@ -209,8 +209,9 @@ const formattedTime = computed(() => {
 }
 
 .button-secondary {
-  background: #f3f4f6;
-  color: #374151;
+  background: #ffffff;
+  color: #000000;
+  border: 1px solid #d1d5db;
 }
 
 .button-secondary:hover:not(:disabled) {

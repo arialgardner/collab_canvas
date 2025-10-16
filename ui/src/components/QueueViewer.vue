@@ -90,7 +90,7 @@ export default {
   border-bottom: 1px solid #e2e8f0;
 }
 .header h4 { margin: 0; font-size: 14px; color: #2d3748; }
-.close { background: none; border: none; font-size: 18px; cursor: pointer; }
+.close { background: none; border: none; font-size: 18px; cursor: pointer; color: #000000; }
 .content { max-height: 50vh; overflow: auto; }
 .empty { padding: 16px; color: #718096; font-size: 13px; text-align: center; }
 .list { display: flex; flex-direction: column; }
@@ -103,8 +103,8 @@ export default {
 .shape { font-size: 12px; color: #334155; }
 .right { display: flex; gap: 6px; align-items: center; }
 .status { font-size: 12px; color: #64748b; margin-right: 4px; }
-.btn { background: #edf2f7; border: 1px solid #e2e8f0; border-radius: 4px; padding: 6px 8px; font-size: 12px; cursor: pointer; }
-.btn:hover { background: #e2e8f0; }
+.btn { background: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 6px 8px; font-size: 12px; cursor: pointer; color: #000000; }
+.btn:hover { background: #f3f4f6; }
 .btn.danger { background: #fee2e2; border-color: #fecaca; }
 .btn.danger:hover { background: #fecaca; }
 .footer { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #e2e8f0; }

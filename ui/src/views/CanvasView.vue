@@ -206,7 +206,7 @@
       :versions="versionsList"
       :is-loading="versionsLoading"
       :can-restore="canRestoreVersions"
-      @close="showVersionHistory = false"
+      @close="handleCloseVersionHistory"
       @restore="handleRestoreVersion"
     />
   </div>
@@ -1686,7 +1686,7 @@ export default {
             if (versionOpsCounter >= 10 && user.value?.uid) {
               const shapesArray = Array.from(shapes.values())
               if (shapesArray.length > 0) {
-                await createVersion(canvasId.value, user.value.uid, shapesArray, 'threshold')
+                await createVersion(canvasId.value, user.value.uid, userName.value, shapesArray, 'threshold')
                 versionOpsCounter = 0
               }
             }
@@ -1719,7 +1719,7 @@ export default {
         try {
           const shapesArray = Array.from(shapes.values())
           if (shapesArray.length > 0) {
-            await createVersion(canvasId.value, user.value.uid, shapesArray, 'manual')
+            await createVersion(canvasId.value, user.value.uid, userName.value, shapesArray, 'manual')
             await listVersions(canvasId.value)
           }
         } catch (e) {
@@ -1748,7 +1748,7 @@ export default {
       try {
         const shapesArray = Array.from(shapes.values())
         if (shapesArray.length > 0 && user.value?.uid) {
-          await createVersion(canvasId.value, user.value.uid, shapesArray, 'initial')
+          await createVersion(canvasId.value, user.value.uid, userName.value, shapesArray, 'initial')
         }
       } catch (e) {
         console.error('Initial version save failed:', e)
@@ -1854,7 +1854,7 @@ export default {
         try {
           const shapesArray = Array.from(shapes.values())
           if (shapesArray.length > 0 && user.value?.uid) {
-            await createVersion(canvasId.value, user.value.uid, shapesArray, 'periodic')
+            await createVersion(canvasId.value, user.value.uid, userName.value, shapesArray, 'periodic')
           }
         } catch (e) {
           console.error('Periodic version save failed:', e)
@@ -2117,6 +2117,13 @@ export default {
       }
     }
 
+    const handleCloseVersionHistory = () => {
+      // Remove the history query parameter from URL
+      const query = { ...route.query }
+      delete query.history
+      router.replace({ name: route.name, params: route.params, query })
+    }
+
     return {
       // Refs
       stage,
@@ -2209,6 +2216,7 @@ export default {
       versionsLoading,
       canRestoreVersions,
       handleRestoreVersion,
+      handleCloseVersionHistory,
       // Undo/Redo exposure for Toolbar
       handleUndo,
       handleRedo,

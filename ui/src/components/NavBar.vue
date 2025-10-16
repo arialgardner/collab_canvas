@@ -3,6 +3,9 @@
     <div class="nav-content">
       <!-- Logo/Title -->
       <div class="nav-brand">
+        <button class="back-button" @click="handleBackToDashboard" title="Back to Dashboard">
+          ← Back
+        </button>
         <h1>CollabCanvas</h1>
       </div>
 
@@ -181,6 +184,11 @@ export default {
       }
     }
 
+    // Handle back to dashboard
+    const handleBackToDashboard = () => {
+      router.push({ name: 'Dashboard' })
+    }
+
     // Close dropdown when clicking outside
     const handleClickOutside = (event) => {
       if (!event.target.closest('.presence-section')) {
@@ -218,7 +226,8 @@ export default {
       activeUserCount,
       showPresenceDropdown,
       togglePresenceDropdown,
-      handleLogout
+      handleLogout,
+      handleBackToDashboard
     }
   }
 }
@@ -245,11 +254,37 @@ export default {
   margin: 0 auto;
 }
 
+.nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .nav-brand h1 {
   margin: 0;
   color: #2d3748;
   font-size: 1.5rem;
   font-weight: 600;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #000000;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
 }
 
 .nav-controls {

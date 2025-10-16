@@ -218,6 +218,7 @@ export default {
   background: white;
   font-size: 13px;
   cursor: pointer;
+  color: #000000;
 }
 
 .toolbar-select:hover {
@@ -237,6 +238,7 @@ export default {
   cursor: pointer;
   font-size: 14px;
   transition: all 0.15s;
+  color: #000000;
 }
 
 .toolbar-button:hover {
