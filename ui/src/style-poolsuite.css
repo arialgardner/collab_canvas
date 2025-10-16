@@ -1,0 +1,55 @@
+/* Poolsuite-inspired global stylesheet (no dark mode) */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,700&family=Space+Grotesk:wght@400;500;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-surface: theme(colors.surface.50);
+    --color-ink: theme(colors.ink.900);
+    --color-border: theme(colors.border.200);
+    --color-primary: theme(colors.primary.500);
+  }
+
+  html, body {
+    @apply bg-surface-50 text-ink-900 antialiased;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display text-ink-900;
+  }
+
+  a {
+    @apply text-primary-700 no-underline;
+  }
+  a:hover {
+    @apply text-primary-800;
+  }
+}
+
+@layer components {
+  /* Make default button and form elements match the theme even without classes */
+  button {
+    @apply btn btn-md;
+  }
+  input[type="text"], input[type="email"], input[type="password"], input[type="search"], input[type="url"], input[type="number"], select, textarea {
+    @apply input;
+  }
+}
+
+@layer utilities {
+  /* Reduced motion niceties */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+

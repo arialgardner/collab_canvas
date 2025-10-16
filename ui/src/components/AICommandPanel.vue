@@ -1,0 +1,482 @@
+<template>
+  <div class="ai-command-panel" :class="{ 'is-focused': isFocused }" data-testid="ai-panel">
+    <!-- Main input area -->
+    <div class="input-area">
+      <input
+        ref="commandInput"
+        v-model="userInput"
+        @focus="handleFocus"
+        @blur="handleBlur"
+        @keydown.enter="handleSendCommand"
+        @keydown.up="navigateHistory(-1)"
+        @keydown.down="navigateHistory(1)"
+        :placeholder="isProcessing ? 'Processing...' : 'Type AI command (Cmd/Ctrl+J)'"
+        :disabled="isProcessing"
+        class="command-input"
+        autocomplete="off"
+        data-testid="ai-command-input"
+      />
+      <button
+        @click="handleSendCommand"
+        :disabled="isProcessing || !userInput.trim()"
+        class="send-button"
+        :title="isProcessing ? 'Processing...' : 'Send command'"
+        data-testid="ai-submit-button"
+      >
+        <span v-if="!isProcessing">Send</span>
+        <span v-else class="spinner"></span>
+      </button>
+    </div>
+
+    <!-- Feedback message (success/error) -->
+    <transition name="fade">
+      <div v-if="currentMessage" class="feedback-message" :class="currentMessage.type" data-testid="ai-status">
+        {{ currentMessage.text }}
+      </div>
+    </transition>
+
+    <!-- Command history dropdown (when focused) -->
+    <transition name="slide-down">
+      <div
+        v-if="isFocused && commandHistory.length > 0 && !isProcessing"
+        class="command-history"
+      >
+        <div class="history-header">Recent Commands</div>
+        <div
+          v-for="(cmd, index) in commandHistory.slice(0, 10)"
+          :key="index"
+          @click="selectHistoryCommand(cmd.input)"
+          class="history-item"
+          :class="{ 'history-item-error': !cmd.success }"
+        >
+          <span class="history-icon" :class="cmd.success ? 'success' : 'error'">
+            {{ cmd.success ? '✓' : '✗' }}
+          </span>
+          <span class="history-text">{{ cmd.input }}</span>
+          <span class="history-time">{{ formatTime(cmd.timestamp) }}</span>
+        </div>
+      </div>
+    </transition>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted, watch, defineProps, defineEmits } from 'vue'
+import { useAICommands } from '../composables/useAICommands'
+import { useCommandExecutor } from '../composables/useCommandExecutor'
+
+const props = defineProps({
+  context: {
+    type: Object,
+    required: true,
+  },
+})
+
+const emit = defineEmits(['command-executed', 'utility-action'])
+
+// Component state
+const userInput = ref('')
+const isFocused = ref(false)
+const commandInput = ref(null)
+const currentMessage = ref(null) // { type: 'success' | 'error', text: '...' }
+const historyIndex = ref(-1)
+
+// Composables
+const { isProcessing, error: aiError, commandHistory, executeCommand: parseAICommand } = useAICommands()
+const { executeCommand: executeCanvasCommand } = useCommandExecutor()
+
+// Watch for AI parsing errors
+watch(aiError, (newError) => {
+  if (newError) {
+    showMessage('error', newError, 5000)
+  }
+})
+
+/**
+ * Handle focus event
+ */
+const handleFocus = () => {
+  isFocused.value = true
+  historyIndex.value = -1
+}
+
+/**
+ * Handle blur event (with small delay to allow clicks on history)
+ */
+const handleBlur = () => {
+  setTimeout(() => {
+    isFocused.value = false
+  }, 200)
+}
+
+/**
+ * Handle send command
+ */
+const handleSendCommand = async () => {
+  if (!userInput.value.trim() || isProcessing.value) return
+
+  const commandText = userInput.value.trim()
+  userInput.value = '' // Clear input immediately
+  historyIndex.value = -1
+
+  try {
+    // 1. Parse command using AI service (calls Cloud Function)
+    const parsedCommand = await parseAICommand(commandText, props.context)
+
+    // 2. Execute command on canvas
+    const executionResult = await executeCanvasCommand(parsedCommand, props.context)
+
+    // 3. Handle specific results
+    if (parsedCommand.category === 'selection' && executionResult?.selectedIds) {
+      emit('command-executed', {
+        type: 'selection',
+        selectedIds: executionResult.selectedIds,
+      })
+    } else if (parsedCommand.category === 'utility' && executionResult?.action) {
+      emit('utility-action', executionResult.action, executionResult.amount)
+    } else {
+      emit('command-executed', {
+        type: parsedCommand.category,
+        result: executionResult,
+      })
+    }
+
+    showMessage('success', `✓ ${commandText}`, 2000)
+  } catch (err) {
+    console.error('AI Command execution failed:', err)
+    showMessage('error', err.message || 'Failed to execute command', 5000)
+  }
+}
+
+/**
+ * Show feedback message
+ */
+const showMessage = (type, text, duration) => {
+  currentMessage.value = { type, text }
+  if (duration) {
+    setTimeout(() => {
+      if (currentMessage.value?.text === text) {
+        currentMessage.value = null
+      }
+    }, duration)
+  }
+}
+
+/**
+ * Select command from history
+ */
+const selectHistoryCommand = (command) => {
+  userInput.value = command
+  commandInput.value?.focus()
+  isFocused.value = true
+}
+
+/**
+ * Navigate through command history with arrow keys
+ */
+const navigateHistory = (direction) => {
+  if (commandHistory.value.length === 0) return
+
+  const newIndex = historyIndex.value + direction
+
+  if (newIndex < -1) {
+    historyIndex.value = -1
+    userInput.value = ''
+  } else if (newIndex >= commandHistory.value.length) {
+    historyIndex.value = commandHistory.value.length - 1
+  } else {
+    historyIndex.value = newIndex
+    if (newIndex === -1) {
+      userInput.value = ''
+    } else {
+      userInput.value = commandHistory.value[newIndex].input
+    }
+  }
+}
+
+/**
+ * Format timestamp for display
+ */
+const formatTime = (timestamp) => {
+  const diff = Date.now() - timestamp
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+
+  if (hours > 0) return `${hours}h ago`
+  if (minutes > 0) return `${minutes}m ago`
+  return `${seconds}s ago`
+}
+
+/**
+ * Handle keyboard shortcut (Cmd/Ctrl+J)
+ */
+const handleKeyDown = (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'j') {
+    e.preventDefault()
+    commandInput.value?.focus()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
+})
+</script>
+
+<style scoped>
+.ai-command-panel {
+  position: fixed;
+  bottom: 20px;
+  right: 320px; /* Above properties panel */
+  width: 400px;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid #e2e8f0;
+}
+
+.ai-command-panel.is-focused {
+  background-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border-color: #3b82f6;
+}
+
+.input-area {
+  display: flex;
+  gap: 8px;
+}
+
+.command-input {
+  flex-grow: 1;
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+  background-color: #ffffff;
+}
+
+.command-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.command-input::placeholder {
+  color: #9ca3af;
+}
+
+.command-input:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+  color: #6b7280;
+}
+
+.send-button {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.send-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  transform: translateY(-1px);
+}
+
+.send-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.send-button:disabled {
+  background: linear-gradient(135deg, #93c5fd 0%, #bfdbfe 100%);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.spinner {
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid #fff;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.feedback-message {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: slideIn 0.2s ease-out;
+}
+
+.feedback-message.success {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.feedback-message.error {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.command-history {
+  max-height: 300px;
+  overflow-y: auto;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.history-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+  padding: 4px 8px;
+  letter-spacing: 0.5px;
+}
+
+.history-item {
+  padding: 8px 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-item:hover {
+  background-color: #f3f4f6;
+}
+
+.history-item-error {
+  opacity: 0.6;
+}
+
+.history-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+.history-icon.success {
+  background-color: #d1fae5;
+  color: #059669;
+}
+
+.history-icon.error {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.history-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-time {
+  font-size: 11px;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* Scrollbar styling */
+.command-history::-webkit-scrollbar {
+  width: 6px;
+}
+
+.command-history::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 3px;
+}
+
+.command-history::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.command-history::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Transitions */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.2s ease;
+}
+
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

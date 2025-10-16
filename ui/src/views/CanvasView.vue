@@ -200,6 +200,14 @@
       @close="handleCloseVersionHistory"
       @restore="handleRestoreVersion"
     />
+
+    <!-- AI Command Panel (v6: AI-powered natural language commands) -->
+    <AICommandPanel
+      v-if="user"
+      :context="aiContext"
+      @command-executed="handleAICommandExecuted"
+      @utility-action="handleAIUtilityAction"
+    />
   </div>
 </template>
 
@@ -225,6 +233,7 @@ import TestingDashboard from '../components/TestingDashboard.vue'
 import PropertiesPanel from '../components/PropertiesPanel.vue'
 import RecoveryModal from '../components/RecoveryModal.vue'
 import VersionHistory from '../components/VersionHistory.vue'
+import AICommandPanel from '../components/AICommandPanel.vue'
 import { useShapes } from '../composables/useShapes'
 import { useFirestore } from '../composables/useFirestore' // v5: Batch operations
 import { getMaxZIndex } from '../types/shapes'
@@ -266,7 +275,8 @@ export default {
     Notifications,
     LoadingSpinner,
     EmptyState,
-    TestingDashboard
+    TestingDashboard,
+    AICommandPanel
   },
   setup() {
     // Router
@@ -542,6 +552,8 @@ export default {
       scaleY: zoomLevel.value,
       draggable: false // We'll handle dragging manually for better control
     }))
+
+    // (Duplicate AI context and handlers removed; existing v6 integration is retained below.)
 
     // Initialize canvas position (centered)
     const centerCanvas = () => {
@@ -2285,6 +2297,81 @@ export default {
       router.replace({ name: route.name, params: route.params, query })
     }
 
+    // V6: AI Command System Integration
+    // Calculate viewport center (visible screen area) for AI positioning
+    const aiContext = computed(() => {
+      // Get center of visible screen area
+      const centerScreenX = stageSize.width / 2
+      const centerScreenY = stageSize.height / 2
+      
+      // Convert screen coordinates to canvas coordinates
+      const canvasX = (centerScreenX - stagePosition.x) / zoomLevel.value
+      const canvasY = (centerScreenY - stagePosition.y) / zoomLevel.value
+      
+      // Get selected shapes info for AI context
+      const selectedShapesInfo = selectedShapeIds.value.map(id => {
+        const shape = shapes.get(id)
+        if (!shape) return null
+        return {
+          id: shape.id,
+          type: shape.type,
+          fill: shape.fill,
+          x: shape.x,
+          y: shape.y
+        }
+      }).filter(Boolean)
+      
+      return {
+        selectedShapes: selectedShapesInfo,
+        viewportCenter: {
+          x: canvasX,
+          y: canvasY
+        },
+        canvasSize: {
+          width: CANVAS_SIZE,
+          height: CANVAS_SIZE
+        },
+        userId: user.value?.uid,
+        canvasId: canvasId.value,
+        userName: userName.value,
+        selectedShapeIds: selectedShapeIds.value
+      }
+    })
+    
+    // Handle AI command execution results
+    const handleAICommandExecuted = (result) => {
+      if (result.type === 'selection' && result.selectedIds) {
+        // Update selection from AI command
+        selectedShapeIds.value = result.selectedIds
+        updateTransformer()
+      }
+      // Other command types are already handled by the executor
+    }
+    
+    // Handle utility actions from AI commands
+    const handleAIUtilityAction = (action, amount) => {
+      switch (action) {
+        case 'zoom-in':
+          handleZoomIn()
+          break
+        case 'zoom-out':
+          handleZoomOut()
+          break
+        case 'center':
+          handleZoomReset()
+          break
+        case 'undo':
+          if (canUndo.value) handleUndo()
+          break
+        case 'redo':
+          if (canRedo.value) handleRedo()
+          break
+        case 'clear-selection':
+          clearSelection()
+          break
+      }
+    }
+
     return {
       // Refs
       stage,
@@ -2383,7 +2470,12 @@ export default {
       handleUndo,
       handleRedo,
       canUndo,
-      canRedo
+      canRedo,
+      // V6: AI Command System
+      aiContext,
+      handleAICommandExecuted,
+      handleAIUtilityAction,
+      user
     }
   }
 }

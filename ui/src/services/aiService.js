@@ -1,0 +1,339 @@
+/**
+ * AI Service - OpenAI Integration
+ * 
+ * Handles direct communication with OpenAI API for natural language command parsing.
+ * Uses gpt-3.5-turbo for speed and cost efficiency.
+ * 
+ * PRD v6 Implementation
+ */
+
+import OpenAI from 'openai'
+
+/**
+ * OpenAI Configuration
+ */
+const OPENAI_CONFIG = {
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true // Required for client-side usage
+}
+
+const MODEL = import.meta.env.VITE_AI_MODEL || 'gpt-3.5-turbo'
+const TEMPERATURE = parseFloat(import.meta.env.VITE_AI_TEMPERATURE) || 0.1
+const MAX_TOKENS = parseInt(import.meta.env.VITE_AI_MAX_TOKENS) || 500
+const TIMEOUT = parseInt(import.meta.env.VITE_AI_TIMEOUT) || 5000
+
+/**
+ * System prompt for AI command parsing
+ * Defines capabilities, intents, and response format
+ */
+const SYSTEM_PROMPT = `You are an AI assistant for a collaborative canvas application. Your job is to parse natural language commands and convert them to structured JSON commands.
+
+The canvas supports these shape types: rectangle, circle, line, text
+
+Available command intents:
+- CREATE_SHAPE: Create a single shape
+- CREATE_MULTIPLE_SHAPES: Create multiple shapes
+- CREATE_TEXT: Create text element
+- MOVE_SHAPE: Move/position shapes
+- RESIZE_SHAPE: Resize shapes
+- CHANGE_STYLE: Modify visual properties
+- ARRANGE_SHAPES: Layout shapes in patterns
+- CHANGE_LAYER: Modify z-index
+- CREATE_TEMPLATE: Create predefined components
+- DELETE_SHAPE: Remove shapes
+- QUERY_INFO: Answer questions about canvas
+
+Available templates: login_form, button, card
+
+When parsing commands:
+1. Identify the primary intent
+2. Extract all relevant parameters
+3. Handle ambiguous references (e.g., "it" = last created or selected shape)
+4. Use sensible defaults for missing parameters
+5. Return valid JSON only
+
+Response format:
+{
+  "intent": "INTENT_NAME",
+  "parameters": { ... },
+  "confidence": 0.0-1.0,
+  "reasoning": "brief explanation"
+}
+
+If you cannot parse the command with >70% confidence, return:
+{
+  "intent": "UNKNOWN",
+  "confidence": 0.0,
+  "reasoning": "explanation of what wasn't understood"
+}
+
+Important positioning rules:
+- If no position specified: use viewport center (default)
+- "at center" or "in the center": use viewport center
+- "at X,Y" coordinates: use exact position
+- Viewport center will be provided in context
+
+Color handling:
+- Support color names (red, blue, green, etc.)
+- Support hex values (#FF0000)
+- Default colors: circle = blue, rectangle = gray, text = black
+
+Size handling:
+- "bigger" = 1.5x current size
+- "smaller" = 0.5x current size
+- "double" = 2x current size
+- Default rectangle: 100x100
+- Default circle radius: 50
+
+Target resolution for ambiguous references:
+- "it" or "this" → last created shape OR first selected shape
+- "selected" → all currently selected shapes
+- "the circle" → most recently created circle
+- No target specified for modifications → use selected shapes or last created
+
+Always return pure JSON with no markdown formatting or explanations outside the JSON structure.`
+
+/**
+ * Build user prompt with command and context
+ */
+const buildUserPrompt = (commandText, context) => {
+  const { viewportCenter, selectedShapeIds = [], lastCreatedShape, totalShapes = 0 } = context
+
+  return `Command: "${commandText}"
+
+Current Context:
+- Viewport center: (${viewportCenter?.x || 0}, ${viewportCenter?.y || 0})
+- Selected shapes: ${selectedShapeIds.length} shape(s) selected
+- Last created shape: ${lastCreatedShape ? `${lastCreatedShape.type} (ID: ${lastCreatedShape.id})` : 'none'}
+- Total shapes on canvas: ${totalShapes}
+- Canvas dimensions: 3000x3000 (bounded area)
+
+Parse this command and return structured JSON.`
+}
+
+/**
+ * Error message mapping for user-friendly display
+ */
+const ERROR_MESSAGES = {
+  NO_API_KEY: 'AI service not configured. Please add VITE_OPENAI_API_KEY to environment variables.',
+  TIMEOUT: 'AI request timed out. Please try again.',
+  RATE_LIMIT: 'Too many requests. Please wait a moment and try again.',
+  NETWORK: 'Network error. Please check your connection.',
+  PARSE_ERROR: 'Could not understand the response from AI. Please try again.',
+  LOW_CONFIDENCE: 'I couldn\'t understand that command. Try being more specific.',
+  UNKNOWN_INTENT: 'I\'m not sure how to do that. Try commands like "draw a circle" or "create a rectangle".',
+  INVALID_INPUT: 'Command cannot be empty.',
+  TOO_LONG: 'Command too long (max 500 characters).',
+  API_ERROR: 'AI service error. Please try again.',
+}
+
+/**
+ * AI Service Class
+ */
+class AIService {
+  constructor() {
+    this.openai = null
+    this.initialized = false
+    this.initPromise = null
+  }
+
+  /**
+   * Initialize OpenAI client (lazy initialization)
+   */
+  async initialize() {
+    if (this.initialized) {
+      return
+    }
+
+    if (this.initPromise) {
+      return this.initPromise
+    }
+
+    this.initPromise = (async () => {
+      try {
+        if (!OPENAI_CONFIG.apiKey) {
+          throw new Error(ERROR_MESSAGES.NO_API_KEY)
+        }
+
+        this.openai = new OpenAI(OPENAI_CONFIG)
+        this.initialized = true
+        console.log('✅ OpenAI client initialized')
+      } catch (error) {
+        console.error('❌ Failed to initialize OpenAI client:', error)
+        throw error
+      }
+    })()
+
+    return this.initPromise
+  }
+
+  /**
+   * Parse natural language command into structured format
+   * 
+   * @param {string} commandText - Natural language command from user
+   * @param {Object} contextData - Canvas context (viewport, selection, etc.)
+   * @returns {Promise<Object>} Parsed command with intent and parameters
+   */
+  async parseNaturalLanguageCommand(commandText, contextData = {}) {
+    // Validate input
+    if (!commandText || typeof commandText !== 'string') {
+      throw new Error(ERROR_MESSAGES.INVALID_INPUT)
+    }
+
+    const trimmed = commandText.trim()
+    
+    if (trimmed.length === 0) {
+      throw new Error(ERROR_MESSAGES.INVALID_INPUT)
+    }
+
+    if (trimmed.length > 500) {
+      throw new Error(ERROR_MESSAGES.TOO_LONG)
+    }
+
+    // Initialize OpenAI client if needed
+    await this.initialize()
+
+    const startTime = Date.now()
+
+    try {
+      // Build prompts
+      const systemPrompt = SYSTEM_PROMPT
+      const userPrompt = buildUserPrompt(trimmed, contextData)
+
+      console.log('🤖 Sending command to OpenAI:', trimmed)
+
+      // Create timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error(ERROR_MESSAGES.TIMEOUT)), TIMEOUT)
+      })
+
+      // Call OpenAI API
+      const apiPromise = this.openai.chat.completions.create({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: TEMPERATURE,
+        max_tokens: MAX_TOKENS,
+        response_format: { type: 'json_object' }
+      })
+
+      // Race between API call and timeout
+      const response = await Promise.race([apiPromise, timeoutPromise])
+
+      const duration = Date.now() - startTime
+      console.log(`✅ OpenAI response received in ${duration}ms`)
+
+      // Parse response
+      const content = response.choices[0]?.message?.content
+      if (!content) {
+        throw new Error(ERROR_MESSAGES.PARSE_ERROR)
+      }
+
+      let parsed
+      try {
+        parsed = JSON.parse(content)
+      } catch (e) {
+        console.error('Failed to parse OpenAI response:', content)
+        throw new Error(ERROR_MESSAGES.PARSE_ERROR)
+      }
+
+      // Check confidence threshold
+      if (parsed.confidence < 0.7) {
+        throw new Error(parsed.reasoning || ERROR_MESSAGES.LOW_CONFIDENCE)
+      }
+
+      // Check for UNKNOWN intent
+      if (parsed.intent === 'UNKNOWN') {
+        throw new Error(parsed.reasoning || ERROR_MESSAGES.UNKNOWN_INTENT)
+      }
+
+      // Validate structure
+      if (!parsed.intent || !parsed.parameters) {
+        throw new Error(ERROR_MESSAGES.PARSE_ERROR)
+      }
+
+      console.log('✅ Command parsed successfully:', parsed)
+
+      return parsed
+
+    } catch (error) {
+      const duration = Date.now() - startTime
+      console.error(`❌ AI parsing failed after ${duration}ms:`, error)
+
+      // Handle specific OpenAI errors
+      if (error.code === 'insufficient_quota' || error.status === 429) {
+        throw new Error(ERROR_MESSAGES.RATE_LIMIT)
+      }
+
+      if (error.code === 'invalid_api_key' || error.status === 401) {
+        throw new Error(ERROR_MESSAGES.NO_API_KEY)
+      }
+
+      if (error.message && error.message.includes('network')) {
+        throw new Error(ERROR_MESSAGES.NETWORK)
+      }
+
+      // Re-throw formatted errors
+      if (error.message && Object.values(ERROR_MESSAGES).includes(error.message)) {
+        throw error
+      }
+
+      // Generic API error
+      throw new Error(error.message || ERROR_MESSAGES.API_ERROR)
+    }
+  }
+
+  /**
+   * Validate command structure (client-side check)
+   *
+   * @param {Object} command - Parsed command object
+   * @returns {boolean} True if valid
+   */
+  validateCommand(command) {
+    if (!command || typeof command !== 'object') {
+      return false
+    }
+
+    const validIntents = [
+      'CREATE_SHAPE',
+      'CREATE_MULTIPLE_SHAPES',
+      'CREATE_TEXT',
+      'MOVE_SHAPE',
+      'RESIZE_SHAPE',
+      'CHANGE_STYLE',
+      'ARRANGE_SHAPES',
+      'CHANGE_LAYER',
+      'CREATE_TEMPLATE',
+      'DELETE_SHAPE',
+      'QUERY_INFO'
+    ]
+
+    if (!validIntents.includes(command.intent)) {
+      return false
+    }
+
+    if (!command.parameters || typeof command.parameters !== 'object') {
+      return false
+    }
+
+    return true
+  }
+
+  /**
+   * Get error message for display
+   * 
+   * @param {Error} error - Error object
+   * @returns {string} User-friendly error message
+   */
+  getErrorMessage(error) {
+    if (error.message && Object.values(ERROR_MESSAGES).includes(error.message)) {
+      return error.message
+    }
+    return ERROR_MESSAGES.API_ERROR
+  }
+}
+
+// Export singleton instance
+export default new AIService()
