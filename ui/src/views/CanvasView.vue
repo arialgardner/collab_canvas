@@ -176,7 +176,6 @@
       :canvas-width="canvasWidth"
       :canvas-height="canvasHeight"
       :total-shapes="shapesList.length"
-      :active-users="activeUserCount"
       @update-property="handleUpdateProperty"
       @update-canvas-size="handleUpdateCanvasSize"
       @bulk-update="handleBulkUpdate"
@@ -618,6 +617,10 @@ export default {
             return
           }
         } else if (activeTool.value === 'text' && canUserEdit.value) {
+          // Don't create new text if we're currently editing text (prevents duplicate creation when clicking away to close editor)
+          if (showTextEditor.value) {
+            return
+          }
           // Create text shape and immediately open editor
           const newText = await createShape('text', { x: canvasX, y: canvasY }, userId, canvasId.value, userName.value)
           if (newText) {
@@ -1031,13 +1034,17 @@ export default {
       transformerNode.getLayer().batchDraw()
     }
 
-    // Throttled transform update during drag (60 FPS = 16ms)
+    // Track which shapes are being resized (to detect resize in transformend after scale reset)
+    const resizingShapes = ref(new Set())
+
+    // Throttled transform update during drag
     // v3: These are interim updates, will be batched as low priority
+    // Using 50ms for smoother, less jittery updates (was 16ms / 60 FPS)
     const throttledTransformUpdate = throttle(async (shapeId, updates, userId, userName) => {
       // Update local state only during transform (no Firestore save)
       // isFinal=false means this is an interim update (not used here since saveToFirestore=false)
       await updateShape(shapeId, updates, userId, canvasId.value, false, false, userName)
-    }, 16)
+    }, 50)
 
     // Handle transform changes during drag (throttled)
     const handleTransform = (e) => {
@@ -1056,12 +1063,56 @@ export default {
       // Don't send updates during pure rotation - only on transformend
       if (!isResizing) return
       
+      // Mark shape as being resized
+      resizingShapes.value.add(shapeId)
+      
       // Get transform updates based on shape type
       const updates = {
         rotation: node.rotation()
       }
       
-      if (shape.type === 'rectangle' || shape.type === 'text') {
+      if (shape.type === 'rectangle') {
+        // Handle negative scaling (when user drags past opposite corner)
+        const newWidth = Math.abs(node.width() * scaleX)
+        const newHeight = Math.abs(node.height() * scaleY)
+        
+        // Calculate position accounting for potential flip
+        // When scale is negative, the anchor point shifts
+        const offsetX = scaleX < 0 ? -newWidth / 2 : newWidth / 2
+        const offsetY = scaleY < 0 ? -newHeight / 2 : newHeight / 2
+        
+        // Convert center position back to top-left
+        updates.x = node.x() - offsetX
+        updates.y = node.y() - offsetY
+        updates.width = newWidth
+        updates.height = newHeight
+        
+        // Apply size changes immediately to reduce bouncing
+        node.width(newWidth)
+        node.height(newHeight)
+        node.offsetX(newWidth / 2)
+        node.offsetY(newHeight / 2)
+        node.scaleX(1)
+        node.scaleY(1)
+      } else if (shape.type === 'circle') {
+        // Calculate new radius (keepRatio ensures uniform scaling)
+        const newWidth = node.width() * scaleX
+        const newRadius = Math.max(5, newWidth / 2) // Min 5px radius
+        
+        updates.radius = newRadius
+        // During transform, just track current node position
+        // Don't calculate position changes - let transformer control it
+        updates.x = node.x()
+        updates.y = node.y()
+        
+        // Apply size changes immediately to reduce bouncing
+        node.width(newRadius * 2)
+        node.height(newRadius * 2)
+        node.offsetX(newRadius)
+        node.offsetY(newRadius)
+        node.scaleX(1)
+        node.scaleY(1)
+      } else if (shape.type === 'text') {
         const newWidth = node.width() * scaleX
         const newHeight = node.height() * scaleY
         // Convert center position back to top-left (accounting for offset)
@@ -1069,14 +1120,6 @@ export default {
         updates.y = node.y() - newHeight / 2
         updates.width = newWidth
         updates.height = newHeight
-      } else if (shape.type === 'circle') {
-        // Calculate new radius (keepRatio ensures uniform scaling)
-        const newWidth = node.width() * scaleX
-        const newRadius = Math.max(5, newWidth / 2) // Min 5px radius
-        updates.radius = newRadius
-        // Update position (circle uses center, transformer uses top-left with offset)
-        updates.x = node.x()
-        updates.y = node.y()
       } else if (shape.type === 'line') {
         updates.x = node.x()
         updates.y = node.y()
@@ -1106,18 +1149,29 @@ export default {
       
       const scaleX = node.scaleX()
       const scaleY = node.scaleY()
-      const wasResized = Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001
+      // Check if was resized using our tracking set (for circles/rectangles with immediate scale reset)
+      // or using scale check (for other shapes)
+      const wasResized = resizingShapes.value.has(shapeId) || Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001
+      
+      // Clear resize tracking for this shape
+      resizingShapes.value.delete(shapeId)
       
       if (shape.type === 'rectangle' || shape.type === 'text') {
         // For rectangles/text, node position is at center (due to offset in component)
         // During rotation, Konva updates node.x/y to keep shape visually in place
         // We need to convert this center position back to top-left for our data model
-        const currentWidth = wasResized ? node.width() * scaleX : node.width()
-        const currentHeight = wasResized ? node.height() * scaleY : node.height()
+        
+        // Handle negative scaling (when user drags past opposite corner)
+        const currentWidth = wasResized ? Math.abs(node.width() * scaleX) : node.width()
+        const currentHeight = wasResized ? Math.abs(node.height() * scaleY) : node.height()
+        
+        // Calculate position accounting for potential flip
+        const offsetX = (wasResized && scaleX < 0) ? -currentWidth / 2 : currentWidth / 2
+        const offsetY = (wasResized && scaleY < 0) ? -currentHeight / 2 : currentHeight / 2
         
         // Convert center position back to top-left
-        updates.x = node.x() - currentWidth / 2
-        updates.y = node.y() - currentHeight / 2
+        updates.x = node.x() - offsetX
+        updates.y = node.y() - offsetY
         
         if (wasResized) {
           updates.width = currentWidth
@@ -1134,17 +1188,23 @@ export default {
       } else if (shape.type === 'circle') {
         if (wasResized) {
           // Calculate new radius (keepRatio ensures uniform scaling)
+          const oldRadius = shape.radius
           const newWidth = node.width() * scaleX
           const newRadius = Math.max(5, newWidth / 2) // Min 5px radius
+          const radiusDelta = newRadius - oldRadius
+          
           updates.radius = newRadius
-          // Update position (circle uses center, transformer uses top-left with offset)
-          updates.x = node.x()
-          updates.y = node.y()
+          // Keep top-left corner fixed: as radius grows, center moves by the delta
+          updates.x = shape.x + radiusDelta
+          updates.y = shape.y + radiusDelta
+          
           // Reset scale and update node dimensions with new offset
           node.width(newRadius * 2)
           node.height(newRadius * 2)
           node.offsetX(newRadius)
           node.offsetY(newRadius)
+          node.x(updates.x)
+          node.y(updates.y)
           node.scaleX(1)
           node.scaleY(1)
         } else {
@@ -1630,7 +1690,15 @@ export default {
       }
       
       // Delete or Backspace: Delete selected shapes
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeIds.value.length > 0 && !showTextEditor.value) {
+      // Check if user is typing in an input field
+      const activeElement = document.activeElement
+      const isTyping = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.isContentEditable
+      )
+      
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedShapeIds.value.length > 0 && !showTextEditor.value && !isTyping) {
         e.preventDefault()
         
         // Show confirmation modal if >5 shapes are selected
@@ -1798,7 +1866,7 @@ export default {
         
         // Start real-time synchronization after initial load
         console.log('🔄 Starting real-time sync...')
-        startRealtimeSync(canvasId.value)
+        startRealtimeSync(canvasId.value, user.value?.uid)
         console.log('✅ Real-time sync started')
       } catch (err) {
         console.error('❌ Failed to load canvas/shapes on mount:', err)
@@ -1810,7 +1878,7 @@ export default {
         // Continue without shapes - user can still create new ones
         // Still start real-time sync for new shapes
         try {
-          startRealtimeSync(canvasId.value)
+          startRealtimeSync(canvasId.value, user.value?.uid)
         } catch (syncErr) {
           console.error('❌ Failed to start sync:', syncErr)
         }

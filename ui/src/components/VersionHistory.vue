@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isVisible" class="vh-overlay" @click.self="$emit('close')">
+  <div v-if="isVisible" class="vh-overlay">
     <div class="vh-panel">
       <div class="vh-header">
         <h3>Version History</h3>

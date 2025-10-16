@@ -35,10 +35,6 @@
           <span class="info-label">Total Shapes</span>
           <span class="info-value">{{ totalShapes }}</span>
         </div>
-        <div class="info-row">
-          <span class="info-label">Active Users</span>
-          <span class="info-value">{{ activeUsers }}</span>
-        </div>
       </div>
     </div>
 
@@ -613,10 +609,6 @@ const props = defineProps({
     required: true
   },
   totalShapes: {
-    type: Number,
-    required: true
-  },
-  activeUsers: {
     type: Number,
     required: true
   }

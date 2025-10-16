@@ -4,7 +4,6 @@ import {
   generateRandomColor, 
   DEFAULT_RECT_SIZE,
   DEFAULT_SHAPE_PROPERTIES,
-  constrainToBounds,
   getMaxZIndex,
   getMinZIndex,
   needsZIndexNormalization
@@ -73,11 +72,10 @@ export const useShapes = () => {
       switch (type) {
         case 'rectangle': {
           const { x = 0, y = 0 } = properties
-          const constrainedPos = constrainToBounds(x, y)
           shape = {
             ...baseShape,
-            x: constrainedPos.x,
-            y: constrainedPos.y,
+            x,
+            y,
             width: DEFAULT_SHAPE_PROPERTIES.rectangle.width,
             height: DEFAULT_SHAPE_PROPERTIES.rectangle.height,
             fill: DEFAULT_SHAPE_PROPERTIES.rectangle.fill
@@ -157,33 +155,7 @@ export const useShapes = () => {
       return null
     }
 
-    // Constrain all shapes to canvas bounds
-    if (updates.x !== undefined || updates.y !== undefined) {
-      const newX = updates.x !== undefined ? updates.x : shape.x
-      const newY = updates.y !== undefined ? updates.y : shape.y
-      
-      // Get dimensions based on shape type
-      let width = 0
-      let height = 0
-      
-      if (shape.type === 'rectangle' || shape.type === 'text') {
-        width = updates.width !== undefined ? updates.width : shape.width || 0
-        height = updates.height !== undefined ? updates.height : shape.height || 0
-      } else if (shape.type === 'circle') {
-        const radius = updates.radius !== undefined ? updates.radius : shape.radius
-        width = radius * 2
-        height = radius * 2
-      } else if (shape.type === 'line') {
-        // For lines, ensure endpoints stay within bounds
-        // Lines use points array, keep x,y at 0,0 and constrain points instead
-        width = 0
-        height = 0
-      }
-      
-      const constrainedPos = constrainToBounds(newX, newY, width, height)
-      updates.x = constrainedPos.x
-      updates.y = constrainedPos.y
-    }
+    // Allow shapes to be positioned anywhere on the full canvas
 
     // Update shape with new properties
     const updatedShape = {
@@ -310,7 +282,7 @@ export const useShapes = () => {
   }
 
   // Set up real-time synchronization
-  const startRealtimeSync = (canvasId = 'default') => {
+  const startRealtimeSync = (canvasId = 'default', currentUserId = null) => {
     if (realtimeUnsubscribe) {
       console.warn('Real-time sync already active')
       return
@@ -356,11 +328,14 @@ export const useShapes = () => {
               }
               console.log(`Real-time: Shape ${shapeId} (${shape.type}) updated`)
               // Visual feedback trigger: mark recent editor for UI highlights
-              // Store a transient marker on the shape object for components to read
-              const marked = { ...shape, __highlightUntil: Date.now() + 2000 }
-              shapes.set(shapeId, marked)
-              // Basic notification for awareness (optional, lightweight)
-              // info(`Edited by ${shape.lastModifiedBy || 'someone'}`)
+              // Only highlight if edited by someone else, not by current user
+              const isOtherUser = currentUserId && shape.lastModifiedBy && shape.lastModifiedBy !== currentUserId
+              if (isOtherUser) {
+                const marked = { ...shape, __highlightUntil: Date.now() + 2000 }
+                shapes.set(shapeId, marked)
+                // Basic notification for awareness (optional, lightweight)
+                // info(`Edited by ${shape.lastModifiedBy || 'someone'}`)
+              }
             } else {
               console.log(`Real-time: Ignoring older update for shape ${shapeId}`)
               // If local is newer within 2s window, show conflict note

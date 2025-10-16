@@ -1,7 +1,7 @@
 <template>
   <div v-if="isVisible">
     <!-- Backdrop overlay -->
-    <div class="queue-overlay" @click="$emit('close')"></div>
+    <div class="queue-overlay"></div>
     
     <!-- Centered modal -->
     <div class="queue-viewer">
@@ -27,7 +27,7 @@
       </div>
       <div class="footer">
         <button class="btn" @click="refresh">Refresh</button>
-        <button class="btn danger" @click="clearAll">Clear All</button>
+        <button class="btn danger" @click="clearAll" :disabled="ops.length === 0">Clear All</button>
       </div>
     </div>
   </div>
@@ -140,8 +140,11 @@ export default {
 .status { font-size: 12px; color: #64748b; margin-right: 4px; }
 .btn { background: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 6px 8px; font-size: 12px; cursor: pointer; color: #000000; }
 .btn:hover { background: #f3f4f6; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn:disabled:hover { background: #ffffff; }
 .btn.danger { background: #fee2e2; border-color: #fecaca; }
 .btn.danger:hover { background: #fecaca; }
+.btn.danger:disabled:hover { background: #fee2e2; }
 .footer { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #e2e8f0; }
 </style>
 
