@@ -53,7 +53,8 @@ export const useOperationQueue = () => {
       ...operation
     }
     await persistOperation(queued)
-    getOperationQueue().enqueue(operation, priority)
+    // Pass the full queued operation (including ID) to in-memory queue for cleanup
+    getOperationQueue().enqueue(queued, priority)
   }
 
   singleton = {

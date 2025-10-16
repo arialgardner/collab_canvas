@@ -110,10 +110,21 @@ export const useConnectionState = () => {
   const syncNow = async () => {
     setStatus(CONNECTION_STATUS.SYNCING)
     try {
+      // First check if we're actually online
+      const isConnected = await heartbeatPing()
+      
+      if (!isConnected) {
+        // Don't try to sync if we're not connected
+        // heartbeatPing already set the appropriate status (OFFLINE or ERROR)
+        return
+      }
+      
       if (typeof syncHandler === 'function') {
         await syncHandler()
       }
       state.lastSyncTime = Date.now()
+      // Only set to CONNECTED if heartbeatPing confirmed we're online
+      // (it already set this, but we set it again after successful sync)
       setStatus(CONNECTION_STATUS.CONNECTED)
     } catch (err) {
       setStatus(CONNECTION_STATUS.ERROR, 'Sync failed')

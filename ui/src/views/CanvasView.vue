@@ -16,14 +16,6 @@
     <!-- Toolbar -->
       <Toolbar @tool-selected="handleToolSelected" :can-undo="canUndo" :can-redo="canRedo" @undo="handleUndo" @redo="handleRedo" />
 
-    <!-- Sync Status -->
-    <SyncStatus
-      :is-connected="isConnected"
-      :is-syncing="isSyncing"
-      :has-error="!!error"
-      :user-count="activeUserCount + 1"
-    />
-
     <!-- Zoom Controls -->
     <ZoomControls 
       :zoom="zoomLevel"
@@ -225,7 +217,6 @@ import TextEditor from '../components/TextEditor.vue'
 import TextFormatToolbar from '../components/TextFormatToolbar.vue'
 import ContextMenu from '../components/ContextMenu.vue'
 import ConfirmModal from '../components/ConfirmModal.vue'
-import SyncStatus from '../components/SyncStatus.vue'
 import UserCursor from '../components/UserCursor.vue'
 import PerformanceMonitor from '../components/PerformanceMonitor.vue'
 import Notifications from '../components/Notifications.vue'
@@ -269,7 +260,6 @@ export default {
     PropertiesPanel,
     RecoveryModal,
     VersionHistory,
-    SyncStatus,
     UserCursor,
     PerformanceMonitor,
     Notifications,

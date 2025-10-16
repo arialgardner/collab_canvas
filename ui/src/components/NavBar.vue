@@ -14,7 +14,7 @@
         <!-- Connection Status -->
         <ConnectionStatus />
         <!-- Presence List -->
-        <div v-if="user" class="presence-section">
+        <div v-if="user && presenceLoaded" class="presence-section">
           <!-- User Count -->
           <div class="user-count" @click="togglePresenceDropdown">
             <span class="count-badge">{{ activeUserCount + 1 }}</span>
@@ -72,7 +72,15 @@
           <span class="user-name">{{ userDisplayName }}</span>
         </div>
 
-        <!-- Version History (owner-only) & Logout Button -->
+        <!-- Version History & Save (owner-only) -->
+        <button v-if="isOwner" class="logout-button" title="Version History" @click="$emit('toggle-versions')" style="background:#e0e7ff;color:#3730a3;border-color:#c7d2fe;">
+          History
+        </button>
+        <button v-if="isOwner" class="logout-button" title="Save Version" @click="$emit('save-version')" :disabled="isOffline" style="background:#dcfce7;color:#065f46;border-color:#bbf7d0;">
+          Save
+        </button>
+        
+        <!-- Sign Out Button (far right) -->
         <button 
           v-if="user" 
           @click="handleLogout"
@@ -84,12 +92,6 @@
             <path d="M3 3a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 13.846 4.632 16 6.414 16H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 6H6.28l-.31-1.243A1 1 0 005 4H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
           </svg>
           {{ isLoading ? 'Signing out...' : 'Sign Out' }}
-        </button>
-        <button v-if="isOwner" class="logout-button" title="Version History" @click="$emit('toggle-versions')" style="background:#e0e7ff;color:#3730a3;border-color:#c7d2fe;">
-          History
-        </button>
-        <button v-if="isOwner" class="logout-button" title="Save Version" @click="$emit('save-version')" style="background:#dcfce7;color:#065f46;border-color:#bbf7d0;">
-          Save
         </button>
       </div>
     </div>
@@ -104,11 +106,12 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { useRouter } from 'vue-router'
 import { usePresence } from '../composables/usePresence'
 import { useCursors } from '../composables/useCursors'
+import { useConnectionState, CONNECTION_STATUS } from '../composables/useConnectionState'
 import ConnectionStatus from './ConnectionStatus.vue'
 
 export default {
@@ -128,11 +131,13 @@ export default {
     const { user, signOut, isLoading } = useAuth()
     const { activeUsers, getActiveUsers, getActiveUserCount, setUserOffline } = usePresence()
     const { removeCursor } = useCursors()
+    const { state: connectionState } = useConnectionState()
     const router = useRouter()
     
     // Local state
     const showPresenceDropdown = ref(false)
     const userCursorColor = ref('#667eea')
+    const presenceLoaded = ref(false)
 
     // Computed properties
     const userDisplayName = computed(() => {
@@ -140,8 +145,12 @@ export default {
       return user.value.displayName || user.value.email?.split('@')[0] || 'Anonymous'
     })
 
-    const activeUserCount = computed(() => getActiveUserCount())
-    const activeUsersList = computed(() => getActiveUsers())
+    // Use activeUsers directly for reactivity
+    const activeUserCount = computed(() => activeUsers.size)
+    const activeUsersList = computed(() => Array.from(activeUsers.values()))
+    
+    // Check if offline
+    const isOffline = computed(() => connectionState.status === CONNECTION_STATUS.OFFLINE)
 
     // Load user's cursor color from Firestore (disabled until PR #5)
     const loadUserCursorColor = async () => {
@@ -196,6 +205,15 @@ export default {
       }
     }
 
+    // Watch for presence data to load
+    watch(activeUsersList, () => {
+      // Mark presence as loaded after we receive data
+      // Small delay to ensure initial snapshot is processed
+      setTimeout(() => {
+        presenceLoaded.value = true
+      }, 500)
+    }, { immediate: true })
+
     // Lifecycle
     onMounted(() => {
       if (user.value) {
@@ -227,7 +245,9 @@ export default {
       showPresenceDropdown,
       togglePresenceDropdown,
       handleLogout,
-      handleBackToDashboard
+      handleBackToDashboard,
+      presenceLoaded,
+      isOffline
     }
   }
 }
@@ -250,8 +270,6 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1.5rem;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
 .nav-brand {

@@ -1,12 +1,14 @@
 <template>
   <div class="error-container">
     <!-- Network Status Banner -->
-    <div v-if="!isOnline" class="error-banner network-error">
-      <div class="banner-content">
-        <span class="error-icon">📡</span>
-        <span class="error-text">You are offline. Some features may not work.</span>
+    <transition name="banner">
+      <div v-if="showOfflineBanner" class="error-banner network-error">
+        <div class="banner-content">
+          <span class="error-icon">📡</span>
+          <span class="error-text">You are offline. Some features may not work.</span>
+        </div>
       </div>
-    </div>
+    </transition>
 
     <!-- Error Toast Notifications -->
     <transition-group name="toast" tag="div" class="toast-container">
@@ -30,8 +32,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useErrorHandling } from '../composables/useErrorHandling'
+import { useAuth } from '../composables/useAuth'
 
 const emit = defineEmits(['retry'])
 
@@ -41,6 +44,45 @@ const {
   removeError, 
   ERROR_TYPES 
 } = useErrorHandling()
+
+const { user } = useAuth()
+
+const showOfflineBanner = ref(false)
+let hideTimeout = null
+
+// Watch for offline status changes
+watch(isOnline, (newValue, oldValue) => {
+  // Clear any existing timeout
+  if (hideTimeout) {
+    clearTimeout(hideTimeout)
+    hideTimeout = null
+  }
+  
+  // Only show banner if user is logged in
+  if (!user.value) {
+    showOfflineBanner.value = false
+    return
+  }
+  
+  // When going offline, show banner and auto-hide after 4 seconds
+  if (!newValue) {
+    showOfflineBanner.value = true
+    hideTimeout = setTimeout(() => {
+      showOfflineBanner.value = false
+      hideTimeout = null
+    }, 4000)
+  } else {
+    // When coming back online, hide immediately
+    showOfflineBanner.value = false
+  }
+}, { immediate: true })
+
+// Clean up timeout on unmount
+onUnmounted(() => {
+  if (hideTimeout) {
+    clearTimeout(hideTimeout)
+  }
+})
 
 const getErrorIcon = (type) => {
   switch (type) {
@@ -217,6 +259,25 @@ const getErrorIcon = (type) => {
   to {
     transform: translateY(0);
   }
+}
+
+/* Banner Transitions */
+.banner-enter-active {
+  transition: all 0.3s ease-out;
+}
+
+.banner-leave-active {
+  transition: all 0.3s ease-in;
+}
+
+.banner-enter-from {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+.banner-leave-to {
+  transform: translateY(-100%);
+  opacity: 0;
 }
 
 @keyframes progress {

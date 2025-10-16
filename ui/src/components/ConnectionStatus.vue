@@ -8,22 +8,25 @@
       </svg>
 
       <div v-if="expanded" class="panel">
+        <div class="dropdown-header">Connection</div>
         <div class="row actions">
           <button class="btn" @click.stop="syncNow">Sync Now</button>
-          <button class="btn" @click.stop="retryConnection">Retry</button>
+          <button class="btn" @click.stop="retryConnection" :disabled="isConnected">Retry</button>
           <button class="btn" @click.stop="toggleQueue">View Queue</button>
         </div>
         <div v-if="state.error" class="error">{{ state.error }}</div>
-        <QueueViewer :is-visible="showQueue" @close="showQueue = false" />
       </div>
     </div>
 
-    <!-- Click outside to close -->
+    <!-- Click outside to close dropdown -->
     <div 
       v-if="expanded" 
       @click="expanded = false"
       class="dropdown-overlay"
     ></div>
+
+    <!-- Queue Viewer Modal (outside dropdown) -->
+    <QueueViewer :is-visible="showQueue" @close="showQueue = false" />
   </div>
 </template>
 
@@ -82,6 +85,8 @@ export default {
     const toggleQueue = () => showQueue.value = !showQueue.value
     const formatTime = (ts) => new Date(ts).toLocaleTimeString()
 
+    const isConnected = computed(() => state.status === CONNECTION_STATUS.CONNECTED)
+
     return {
       state,
       label,
@@ -93,7 +98,8 @@ export default {
       syncNow,
       retryConnection,
       tooltip,
-      showQueue
+      showQueue,
+      isConnected
     }
   }
 }
@@ -132,26 +138,54 @@ export default {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 8px;
+  padding: 0;
   z-index: 1001;
+  min-width: 180px;
+}
+.dropdown-header {
+  padding: 0.75rem 1rem 0.5rem 1rem;
+  font-weight: 600;
+  color: #2d3748;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 0.9rem;
 }
 .row {
   display: flex;
-  justify-content: space-between;
-  font-size: 12px;
+  flex-direction: column;
+  gap: 0;
 }
-.row.actions { gap: 6px; }
+.row.actions { 
+  gap: 0;
+  flex-direction: column;
+}
 .btn {
-  background: #ffffff;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  padding: 4px 6px;
-  font-size: 12px;
+  background: white;
+  border: none;
+  border-radius: 0;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
   cursor: pointer;
-  color: #000000;
+  color: #2d3748;
+  transition: background-color 0.2s;
+  text-align: left;
+  width: 100%;
 }
-.btn:hover { background: #f3f4f6; }
-.error { color: #ef4444; font-size: 11px; margin-top: 6px; }
+.btn:hover { background: #f7fafc; }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  color: #9ca3af;
+}
+.btn:disabled:hover {
+  background: white;
+}
+.error { 
+  color: #ef4444; 
+  font-size: 0.9rem; 
+  padding: 0.5rem 1rem;
+  background: #fef2f2;
+  border-top: 1px solid #e2e8f0;
+}
 .dropdown-overlay {
   position: fixed;
   top: 0;

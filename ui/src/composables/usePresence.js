@@ -185,13 +185,17 @@ export const usePresence = () => {
             // Only add users who are marked as online
             if (presence.online) {
               activeUsers.set(userId, presence)
-              console.log(`User ${presence.userName} joined canvas ${canvasId}`)
+              console.log(`✅ User ${presence.userName} joined canvas ${canvasId} (total: ${activeUsers.size})`)
+            } else {
+              // User marked as offline, remove them
+              activeUsers.delete(userId)
+              console.log(`⚠️ User ${presence.userName} marked offline, removing (total: ${activeUsers.size})`)
             }
           }
           
           if (change.type === 'removed') {
             activeUsers.delete(userId)
-            console.log(`User ${presenceData.userName || userId} left canvas ${canvasId}`)
+            console.log(`👋 User ${presenceData.userName || userId} left canvas ${canvasId} (total: ${activeUsers.size})`)
           }
         })
       })

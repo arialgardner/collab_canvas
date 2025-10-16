@@ -62,7 +62,7 @@ export const useFirestore = () => {
 
   // Execute queued operation (v3)
   const executeQueuedOperation = async (operation) => {
-    const { type, shapeId, canvasId, data, userId, sequenceNumber } = operation
+    const { type, shapeId, canvasId, data, userId, sequenceNumber, id } = operation
     
     try {
       trackFirestoreOperation()
@@ -94,6 +94,13 @@ export const useFirestore = () => {
       
       // Mark operation as processed for deduplication
       markOperationProcessed(shapeId, operation.timestamp, userId, type)
+      
+      // Clean up from IndexedDB on success (only persist failed operations)
+      if (id) {
+        const { markCompleted } = useOperationQueue()
+        await markCompleted(id)
+        console.log(`✅ Operation ${id} completed and removed from queue`)
+      }
       
       return true
     } catch (error) {

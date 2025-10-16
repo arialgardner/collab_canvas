@@ -1,28 +1,34 @@
 <template>
-  <div v-if="isVisible" class="queue-viewer">
-    <div class="header">
-      <h4>Operation Queue</h4>
-      <button class="close" @click="$emit('close')">×</button>
-    </div>
-    <div class="content">
-      <div v-if="ops.length === 0" class="empty">No queued operations</div>
-      <div v-else class="list">
-        <div v-for="op in ops" :key="op.id" class="item">
-          <div class="left">
-            <span class="type" :class="op.type">{{ op.type }}</span>
-            <span class="shape">{{ op.shapeId }}</span>
-          </div>
-          <div class="right">
-            <span class="status">{{ op.status || 'pending' }}</span>
-            <button class="btn" @click="retry(op)">Retry</button>
-            <button class="btn danger" @click="remove(op)">Remove</button>
+  <div v-if="isVisible">
+    <!-- Backdrop overlay -->
+    <div class="queue-overlay" @click="$emit('close')"></div>
+    
+    <!-- Centered modal -->
+    <div class="queue-viewer">
+      <div class="header">
+        <h4>Operation Queue</h4>
+        <button class="close" @click="$emit('close')">×</button>
+      </div>
+      <div class="content">
+        <div v-if="ops.length === 0" class="empty">No queued operations</div>
+        <div v-else class="list">
+          <div v-for="op in ops" :key="op.id" class="item">
+            <div class="left">
+              <span class="type" :class="op.type">{{ op.type }}</span>
+              <span class="shape">{{ op.shapeId }}</span>
+            </div>
+            <div class="right">
+              <span class="status">{{ op.status || 'pending' }}</span>
+              <button class="btn" @click="retry(op)">Retry</button>
+              <button class="btn danger" @click="remove(op)">Remove</button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div class="footer">
-      <button class="btn" @click="refresh">Refresh</button>
-      <button class="btn danger" @click="clearAll">Clear All</button>
+      <div class="footer">
+        <button class="btn" @click="refresh">Refresh</button>
+        <button class="btn danger" @click="clearAll">Clear All</button>
+      </div>
     </div>
   </div>
 </template>
@@ -69,18 +75,30 @@ export default {
 </script>
 
 <style scoped>
+.queue-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+}
 .queue-viewer {
   position: fixed;
-  top: 100px;
-  right: 20px;
-  width: 360px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 500px;
   background: white;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  z-index: 2000;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  z-index: 2001;
   display: flex;
   flex-direction: column;
+  max-height: 80vh;
 }
 .header {
   display: flex;
@@ -90,8 +108,25 @@ export default {
   border-bottom: 1px solid #e2e8f0;
 }
 .header h4 { margin: 0; font-size: 14px; color: #2d3748; }
-.close { background: none; border: none; font-size: 18px; cursor: pointer; color: #000000; }
-.content { max-height: 50vh; overflow: auto; }
+.close { 
+  background: none; 
+  border: none; 
+  font-size: 20px; 
+  cursor: pointer; 
+  color: #2d3748;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.close:hover { 
+  color: #000000; 
+}
+.content { flex: 1; overflow: auto; min-height: 0; }
 .empty { padding: 16px; color: #718096; font-size: 13px; text-align: center; }
 .list { display: flex; flex-direction: column; }
 .item { display: flex; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }

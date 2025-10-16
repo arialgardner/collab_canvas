@@ -1,9 +1,11 @@
 import { ref, computed } from 'vue'
 
+// Singleton state - shared across all component instances
+const errors = ref([])
+const isOnline = ref(navigator.onLine)
+const connectionRetries = ref(0)
+
 export const useErrorHandling = () => {
-  const errors = ref([])
-  const isOnline = ref(navigator.onLine)
-  const connectionRetries = ref(0)
   
   // Error types
   const ERROR_TYPES = {

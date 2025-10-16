@@ -34,6 +34,7 @@
       type="dashboard"
       title="No Canvases Yet"
       message="Create your first canvas to start collaborating"
+      class="dashboard-empty-state"
     >
       <button @click="showCreateModal = true" class="empty-state-button">
         Create Canvas
@@ -118,8 +119,8 @@
     </div>
 
     <!-- Create Canvas Modal -->
-    <div v-if="showCreateModal" class="modal-overlay" @click="showCreateModal = false">
-      <div class="modal-content" @click.stop>
+    <div v-if="showCreateModal" class="modal-overlay">
+      <div class="modal-content">
         <div class="modal-header">
           <h2>Create New Canvas</h2>
           <button @click="showCreateModal = false" class="close-button">×</button>
@@ -773,6 +774,14 @@ const formatDate = (timestamp) => {
   background: #fee2e2;
 }
 
+.dashboard-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
 .empty-state-button {
   margin-top: 20px;
   padding: 12px 24px;
@@ -816,7 +825,7 @@ const formatDate = (timestamp) => {
 .modal-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   padding: 24px;
   border-bottom: 1px solid #e5e7eb;
 }
@@ -829,18 +838,20 @@ const formatDate = (timestamp) => {
 }
 
 .close-button {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: none;
   border: none;
-  font-size: 28px;
+  font-size: 24px;
   color: #6b7280;
   cursor: pointer;
   border-radius: 4px;
   transition: all 0.2s;
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .close-button:hover {
