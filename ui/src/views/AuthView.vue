@@ -43,7 +43,7 @@
             placeholder="Enter your display name"
             class="form-input"
           />
-          <div v-if="displayNameError" class="field-error">{{ displayNameError }}</div>
+          <div class="field-error" :class="{ visible: displayNameError }">{{ displayNameError || '&nbsp;' }}</div>
         </div>
 
         <!-- Email Field -->
@@ -58,7 +58,7 @@
             placeholder="Enter your email"
             class="form-input"
           />
-          <div v-if="emailError" class="field-error">{{ emailError }}</div>
+          <div class="field-error" :class="{ visible: emailError }">{{ emailError || '&nbsp;' }}</div>
         </div>
 
         <!-- Password Field -->
@@ -73,7 +73,7 @@
             placeholder="Enter your password"
             class="form-input"
           />
-          <div v-if="passwordError" class="field-error">{{ passwordError }}</div>
+          <div class="field-error" :class="{ visible: passwordError }">{{ passwordError || '&nbsp;' }}</div>
         </div>
 
         <!-- Submit Button -->
@@ -271,6 +271,7 @@ export default {
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
+  min-width: 320px; /* Prevent card from shrinking too much */
 }
 
 .auth-header {
@@ -330,6 +331,8 @@ export default {
 
 .form-group {
   margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-group label {
@@ -346,6 +349,8 @@ export default {
   border-radius: 6px;
   font-size: 1rem;
   transition: border-color 0.2s;
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .form-input:focus {
@@ -359,9 +364,21 @@ export default {
 }
 
 .field-error {
-  color: #c33;
   font-size: 0.8rem;
   margin-top: 0.25rem;
+  /* Always take up space to prevent layout shift */
+  min-height: 1.2rem;
+  /* Invisible by default */
+  color: transparent;
+  transition: color 0.2s ease;
+  /* Prevent text from expanding width */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.field-error.visible {
+  /* Show error text when visible class is applied */
+  color: #c33;
 }
 
 .auth-button {

@@ -115,6 +115,7 @@
               type="color"
               :value="selectedShapes[0].fill"
               @input="onFillInput($event.target.value)"
+              @change="onFillChange($event.target.value)"
               class="property-color"
             />
             <div class="mru-row" v-if="mruFill.length">
@@ -196,6 +197,7 @@
               type="color"
               :value="selectedShapes[0].fill"
               @input="onFillInput($event.target.value)"
+              @change="onFillChange($event.target.value)"
               class="property-color"
             />
             <div class="mru-row" v-if="mruFill.length">
@@ -206,12 +208,18 @@
 
         <div class="property-group">
           <label class="property-label">Stroke Color</label>
-          <input
-            type="color"
-            :value="selectedShapes[0].stroke || '#000000'"
-            @input="handlePropertyChange('stroke', $event.target.value)"
-            class="property-color"
-          />
+          <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
+            <input
+              type="color"
+              :value="selectedShapes[0].stroke || '#000000'"
+              @input="onStrokeInput($event.target.value)"
+              @change="onStrokeChange($event.target.value)"
+              class="property-color"
+            />
+            <div class="mru-row" v-if="mruStroke.length">
+              <button v-for="c in mruStroke" :key="'circle-stroke-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyStroke(c)"></button>
+            </div>
+          </div>
         </div>
 
         <div class="property-group">
@@ -298,12 +306,18 @@
 
         <div class="property-group">
           <label class="property-label">Stroke Color</label>
-          <input
-            type="color"
-            :value="selectedShapes[0].stroke"
-            @input="handlePropertyChange('stroke', $event.target.value)"
-            class="property-color"
-          />
+          <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
+            <input
+              type="color"
+              :value="selectedShapes[0].stroke"
+              @input="onStrokeInput($event.target.value)"
+              @change="onStrokeChange($event.target.value)"
+              class="property-color"
+            />
+            <div class="mru-row" v-if="mruStroke.length">
+              <button v-for="c in mruStroke" :key="'line-stroke-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyStroke(c)"></button>
+            </div>
+          </div>
         </div>
 
         <div class="property-group">
@@ -458,12 +472,18 @@
 
         <div class="property-group">
           <label class="property-label">Fill Color</label>
-          <input
-            type="color"
-            :value="selectedShapes[0].fill"
-            @input="handlePropertyChange('fill', $event.target.value)"
-            class="property-color"
-          />
+          <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
+            <input
+              type="color"
+              :value="selectedShapes[0].fill"
+              @input="onFillInput($event.target.value)"
+              @change="onFillChange($event.target.value)"
+              class="property-color"
+            />
+            <div class="mru-row" v-if="mruFill.length">
+              <button v-for="c in mruFill" :key="'text-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+            </div>
+          </div>
         </div>
 
         <div class="property-group">
@@ -521,6 +541,7 @@
             type="color"
             :value="getCommonValue('fill')"
             @input="onBulkFillInput($event.target.value)"
+            @change="onBulkFillChange($event.target.value)"
             :class="{ mixed: !isValueConsistent('fill') }"
             class="property-color"
           />
@@ -538,6 +559,7 @@
             type="color"
             :value="getCommonValue('stroke')"
             @input="onBulkStrokeInput($event.target.value)"
+            @change="onBulkStrokeChange($event.target.value)"
             :class="{ mixed: !isValueConsistent('stroke') }"
             class="property-color"
           />
@@ -611,32 +633,66 @@ onMounted(() => {
 })
 
 const onFillInput = (value) => {
+  // Live preview - update the shape immediately with debounce
   handlePropertyChange('fill', value)
+}
+
+const onFillChange = (value) => {
+  // Only add to MRU when user finishes selecting (clicks away from picker)
   mruFill.value = mruColors.addFill(value)
 }
 
 const applyFill = (color) => {
   handlePropertyChange('fill', color)
+  // Immediate MRU update when clicking a swatch
   mruFill.value = mruColors.addFill(color)
 }
 
+const onStrokeInput = (value) => {
+  // Live preview - update the shape immediately with debounce
+  handlePropertyChange('stroke', value)
+}
+
+const onStrokeChange = (value) => {
+  // Only add to MRU when user finishes selecting (clicks away from picker)
+  mruStroke.value = mruColors.addStroke(value)
+}
+
+const applyStroke = (color) => {
+  handlePropertyChange('stroke', color)
+  // Immediate MRU update when clicking a swatch
+  mruStroke.value = mruColors.addStroke(color)
+}
+
 const onBulkFillInput = (value) => {
+  // Live preview - update the shapes immediately with debounce
   handleBulkPropertyChange('fill', value)
+}
+
+const onBulkFillChange = (value) => {
+  // Only add to MRU when user finishes selecting (clicks away from picker)
   mruFill.value = mruColors.addFill(value)
 }
 
 const applyBulkFill = (color) => {
   handleBulkPropertyChange('fill', color)
+  // Immediate MRU update when clicking a swatch
   mruFill.value = mruColors.addFill(color)
 }
 
 const onBulkStrokeInput = (value) => {
+  // Live preview - update the shapes immediately with debounce
   handleBulkPropertyChange('stroke', value)
+}
+
+const onBulkStrokeChange = (value) => {
+  // Only add to MRU when user finishes selecting (clicks away from picker)
   mruStroke.value = mruColors.addStroke(value)
 }
 
 const applyBulkStroke = (color) => {
   handleBulkPropertyChange('stroke', color)
+  // Immediate MRU update when clicking a swatch
   mruStroke.value = mruColors.addStroke(color)
 }
 
@@ -662,8 +718,9 @@ const uniqueShapeTypes = computed(() => {
   return types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ');
 });
 
-// Debounce timer
+// Debounce timers
 let debounceTimer = null;
+let mruDebounceTimer = null;
 
 const handlePropertyChange = (property, value) => {
   if (props.selectedShapes.length === 0) return;
@@ -737,15 +794,29 @@ const handleBulkPropertyChange = (property, value) => {
 .properties-panel {
   position: fixed;
   right: 0;
-  top: 0;
+  top: 70px; /* Below navbar */
   bottom: 0;
   width: 300px;
   background: #fff;
   border-left: 1px solid #e5e7eb;
   overflow-y: auto;
-  padding: 100px 20px 20px 20px; /* Top padding clears navbar + margin */
+  padding: 20px;
   z-index: 99; /* Below navbar to avoid covering it */
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Responsive width for smaller screens */
+@media (max-width: 1200px) {
+  .properties-panel {
+    width: 250px;
+  }
+}
+
+/* Hide on very small screens or convert to overlay */
+@media (max-width: 768px) {
+  .properties-panel {
+    display: none; /* Hide on mobile - could be toggled via button later */
+  }
 }
 
 .panel-section {

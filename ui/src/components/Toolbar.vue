@@ -112,7 +112,7 @@ export default {
 <style scoped>
 .toolbar {
   position: fixed;
-  top: 80px;
+  top: 90px; /* Position below navbar (70px) + 20px margin */
   left: 50%;
   transform: translateX(-50%);
   background: white;
@@ -121,7 +121,7 @@ export default {
   padding: 8px;
   display: flex;
   gap: 8px;
-  z-index: 1001;
+  z-index: 100; /* Above canvas but below navbar */
 }
 
 .toolbar-group {

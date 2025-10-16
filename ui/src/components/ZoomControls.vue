@@ -53,7 +53,7 @@ export default {
 .zoom-controls {
   position: fixed;
   bottom: 2rem;
-  right: 2rem;
+  right: 340px; /* Account for properties panel (300px) + margin */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -63,6 +63,20 @@ export default {
   padding: 0.75rem;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border: 1px solid #e2e8f0;
+}
+
+/* Responsive positioning for smaller screens */
+@media (max-width: 1200px) {
+  .zoom-controls {
+    right: 290px; /* Account for narrower properties panel (250px) + margin */
+  }
+}
+
+@media (max-width: 768px) {
+  .zoom-controls {
+    right: 2rem; /* Align to right edge on mobile */
+    bottom: 5rem; /* Higher to avoid mobile UI elements */
+  }
 }
 
 .zoom-display {

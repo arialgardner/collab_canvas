@@ -287,6 +287,7 @@ export default {
     const {
       currentCanvas,
       getCanvas,
+      updateCanvas,
       subscribeToCanvas,
       unsubscribeFromCanvas,
       getUserRole,
@@ -1106,19 +1107,24 @@ export default {
       const wasResized = Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001
       
       if (shape.type === 'rectangle' || shape.type === 'text') {
+        // For rectangles/text, node position is at center (due to offset in component)
+        // During rotation, Konva updates node.x/y to keep shape visually in place
+        // We need to convert this center position back to top-left for our data model
+        const currentWidth = wasResized ? node.width() * scaleX : node.width()
+        const currentHeight = wasResized ? node.height() * scaleY : node.height()
+        
+        // Convert center position back to top-left
+        updates.x = node.x() - currentWidth / 2
+        updates.y = node.y() - currentHeight / 2
+        
         if (wasResized) {
-          const newWidth = node.width() * scaleX
-          const newHeight = node.height() * scaleY
-          // Convert center position back to top-left (accounting for offset)
-          updates.x = node.x() - newWidth / 2
-          updates.y = node.y() - newHeight / 2
-          updates.width = newWidth
-          updates.height = newHeight
+          updates.width = currentWidth
+          updates.height = currentHeight
           // Update node dimensions and offset
-          node.width(newWidth)
-          node.height(newHeight)
-          node.offsetX(newWidth / 2)
-          node.offsetY(newHeight / 2)
+          node.width(currentWidth)
+          node.height(currentHeight)
+          node.offsetX(currentWidth / 2)
+          node.offsetY(currentHeight / 2)
           // Reset scale after applying to width/height
           node.scaleX(1)
           node.scaleY(1)
@@ -1139,6 +1145,10 @@ export default {
           node.offsetY(newRadius)
           node.scaleX(1)
           node.scaleY(1)
+        } else {
+          // Rotation without resize - update position
+          updates.x = node.x()
+          updates.y = node.y()
         }
       } else if (shape.type === 'line') {
         if (wasResized) {
@@ -1150,6 +1160,10 @@ export default {
           )
           node.scaleX(1)
           node.scaleY(1)
+        } else {
+          // Rotation without resize - update position
+          updates.x = node.x()
+          updates.y = node.y()
         }
       }
       
@@ -1356,7 +1370,8 @@ export default {
     const handleDoubleClick = async (e) => {
       const clickedOnEmpty = e.target === stage.value.getNode()
       
-      if (clickedOnEmpty) {
+      // Only create text on double-click if in select or text mode
+      if (clickedOnEmpty && (activeTool.value === 'select' || activeTool.value === 'text') && canUserEdit.value) {
         // Double-click on empty canvas - create new text
         const pointer = stage.value.getNode().getPointerPosition()
         const stageAttrs = stage.value.getNode().attrs
@@ -1901,6 +1916,14 @@ export default {
 
     const canvasWidth = ref(3000)
     const canvasHeight = ref(3000)
+    
+    // Watch for canvas metadata changes and update dimensions
+    watch(currentCanvas, (newCanvas) => {
+      if (newCanvas) {
+        canvasWidth.value = newCanvas.width || 3000
+        canvasHeight.value = newCanvas.height || 3000
+      }
+    }, { immediate: true })
 
     // Properties panel handlers
     const handleUpdateProperty = ({ shapeId, property, value }) => {
@@ -1942,14 +1965,29 @@ export default {
       }
     }
 
-    const handleUpdateCanvasSize = ({ width, height }) => {
+    const handleUpdateCanvasSize = async ({ width, height }) => {
+      const updates = {}
+      
       if (width !== undefined) {
-        canvasWidth.value = Math.max(100, Math.min(10000, width))
-        stageConfig.width = canvasWidth.value
+        const newWidth = Math.max(100, Math.min(10000, width))
+        canvasWidth.value = newWidth
+        stageConfig.width = newWidth
+        updates.width = newWidth
       }
       if (height !== undefined) {
-        canvasHeight.value = Math.max(100, Math.min(10000, height))
-        stageConfig.height = canvasHeight.value
+        const newHeight = Math.max(100, Math.min(10000, height))
+        canvasHeight.value = newHeight
+        stageConfig.height = newHeight
+        updates.height = newHeight
+      }
+      
+      // Update canvas size in Firestore
+      if (Object.keys(updates).length > 0) {
+        try {
+          await updateCanvas(canvasId.value, updates)
+        } catch (err) {
+          console.error('Failed to update canvas size:', err)
+        }
       }
     }
 
@@ -2101,22 +2139,33 @@ export default {
 .canvas-container {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: 100vh;
   overflow: hidden;
   background: #f5f5f5;
+  display: flex;
+  flex-direction: column;
 }
 
 .canvas-wrapper {
-  width: calc(100% - 300px); /* Account for properties panel */
-  height: 100%;
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 300px; /* Account for properties panel */
+  bottom: 0;
   overflow: hidden; /* Clip any overflow content including cursors */
 }
 
 /* Responsive canvas width for smaller screens */
 @media (max-width: 1200px) {
   .canvas-wrapper {
-    width: calc(100% - 250px); /* Account for narrower properties panel */
+    right: 250px; /* Account for narrower properties panel */
+  }
+}
+
+/* Responsive for very small screens */
+@media (max-width: 768px) {
+  .canvas-wrapper {
+    right: 0; /* Full width, properties panel hidden or overlaid */
   }
 }
 

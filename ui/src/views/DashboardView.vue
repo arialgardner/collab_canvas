@@ -4,10 +4,20 @@
     <div class="dashboard-header">
       <div class="header-content">
         <h1 class="dashboard-title">My Canvases</h1>
-        <button @click="showCreateModal = true" class="create-button">
-          <span class="plus-icon">+</span>
-          Create New Canvas
-        </button>
+        <div class="header-actions">
+          <button @click="showCreateModal = true" class="create-button">
+            <span class="plus-icon">+</span>
+            Create New Canvas
+          </button>
+          <div class="user-menu">
+            <div class="user-info">
+              <span class="user-name">{{ user?.displayName || user?.email }}</span>
+            </div>
+            <button @click="handleSignOut" class="sign-out-button" title="Sign out">
+              Sign Out
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -295,7 +305,7 @@ import LoadingSpinner from '../components/LoadingSpinner.vue'
 import EmptyState from '../components/EmptyState.vue'
 
 const router = useRouter()
-const { user } = useAuth()
+const { user, signOut } = useAuth()
 const {
   canvases,
   isLoading,
@@ -447,6 +457,17 @@ const copyShareLink = async () => {
   }
 }
 
+// Sign out
+const handleSignOut = async () => {
+  try {
+    await signOut()
+    router.push({ name: 'Auth' })
+  } catch (error) {
+    console.error('Error signing out:', error)
+    alert('Failed to sign out. Please try again.')
+  }
+}
+
 // Format date
 const formatDate = (timestamp) => {
   if (!timestamp) return 'Unknown'
@@ -503,6 +524,51 @@ const formatDate = (timestamp) => {
   font-weight: 700;
   color: #111827;
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border-radius: 8px;
+}
+
+.user-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.sign-out-button {
+  padding: 10px 20px;
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sign-out-button:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .create-button {
