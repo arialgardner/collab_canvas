@@ -285,6 +285,13 @@ export default {
     
     // Composables
     const { user } = useAuth()
+    
+    // Computed property for user name
+    const userName = computed(() => {
+      if (!user.value) return 'Anonymous'
+      return user.value.displayName || user.value.email?.split('@')[0] || 'Anonymous'
+    })
+    
     const {
       currentCanvas,
       getCanvas,
@@ -608,10 +615,10 @@ export default {
         
         // Route to appropriate shape creator based on active tool
         if (activeTool.value === 'rectangle' && canUserEdit.value) {
-          await createShape('rectangle', { x: canvasX, y: canvasY }, userId, canvasId.value)
+          await createShape('rectangle', { x: canvasX, y: canvasY }, userId, canvasId.value, userName.value)
           return
         } else if (activeTool.value === 'circle' && canUserEdit.value) {
-          await createShape('circle', { x: canvasX, y: canvasY }, userId, canvasId.value)
+          await createShape('circle', { x: canvasX, y: canvasY }, userId, canvasId.value, userName.value)
           return
         } else if (activeTool.value === 'line' && canUserEdit.value) {
           // Start line creation
@@ -622,7 +629,7 @@ export default {
           }
         } else if (activeTool.value === 'text' && canUserEdit.value) {
           // Create text shape and immediately open editor
-          const newText = await createShape('text', { x: canvasX, y: canvasY }, userId, canvasId.value)
+          const newText = await createShape('text', { x: canvasX, y: canvasY }, userId, canvasId.value, userName.value)
           if (newText) {
             handleTextEdit(newText.id)
           }
@@ -856,7 +863,8 @@ export default {
             zIndex: maxZ + i + 1
           },
           userId,
-          canvasId.value
+          canvasId.value,
+          userName.value
         )
         
         if (newShape) {
@@ -1035,10 +1043,10 @@ export default {
 
     // Throttled transform update during drag (60 FPS = 16ms)
     // v3: These are interim updates, will be batched as low priority
-    const throttledTransformUpdate = throttle(async (shapeId, updates, userId) => {
+    const throttledTransformUpdate = throttle(async (shapeId, updates, userId, userName) => {
       // Update local state only during transform (no Firestore save)
       // isFinal=false means this is an interim update (not used here since saveToFirestore=false)
-      await updateShape(shapeId, updates, userId, canvasId.value, false, false)
+      await updateShape(shapeId, updates, userId, canvasId.value, false, false, userName)
     }, 16)
 
     // Handle transform changes during drag (throttled)
@@ -1088,7 +1096,7 @@ export default {
       }
       
       // Throttled update during transform (only for resize, not rotation)
-      throttledTransformUpdate(shapeId, updates, userId)
+      throttledTransformUpdate(shapeId, updates, userId, userName.value)
     }
 
     // Handle transformer end (final save)
@@ -1172,7 +1180,7 @@ export default {
       }
       
       // Final update with Firestore save (v3: isFinal=true for high priority)
-      await updateShape(shapeId, updates, userId, canvasId.value, true, true)
+      await updateShape(shapeId, updates, userId, canvasId.value, true, true, userName.value)
       // Note: pending remote updates are handled in useShapes after local edit ends
       
       // Force the layer to redraw to pick up rotation changes
@@ -1212,7 +1220,7 @@ export default {
       const userId = user.value?.uid || 'anonymous'
 
       // Update text content (v3: isFinal=true for high priority)
-      await updateShape(editingTextId.value, { text: newText }, userId, canvasId.value, true, true)
+      await updateShape(editingTextId.value, { text: newText }, userId, canvasId.value, true, true, userName.value)
 
       // Release lock and close editor
       await releaseTextLock(editingTextId.value, userId, canvasId.value)
@@ -1239,7 +1247,7 @@ export default {
       const userId = user.value?.uid || 'anonymous'
 
       // Update text formatting (v3: isFinal=true for high priority)
-      await updateShape(editingTextId.value, format, userId, canvasId.value, true, true)
+      await updateShape(editingTextId.value, format, userId, canvasId.value, true, true, userName.value)
     }
 
     // Generic shape update handler
@@ -1248,13 +1256,13 @@ export default {
       const userId = user.value?.uid || 'anonymous'
       
       // Always update local state immediately for smooth dragging
-      await updateShape(id, updates, userId, canvasId.value, false, false)
+      await updateShape(id, updates, userId, canvasId.value, false, false, userName.value)
       
       // Save to Firestore only when saveToFirestore flag is true (e.g., on drag end)
       // v3: isFinal=true for high priority when saveToFirestore is true
       if (saveToFirestore) {
         console.log(`Shape ${id} updated:`, updates)
-        await updateShape(id, updates, userId, canvasId.value, true, true)
+        await updateShape(id, updates, userId, canvasId.value, true, true, userName.value)
       }
     }
 
@@ -1297,7 +1305,7 @@ export default {
               canvasX, 
               canvasY
             ] 
-          }, userId, canvasId.value)
+          }, userId, canvasId.value, userName.value)
         }
         
         // Reset line creation state
@@ -1387,7 +1395,7 @@ export default {
         const userId = user.value?.uid || 'anonymous'
         
         // Create text shape
-        const newText = await createShape('text', { x: canvasX, y: canvasY }, userId, canvasId.value)
+        const newText = await createShape('text', { x: canvasX, y: canvasY }, userId, canvasId.value, userName.value)
         
         // Immediately open editor for the new text
         if (newText) {
@@ -1425,12 +1433,12 @@ export default {
               await deleteShapes([a.data.id], canvasId.value)
             } else if (a.type === 'delete') {
               const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = a.data
-              await createShape(a.data.type, shapeProps, user.value.uid, canvasId.value)
+              await createShape(a.data.type, shapeProps, user.value.uid, canvasId.value, userName.value)
             } else if (a.type === 'update') {
-              await updateShape(a.data.id, a.data.oldValues, user.value.uid, canvasId.value, true)
+              await updateShape(a.data.id, a.data.oldValues, user.value.uid, canvasId.value, true, true, userName.value)
             } else if (a.type === 'property_change') {
               const { shapeId, property, oldValue } = a
-              await updateShape(shapeId, { [property]: oldValue }, user.value.uid, canvasId.value, true)
+              await updateShape(shapeId, { [property]: oldValue }, user.value.uid, canvasId.value, true, true, userName.value)
             }
           }
         } else if (action.type === 'create') {
@@ -1439,14 +1447,14 @@ export default {
         } else if (action.type === 'delete') {
           // Undo delete = recreate with original properties
           const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
-          const recreatedShape = await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value)
+          const recreatedShape = await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value, userName.value)
           // Note: recreated shape will have a new ID, not the original ID
         } else if (action.type === 'update') {
           // Undo update = restore old values
-          await updateShape(action.data.id, action.data.oldValues, user.value.uid, canvasId.value, true)
+          await updateShape(action.data.id, action.data.oldValues, user.value.uid, canvasId.value, true, true, userName.value)
         } else if (action.type === 'property_change') {
           const { shapeId, property, oldValue } = action
-          await updateShape(shapeId, { [property]: oldValue }, user.value.uid, canvasId.value, true)
+          await updateShape(shapeId, { [property]: oldValue }, user.value.uid, canvasId.value, true, true, userName.value)
         }
       } finally {
         setUndoRedoFlag(false)
@@ -1466,29 +1474,29 @@ export default {
             const a = action.actions[i]
             if (a.type === 'create') {
               const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = a.data
-              await createShape(a.data.type, shapeProps, user.value.uid, canvasId.value)
+              await createShape(a.data.type, shapeProps, user.value.uid, canvasId.value, userName.value)
             } else if (a.type === 'delete') {
               await deleteShapes([a.data.id], canvasId.value)
             } else if (a.type === 'update') {
-              await updateShape(a.data.id, a.data.newValues, user.value.uid, canvasId.value, true)
+              await updateShape(a.data.id, a.data.newValues, user.value.uid, canvasId.value, true, true, userName.value)
             } else if (a.type === 'property_change') {
               const { shapeId, property, newValue } = a
-              await updateShape(shapeId, { [property]: newValue }, user.value.uid, canvasId.value, true)
+              await updateShape(shapeId, { [property]: newValue }, user.value.uid, canvasId.value, true, true, userName.value)
             }
           }
         } else if (action.type === 'create') {
           // Redo create with original properties
           const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
-          await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value)
+          await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value, userName.value)
         } else if (action.type === 'delete') {
           // Redo delete
           await deleteShapes([action.data.id], canvasId.value)
         } else if (action.type === 'update') {
           // Redo update = reapply new values
-          await updateShape(action.data.id, action.data.newValues, user.value.uid, canvasId.value, true)
+          await updateShape(action.data.id, action.data.newValues, user.value.uid, canvasId.value, true, true, userName.value)
         } else if (action.type === 'property_change') {
           const { shapeId, property, newValue } = action
-          await updateShape(shapeId, { [property]: newValue }, user.value.uid, canvasId.value, true)
+          await updateShape(shapeId, { [property]: newValue }, user.value.uid, canvasId.value, true, true, userName.value)
         }
       } finally {
         setUndoRedoFlag(false)
@@ -1669,7 +1677,7 @@ export default {
             if (!shape) continue
             const oldValues = { x: shape.x || 0, y: shape.y || 0 }
             const updates = { x: (shape.x || 0) + dx, y: (shape.y || 0) + dy }
-            await updateShape(id, updates, userId, canvasId.value, true, true)
+            await updateShape(id, updates, userId, canvasId.value, true, true, userName.value)
             addAction({ type: 'update', data: { id, oldValues, newValues: updates } })
           }
           // Increment version ops counter and snapshot after >=10 ops
@@ -1989,7 +1997,8 @@ export default {
       if (property === 'y' && validatedValue > canvasHeight.value) validatedValue = canvasHeight.value
       
       // Update the shape
-      updateShape(shapeId, { [property]: validatedValue })
+      const userId = user.value?.uid || 'anonymous'
+      updateShape(shapeId, { [property]: validatedValue }, userId, canvasId.value, true, true, userName.value)
       
       // Track undo/redo
       const shape = shapes.get(shapeId)
@@ -2095,7 +2104,8 @@ export default {
             type,
             { ...properties, id },  // Pass id to preserve original shape IDs
             user.value.uid,
-            canvasId.value
+            canvasId.value,
+            userName.value
           )
         }
         
@@ -2222,7 +2232,7 @@ export default {
 
 .canvas-wrapper {
   position: fixed;
-  top: 0;
+  top: 70px; /* Account for navbar height */
   left: 0;
   right: 300px; /* Account for properties panel */
   bottom: 0;
@@ -2251,6 +2261,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
+  background-color: white;
   background-image: 
     radial-gradient(circle, #ddd 1px, transparent 1px);
   background-size: 20px 20px;

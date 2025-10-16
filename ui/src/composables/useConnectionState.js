@@ -1,6 +1,6 @@
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { reactive } from 'vue'
 import { db } from '../firebase/config'
-import { collection, query, limit, getDocs } from 'firebase/firestore'
+import { collection, getDocs, query, limit } from 'firebase/firestore'
 import { getOperationQueue } from '../utils/operationQueue'
 import { usePerformanceMonitoring } from './usePerformanceMonitoring'
 
@@ -13,6 +13,7 @@ export const CONNECTION_STATUS = {
 }
 
 let singleton = null
+let isInitialized = false
 
 export const useConnectionState = () => {
   if (singleton) return singleton
@@ -47,27 +48,51 @@ export const useConnectionState = () => {
   }
 
   const updateQueueLength = () => {
-    const stats = getOperationQueue().getStats()
-    state.queueLength = stats.total
+    try {
+      const stats = getOperationQueue().getStats()
+      state.queueLength = stats.total
+    } catch (err) {
+      // Queue might not be initialized yet
+      state.queueLength = 0
+    }
   }
 
   const updateLatencyFromPerformance = () => {
-    const stats = performanceStats.value
-    state.latency.object = { avg: stats.objectSync.avg, min: stats.objectSync.min, max: stats.objectSync.max }
-    state.latency.cursor = { avg: stats.cursorSync.avg, min: stats.cursorSync.min, max: stats.cursorSync.max }
+    try {
+      const stats = performanceStats.value
+      if (stats) {
+        state.latency.object = { avg: stats.objectSync.avg, min: stats.objectSync.min, max: stats.objectSync.max }
+        state.latency.cursor = { avg: stats.cursorSync.avg, min: stats.cursorSync.min, max: stats.cursorSync.max }
+      }
+    } catch (err) {
+      // Performance monitoring might not be ready
+    }
   }
 
   const heartbeatPing = async () => {
+    // Check browser online status first
+    if (!navigator.onLine) {
+      setStatus(CONNECTION_STATUS.OFFLINE)
+      return false
+    }
+
     try {
-      // Lightweight read to verify connectivity
-      const q = query(collection(db, 'canvases', 'default', 'shapes'), limit(1))
+      // Simple connectivity check - just list canvases collection
+      const canvasesRef = collection(db, 'canvases')
+      const q = query(canvasesRef, limit(1))
       await getDocs(q)
+      
+      // Successfully connected
       setStatus(CONNECTION_STATUS.CONNECTED)
       updateQueueLength()
       updateLatencyFromPerformance()
       return true
     } catch (err) {
-      setStatus(CONNECTION_STATUS.ERROR, 'Connection issue detected')
+      // Only set error if we've been initialized and previously connected
+      // This prevents showing errors on initial load
+      if (isInitialized) {
+        setStatus(CONNECTION_STATUS.ERROR, 'Connection issue detected')
+      }
       return false
     }
   }
@@ -100,7 +125,10 @@ export const useConnectionState = () => {
   }
 
   const markOffline = () => setStatus(CONNECTION_STATUS.OFFLINE)
-  const markOnline = () => setStatus(CONNECTION_STATUS.CONNECTED)
+  const markOnline = () => {
+    setStatus(CONNECTION_STATUS.CONNECTED)
+    heartbeatPing()
+  }
 
   const setupBrowserNetworkListeners = () => {
     const onOnline = () => markOnline()
@@ -115,23 +143,38 @@ export const useConnectionState = () => {
 
   let removeNetworkListeners = null
 
-  onMounted(() => {
+  const init = () => {
+    if (isInitialized) return
+    
+    // Set up network listeners
     removeNetworkListeners = setupBrowserNetworkListeners()
+    
+    // Start heartbeat monitoring
     startHeartbeat()
-    heartbeatPing()
-  })
+    
+    // Do initial ping after a short delay to allow Firebase to initialize
+    setTimeout(() => {
+      isInitialized = true
+      heartbeatPing()
+    }, 1000)
+  }
 
-  onUnmounted(() => {
+  const cleanup = () => {
     stopHeartbeat()
-    if (removeNetworkListeners) removeNetworkListeners()
-  })
+    if (removeNetworkListeners) {
+      removeNetworkListeners()
+      removeNetworkListeners = null
+    }
+  }
 
   singleton = {
     state,
     setStatus,
     syncNow,
     retryConnection,
-    setSyncHandler
+    setSyncHandler,
+    init,
+    cleanup
   }
 
   return singleton

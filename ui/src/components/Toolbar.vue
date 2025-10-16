@@ -5,41 +5,38 @@
         v-for="tool in tools"
         :key="tool.name"
         :class="['tool-button', { active: activeTool === tool.name }]"
-        :title="`${tool.label} (${tool.shortcut})`"
+        :title="`${tool.label}`"
         @click="selectTool(tool.name)"
       >
         <span class="tool-icon">{{ tool.icon }}</span>
         <span class="tool-label">{{ tool.label }}</span>
-        <span class="tool-shortcut">{{ tool.shortcut }}</span>
       </button>
     </div>
     <div class="toolbar-group">
       <button
         class="tool-button"
         :disabled="!canUndo"
-        title="Undo (Cmd/Ctrl+Z)"
+        title="Undo"
         @click="$emit('undo')"
       >
         <span class="tool-icon">↶</span>
         <span class="tool-label">Undo</span>
-        <span class="tool-shortcut">⌘Z</span>
       </button>
       <button
         class="tool-button"
         :disabled="!canRedo"
-        title="Redo (Cmd/Ctrl+Shift+Z)"
+        title="Redo"
         @click="$emit('redo')"
       >
         <span class="tool-icon">↷</span>
         <span class="tool-label">Redo</span>
-        <span class="tool-shortcut">⇧⌘Z</span>
       </button>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 
 export default {
   name: 'Toolbar',
@@ -52,53 +49,17 @@ export default {
     const activeTool = ref('select')
     
     const tools = [
-      { name: 'select', label: 'Select', icon: '↖', shortcut: 'V' },
-      { name: 'rectangle', label: 'Rectangle', icon: '▭', shortcut: 'R' },
-      { name: 'circle', label: 'Circle', icon: '○', shortcut: 'C' },
-      { name: 'line', label: 'Line', icon: '╱', shortcut: 'L' },
-      { name: 'text', label: 'Text', icon: 'T', shortcut: 'T' }
+      { name: 'select', label: 'Select', icon: '↖' },
+      { name: 'rectangle', label: 'Rectangle', icon: '▭' },
+      { name: 'circle', label: 'Circle', icon: '○' },
+      { name: 'line', label: 'Line', icon: '╱' },
+      { name: 'text', label: 'Text', icon: 'T' }
     ]
 
     const selectTool = (toolName) => {
       activeTool.value = toolName
       emit('tool-selected', toolName)
     }
-
-    const handleKeyPress = (event) => {
-      // Ignore if user is typing in an input field
-      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
-        return
-      }
-
-      const key = event.key.toUpperCase()
-      
-      // ESC key resets to select tool
-      if (key === 'ESCAPE') {
-        selectTool('select')
-        return
-      }
-
-      // Tool shortcuts
-      const toolMap = {
-        'V': 'select',
-        'R': 'rectangle',
-        'C': 'circle',
-        'L': 'line',
-        'T': 'text'
-      }
-
-      if (toolMap[key]) {
-        selectTool(toolMap[key])
-      }
-    }
-
-    onMounted(() => {
-      window.addEventListener('keydown', handleKeyPress)
-    })
-
-    onUnmounted(() => {
-      window.removeEventListener('keydown', handleKeyPress)
-    })
 
     return {
       activeTool,
@@ -135,8 +96,8 @@ export default {
   align-items: center;
   gap: 2px;
   padding: 8px 12px;
-  background: white;
-  border: 2px solid #e5e7eb;
+  background: #d1d5db;
+  border: 2px solid #9ca3af;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -144,8 +105,8 @@ export default {
 }
 
 .tool-button:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
+  background: #9ca3af;
+  border-color: #6b7280;
 }
 
 .tool-button.active {
@@ -166,16 +127,6 @@ export default {
   letter-spacing: 0.5px;
 }
 
-.tool-shortcut {
-  font-size: 9px;
-  opacity: 0.6;
-  font-weight: 600;
-}
-
-.tool-button.active .tool-shortcut {
-  opacity: 0.8;
-}
-
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .toolbar {
@@ -194,10 +145,6 @@ export default {
 
   .tool-label {
     font-size: 10px;
-  }
-
-  .tool-shortcut {
-    font-size: 8px;
   }
 }
 </style>

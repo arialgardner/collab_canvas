@@ -47,7 +47,7 @@ export const useShapes = () => {
   }
 
   // Generic create shape function
-  const createShape = async (type = 'rectangle', properties = {}, userId = 'anonymous', canvasId = 'default') => {
+  const createShape = async (type = 'rectangle', properties = {}, userId = 'anonymous', canvasId = 'default', userName = 'Anonymous') => {
     try {
       // Start measuring sync latency for v3
       const syncMeasurement = startObjectSyncMeasurement()
@@ -64,7 +64,8 @@ export const useShapes = () => {
         createdBy: userId,
         createdAt: Date.now(),
         lastModified: Date.now(),
-        lastModifiedBy: userId
+        lastModifiedBy: userId,
+        lastModifiedByName: userName
       }
 
       // Type-specific properties
@@ -149,7 +150,7 @@ export const useShapes = () => {
   }
 
   // Generic update shape function (v3 enhanced with priority options)
-  const updateShape = async (id, updates, userId = 'anonymous', canvasId = 'default', saveToFirestore = false, isFinal = true) => {
+  const updateShape = async (id, updates, userId = 'anonymous', canvasId = 'default', saveToFirestore = false, isFinal = true, userName = 'Anonymous') => {
     const shape = shapes.get(id)
     if (!shape) {
       console.warn(`Shape with id ${id} not found`)
@@ -189,7 +190,8 @@ export const useShapes = () => {
       ...shape,
       ...updates,
       lastModified: Date.now(),
-      lastModifiedBy: userId
+      lastModifiedBy: userId,
+      lastModifiedByName: userName
     }
 
     // Update local state immediately (optimistic update)

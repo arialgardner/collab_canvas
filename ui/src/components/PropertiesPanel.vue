@@ -709,8 +709,8 @@ const shapeTypeLabel = computed(() => {
 const lastEditedBy = computed(() => {
   if (props.selectedShapes.length !== 1) return ''
   const s = props.selectedShapes[0]
-  if (!s.lastModifiedBy) return 'Unknown'
-  return s.lastModifiedBy
+  if (!s.lastModifiedByName && !s.lastModifiedBy) return 'Unknown'
+  return s.lastModifiedByName || s.lastModifiedBy || 'Unknown'
 })
 
 const uniqueShapeTypes = computed(() => {

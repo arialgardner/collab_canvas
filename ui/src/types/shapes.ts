@@ -8,6 +8,7 @@ export interface BaseShape {
   createdAt: number
   lastModified: number
   lastModifiedBy: string
+  lastModifiedByName?: string
 }
 
 // Rectangle shape

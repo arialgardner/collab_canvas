@@ -7,22 +7,6 @@
     </svg>
 
     <div v-if="expanded" class="panel">
-      <div class="row">
-        <span class="k">Queue</span>
-        <span class="v">{{ state.queueLength }} ops</span>
-      </div>
-      <div class="row">
-        <span class="k">Object Sync</span>
-        <span class="v">avg {{ state.latency.object.avg }}ms</span>
-      </div>
-      <div class="row">
-        <span class="k">Cursor Sync</span>
-        <span class="v">avg {{ state.latency.cursor.avg }}ms</span>
-      </div>
-      <div class="row" v-if="state.lastSyncTime">
-        <span class="k">Last Sync</span>
-        <span class="v">{{ formatTime(state.lastSyncTime) }}</span>
-      </div>
       <div class="row actions">
         <button class="btn" @click.stop="syncNow">Sync Now</button>
         <button class="btn" @click.stop="retryConnection">Retry</button>
@@ -35,7 +19,7 @@
 </template>
 
 <script>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useConnectionState, CONNECTION_STATUS } from '../composables/useConnectionState'
 import QueueViewer from './QueueViewer.vue'
 
@@ -43,9 +27,17 @@ export default {
   name: 'ConnectionStatus',
   components: { QueueViewer },
   setup() {
-    const { state, syncNow, retryConnection } = useConnectionState()
+    const { state, syncNow, retryConnection, init, cleanup } = useConnectionState()
     const expanded = ref(false)
     const showQueue = ref(false)
+
+    onMounted(() => {
+      init()
+    })
+
+    onUnmounted(() => {
+      cleanup()
+    })
 
     const statusClass = computed(() => {
       switch (state.status) {
@@ -131,14 +123,12 @@ export default {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 260px;
-  padding: 10px;
+  padding: 8px;
   z-index: 1001;
 }
 .row {
   display: flex;
   justify-content: space-between;
-  padding: 6px 4px;
   font-size: 12px;
 }
 .row.actions { gap: 6px; }
@@ -146,12 +136,12 @@ export default {
   background: #edf2f7;
   border: 1px solid #e2e8f0;
   border-radius: 4px;
-  padding: 6px 8px;
+  padding: 4px 6px;
   font-size: 12px;
   cursor: pointer;
 }
 .btn:hover { background: #e2e8f0; }
-.error { color: #ef4444; font-size: 12px; padding: 6px 4px; }
+.error { color: #ef4444; font-size: 11px; margin-top: 6px; }
 </style>
 
 
