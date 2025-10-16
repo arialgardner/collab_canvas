@@ -1,16 +1,58 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // TEMPORARY: Simple auth-only rules for testing
-    // TODO: Replace with permission-based rules after canvas metadata is set up
+    // Helper function to check if user has permission on a canvas
+    function hasCanvasAccess(canvasId) {
+      let canvasData = get(/databases/$(database)/documents/canvases/$(canvasId)).data;
+      return request.auth != null && 
+             request.auth.uid in canvasData.permissions;
+    }
+    
+    function isCanvasOwner(canvasId) {
+      let canvasData = get(/databases/$(database)/documents/canvases/$(canvasId)).data;
+      return request.auth != null && canvasData.owner == request.auth.uid;
+    }
     
     // Canvas documents
     match /canvases/{canvasId} {
-      allow read, write: if request.auth != null;
+      // Allow authenticated users to read any canvas (for link sharing)
+      // Allow writes for authenticated users to add themselves to permissions
+      allow read: if request.auth != null;
+      
+      // Allow users to update canvas if they have access
+      // Also allow users to grant themselves 'editor' permission via shared links
+      allow update: if request.auth != null && (
+        hasCanvasAccess(canvasId) ||
+        // Allow adding self to permissions via shared link
+        (request.resource.data.permissions[request.auth.uid] == 'editor' &&
+         !(request.auth.uid in resource.data.permissions))
+      );
+      
+      // Allow canvas creation by any authenticated user
+      allow create: if request.auth != null && 
+                      request.resource.data.owner == request.auth.uid;
+      
+      // Only owner can delete canvas
+      allow delete: if isCanvasOwner(canvasId);
       
       // Shapes within canvas
       match /shapes/{shapeId} {
-        allow read, write: if request.auth != null;
+        // Allow read/write if user has canvas access
+        allow read, write: if hasCanvasAccess(canvasId);
+      }
+
+      // Version history (owner-only access)
+      match /versions/{versionId} {
+        // Only canvas owner can read versions
+        allow read: if request.auth != null &&
+                      get(/databases/$(database)/documents/canvases/$(canvasId)).data.owner == request.auth.uid;
+        // Only canvas owner can create versions
+        allow create: if request.auth != null && 
+                         request.resource.data.createdBy == request.auth.uid &&
+                         get(/databases/$(database)/documents/canvases/$(canvasId)).data.owner == request.auth.uid;
+        // Only canvas owner can delete versions
+        allow delete: if request.auth != null && 
+                        get(/databases/$(database)/documents/canvases/$(canvasId)).data.owner == request.auth.uid;
       }
     }
     
@@ -19,16 +61,25 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Presence
+    // Presence tracking
+    // Note: Stale presence data (users who closed browser/lost connection) is cleaned up by:
+    // 1. Client-side periodic cleanup (every 30s, removes entries older than 60s)
+    // 2. onBeforeUnmount lifecycle hooks
+    // 3. beforeunload event handlers
     match /presence/{canvasId}/users/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId;
+      // Allow any authenticated user to delete stale presence entries
+      allow delete: if request.auth != null;
     }
     
-    // Cursors
+    // Cursor positions
+    // Note: Stale cursors are cleaned up client-side every 10s (removes entries older than 30s)
     match /cursors/{canvasId}/positions/{userId} {
       allow read: if request.auth != null;
       allow write: if request.auth != null && request.auth.uid == userId;
+      // Allow any authenticated user to delete stale cursor entries
+      allow delete: if request.auth != null;
     }
   }
 }

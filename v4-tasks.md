@@ -86,6 +86,8 @@ Tasks:
  UI & restore flow
  
  Version History panel (owner-only) with list and Restore action (confirmation)
+ Add VersionHistory.vue and wire from NavBar (owner-only button) and CanvasView
+ Implement useVersions composable (createVersion, listVersions, retention)
  Restore replaces state, persists to Firestore, and adds local undoable “restore”
  
  
