@@ -6,7 +6,7 @@
         <button class="back-button" @click="handleBackToDashboard" title="Back to Dashboard">
           ← Back
         </button>
-        <h1>CollabCanvas</h1>
+        <h1>Collab Canvas</h1>
       </div>
 
       <!-- User Info & Controls -->
