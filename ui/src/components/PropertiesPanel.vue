@@ -111,15 +111,16 @@
         <div class="property-group">
           <label class="property-label">Fill Color</label>
           <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
-            <input
-              type="color"
-              :value="selectedShapes[0].fill"
-              @input="onFillInput($event.target.value)"
-              @change="onFillChange($event.target.value)"
-              class="property-color"
+            <GrayscaleColorPicker
+              :modelValue="selectedShapes[0].fill"
+              @input="onFillInput"
+              @change="onFillChange"
             />
-            <div class="mru-row" v-if="mruFill.length">
-              <button v-for="c in mruFill" :key="'fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+            <div v-if="mruFill.length" class="mru-section">
+              <label class="mru-label">Recently Used</label>
+              <div class="mru-row">
+                <button v-for="c in mruFill" :key="'fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+              </div>
             </div>
           </div>
         </div>
@@ -196,15 +197,16 @@
         <div class="property-group">
           <label class="property-label">Fill Color</label>
           <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
-            <input
-              type="color"
-              :value="selectedShapes[0].fill"
-              @input="onFillInput($event.target.value)"
-              @change="onFillChange($event.target.value)"
-              class="property-color"
+            <GrayscaleColorPicker
+              :modelValue="selectedShapes[0].fill"
+              @input="onFillInput"
+              @change="onFillChange"
             />
-            <div class="mru-row" v-if="mruFill.length">
-              <button v-for="c in mruFill" :key="'text-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+            <div v-if="mruFill.length" class="mru-section">
+              <label class="mru-label">Recently Used</label>
+              <div class="mru-row">
+                <button v-for="c in mruFill" :key="'text-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+              </div>
             </div>
           </div>
         </div>
@@ -285,15 +287,16 @@
         <div class="property-group">
           <label class="property-label">Stroke Color</label>
           <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
-            <input
-              type="color"
-              :value="selectedShapes[0].stroke"
-              @input="onStrokeInput($event.target.value)"
-              @change="onStrokeChange($event.target.value)"
-              class="property-color"
+            <GrayscaleColorPicker
+              :modelValue="selectedShapes[0].stroke"
+              @input="onStrokeInput"
+              @change="onStrokeChange"
             />
-            <div class="mru-row" v-if="mruStroke.length">
-              <button v-for="c in mruStroke" :key="'line-stroke-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyStroke(c)"></button>
+            <div v-if="mruStroke.length" class="mru-section">
+              <label class="mru-label">Recently Used</label>
+              <div class="mru-row">
+                <button v-for="c in mruStroke" :key="'line-stroke-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyStroke(c)"></button>
+              </div>
             </div>
           </div>
         </div>
@@ -468,15 +471,16 @@
         <div class="property-group">
           <label class="property-label">Fill Color</label>
           <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
-            <input
-              type="color"
-              :value="selectedShapes[0].fill"
-              @input="onFillInput($event.target.value)"
-              @change="onFillChange($event.target.value)"
-              class="property-color"
+            <GrayscaleColorPicker
+              :modelValue="selectedShapes[0].fill"
+              @input="onFillInput"
+              @change="onFillChange"
             />
-            <div class="mru-row" v-if="mruFill.length">
-              <button v-for="c in mruFill" :key="'text-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+            <div v-if="mruFill.length" class="mru-section">
+              <label class="mru-label">Recently Used</label>
+              <div class="mru-row">
+                <button v-for="c in mruFill" :key="'text-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
+              </div>
             </div>
           </div>
         </div>
@@ -533,16 +537,16 @@
       <div v-if="hasCommonProperty('fill')" class="property-group">
         <label class="property-label">Fill Color</label>
         <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
-          <input
-            type="color"
-            :value="getCommonValue('fill')"
-            @input="onBulkFillInput($event.target.value)"
-            @change="onBulkFillChange($event.target.value)"
-            :class="{ mixed: !isValueConsistent('fill') }"
-            class="property-color"
+          <GrayscaleColorPicker
+            :modelValue="getCommonValue('fill')"
+            @input="onBulkFillInput"
+            @change="onBulkFillChange"
           />
-          <div class="mru-row" v-if="mruFill.length">
-            <button v-for="c in mruFill" :key="'bulk-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyBulkFill(c)"></button>
+          <div v-if="mruFill.length" class="mru-section">
+            <label class="mru-label">Recently Used</label>
+            <div class="mru-row">
+              <button v-for="c in mruFill" :key="'bulk-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyBulkFill(c)"></button>
+            </div>
           </div>
         </div>
         <span v-if="!isValueConsistent('fill')" class="mixed-label">Mixed</span>
@@ -551,16 +555,16 @@
       <div v-if="hasCommonProperty('stroke')" class="property-group">
         <label class="property-label">Stroke Color</label>
         <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
-          <input
-            type="color"
-            :value="getCommonValue('stroke')"
-            @input="onBulkStrokeInput($event.target.value)"
-            @change="onBulkStrokeChange($event.target.value)"
-            :class="{ mixed: !isValueConsistent('stroke') }"
-            class="property-color"
+          <GrayscaleColorPicker
+            :modelValue="getCommonValue('stroke')"
+            @input="onBulkStrokeInput"
+            @change="onBulkStrokeChange"
           />
-          <div class="mru-row" v-if="mruStroke.length">
-            <button v-for="c in mruStroke" :key="'bulk-stroke-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyBulkStroke(c)"></button>
+          <div v-if="mruStroke.length" class="mru-section">
+            <label class="mru-label">Recently Used</label>
+            <div class="mru-row">
+              <button v-for="c in mruStroke" :key="'bulk-stroke-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyBulkStroke(c)"></button>
+            </div>
           </div>
         </div>
         <span v-if="!isValueConsistent('stroke')" class="mixed-label">Mixed</span>
@@ -595,6 +599,8 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue';
 import { mruColors } from '../utils/mruColors'
+import { calculateRectPositionAfterRotation } from '../utils/rotationUtils'
+import GrayscaleColorPicker from './GrayscaleColorPicker.vue'
 
 const props = defineProps({
   selectedShapes: {
@@ -724,11 +730,30 @@ const handlePropertyChange = (property, value) => {
   
   clearTimeout(debounceTimer);
   debounceTimer = setTimeout(() => {
-    emit('update-property', {
-      shapeId: props.selectedShapes[0].id,
-      property,
-      value
-    });
+    // Special handling for rectangle rotation - need to update x,y to maintain visual position
+    if (property === 'rotation' && props.selectedShapes[0].type === 'rectangle') {
+      const rect = props.selectedShapes[0]
+      const { x: newX, y: newY } = calculateRectPositionAfterRotation(
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+        value
+      )
+      
+      emit('update-property', {
+        shapeId: rect.id,
+        property,
+        value,
+        additionalUpdates: { x: newX, y: newY }
+      });
+    } else {
+      emit('update-property', {
+        shapeId: props.selectedShapes[0].id,
+        property,
+        value
+      });
+    }
   }, 300); // 300ms debounce for text inputs
 };
 
@@ -879,8 +904,8 @@ const preventTyping = (event) => {
 
 .property-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
 }
 
 .property-input.readonly {
@@ -910,7 +935,23 @@ const preventTyping = (event) => {
 }
 
 .property-color:hover {
-  border-color: #3b82f6;
+  border-color: #000000;
+}
+
+.mru-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.mru-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
 }
 
 .mru-row {
@@ -940,8 +981,8 @@ const preventTyping = (event) => {
 
 .property-select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
 }
 
 .property-textarea {
@@ -959,8 +1000,8 @@ const preventTyping = (event) => {
 
 .property-textarea:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #000000;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
 }
 
 .property-unit {
@@ -993,13 +1034,13 @@ const preventTyping = (event) => {
 }
 
 .style-button:hover {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: #000000;
+  background: #f3f4f6;
 }
 
 .style-button.active {
-  border-color: #3b82f6;
-  background: #3b82f6;
+  border-color: #000000;
+  background: #000000;
   color: white;
 }
 

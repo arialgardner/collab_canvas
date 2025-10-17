@@ -49,7 +49,7 @@ export function useCommandExecutor() {
           break
 
         case 'manipulation':
-          result = await executeManipulation(parameters, selectedShapeIds, userId, canvasId, userName)
+          result = await executeManipulation(parameters, selectedShapeIds, userId, canvasId, userName, viewportCenter)
           info(`Updated ${result.updatedIds?.length || 0} shape(s)`)
           break
 
@@ -206,7 +206,7 @@ export function useCommandExecutor() {
   /**
    * Execute manipulation command
    */
-  const executeManipulation = async (params, selectedIds, userId, canvasId, userName) => {
+  const executeManipulation = async (params, selectedIds, userId, canvasId, userName, viewportCenter) => {
     if (!selectedIds || selectedIds.length === 0) {
       throw new Error('No shapes selected for manipulation')
     }
@@ -221,6 +221,46 @@ export function useCommandExecutor() {
       if (params.size.width !== undefined) updates.width = params.size.width
       if (params.size.height !== undefined) updates.height = params.size.height
       if (params.size.radius !== undefined) updates.radius = params.size.radius
+    }
+
+    // Handle moveTo: "center" - move shapes to viewport center
+    if (params.moveTo === 'center' && viewportCenter) {
+      console.log('🎯 Moving selected shapes to viewport center:', viewportCenter)
+      
+      // For multiple shapes, move them as a group maintaining relative positions
+      if (selectedIds.length === 1) {
+        // Single shape: just center it at viewport center
+        updates.x = viewportCenter.x
+        updates.y = viewportCenter.y
+      } else {
+        // Multiple shapes: center the group and maintain relative positions
+        const allShapes = getAllShapes()
+        const shapesToMove = selectedIds
+          .map((id) => allShapes.find((s) => s.id === id))
+          .filter(Boolean)
+        
+        if (shapesToMove.length > 0) {
+          // Calculate center of the group
+          const bounds = getShapesBounds(shapesToMove)
+          const groupCenterX = bounds.centerX
+          const groupCenterY = bounds.centerY
+          
+          // Calculate offset to move group center to viewport center
+          const offsetX = viewportCenter.x - groupCenterX
+          const offsetY = viewportCenter.y - groupCenterY
+          
+          // Move each shape by the offset
+          for (const shape of shapesToMove) {
+            const shapeUpdates = {
+              x: shape.x + offsetX,
+              y: shape.y + offsetY
+            }
+            await updateShape(shape.id, shapeUpdates, userId, canvasId, true, true, userName)
+          }
+          
+          return { updatedIds: selectedIds }
+        }
+      }
     }
 
     // Position changes

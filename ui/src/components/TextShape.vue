@@ -52,7 +52,7 @@ export default {
       draggable: !props.disableDrag,
       // Visual feedback for selection
       shadowBlur: props.isSelected ? 10 : 0,
-      shadowColor: props.isSelected ? '#3b82f6' : 'transparent',
+      shadowColor: props.isSelected ? '#000000' : 'transparent',
       shadowOpacity: props.isSelected ? 0.5 : 0,
       // Performance optimization
       listening: true,

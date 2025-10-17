@@ -1,5 +1,11 @@
 <template>
   <div class="ai-command-panel" :class="{ 'is-focused': isFocused }" data-testid="ai-panel">
+    <!-- Beta badge -->
+    <div class="beta-badge">
+      <span class="beta-text">AI Assistant</span>
+      <span class="beta-label">BETA</span>
+    </div>
+    
     <!-- Main input area -->
     <div class="input-area">
       <input
@@ -35,10 +41,29 @@
       </div>
     </transition>
 
-    <!-- Command history dropdown (when focused) -->
+    <!-- Suggested commands (when focused and input is empty) -->
     <transition name="slide-down">
       <div
-        v-if="isFocused && commandHistory.length > 0 && !isProcessing"
+        v-if="isFocused && !userInput.trim() && !isProcessing"
+        class="suggested-commands"
+      >
+        <div class="suggestions-header">💡 Example Commands</div>
+        <div
+          v-for="(suggestion, index) in suggestedCommands"
+          :key="index"
+          @click="selectSuggestion(suggestion.text)"
+          class="suggestion-item"
+        >
+          <span class="suggestion-icon">{{ suggestion.icon }}</span>
+          <span class="suggestion-text">{{ suggestion.text }}</span>
+        </div>
+      </div>
+    </transition>
+
+    <!-- Command history dropdown (when focused and has input or history) -->
+    <transition name="slide-down">
+      <div
+        v-if="isFocused && commandHistory.length > 0 && userInput.trim() && !isProcessing"
         class="command-history"
       >
         <div class="history-header">Recent Commands</div>
@@ -80,6 +105,18 @@ const isFocused = ref(false)
 const commandInput = ref(null)
 const currentMessage = ref(null) // { type: 'success' | 'error', text: '...' }
 const historyIndex = ref(-1)
+
+// Suggested commands for users to learn the format
+const suggestedCommands = [
+  { icon: '🟢', text: 'draw three green circles' },
+  { icon: '📝', text: 'add a text layer that says i am gothcollabcanvas' },
+  { icon: '▭', text: 'make a 200x300 rectangle' },
+  { icon: '⬆️', text: 'move the selected circle up 20px' },
+  { icon: '🎯', text: 'move selected to center of screen' },
+  { icon: '🔴', text: 'create a red circle at position 100, 200' },
+  { icon: '🎨', text: 'change the selected shape to blue' },
+  { icon: '🗑️', text: 'delete all selected shapes' },
+]
 
 // Composables
 const { isProcessing, error: aiError, commandHistory, executeCommand: parseAICommand } = useAICommands()
@@ -172,6 +209,15 @@ const selectHistoryCommand = (command) => {
 }
 
 /**
+ * Select a suggested command
+ */
+const selectSuggestion = (command) => {
+  userInput.value = command
+  commandInput.value?.focus()
+  isFocused.value = true
+}
+
+/**
  * Navigate through command history with arrow keys
  */
 const navigateHistory = (direction) => {
@@ -250,6 +296,34 @@ onUnmounted(() => {
   background-color: rgba(255, 255, 255, 1);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   border-color: #2d2d2d;
+}
+
+.beta-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.beta-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.beta-label {
+  display: inline-block;
+  padding: 2px 6px;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.3);
 }
 
 .input-area {
@@ -357,9 +431,54 @@ onUnmounted(() => {
   border: 1px solid #fca5a5;
 }
 
+.suggested-commands {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
+.suggestions-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #6b7280;
+  padding: 4px 8px;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.suggestion-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+.suggestion-item:hover {
+  background-color: #f9fafb;
+  transform: translateX(2px);
+}
+
+.suggestion-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.suggestion-text {
+  flex: 1;
+  color: #4b5563;
+  font-style: italic;
+}
+
 .command-history {
-  max-height: 300px;
-  overflow-y: auto;
   border-top: 1px solid #e2e8f0;
   padding-top: 10px;
   margin-top: 4px;
@@ -429,24 +548,6 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-/* Scrollbar styling */
-.command-history::-webkit-scrollbar {
-  width: 6px;
-}
-
-.command-history::-webkit-scrollbar-track {
-  background: #f3f4f6;
-  border-radius: 3px;
-}
-
-.command-history::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
-}
-
-.command-history::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
 
 /* Transitions */
 .fade-enter-active,

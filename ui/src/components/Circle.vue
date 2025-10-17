@@ -54,7 +54,7 @@ export default {
       offsetY: props.circle.radius,
       // Visual feedback for selection / remote edit highlight
       shadowBlur: (props.isSelected || (props.circle.__highlightUntil && Date.now() < props.circle.__highlightUntil)) ? 10 : 0,
-      shadowColor: (props.circle.__highlightUntil && Date.now() < props.circle.__highlightUntil) ? '#f59e0b' : (props.isSelected ? '#3b82f6' : 'transparent'),
+      shadowColor: (props.circle.__highlightUntil && Date.now() < props.circle.__highlightUntil) ? '#f59e0b' : (props.isSelected ? '#000000' : 'transparent'),
       shadowOpacity: (props.isSelected || (props.circle.__highlightUntil && Date.now() < props.circle.__highlightUntil)) ? 0.6 : 0,
       // Performance optimization
       listening: true,

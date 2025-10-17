@@ -298,6 +298,7 @@ export function useAICommands() {
           parameters: {
             position: toPosition(),
             delta: toDeltaFromDirection(),
+            moveTo: p.moveTo, // Support "center" value for moving to viewport center
           }
         }
         break

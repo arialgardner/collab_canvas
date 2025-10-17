@@ -16,7 +16,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 0,
         fontSize: 14,
-        fill: "#2d3748",
+        fill: "#333333",
         fontFamily: "Arial",
         fontStyle: "normal",
         align: "left",
@@ -28,7 +28,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 24,
         fill: "#ffffff",
-        stroke: "#cbd5e0",
+        stroke: "#cccccc",
         strokeWidth: 1,
       },
       {
@@ -37,7 +37,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 76,
         fontSize: 14,
-        fill: "#2d3748",
+        fill: "#333333",
         fontFamily: "Arial",
         fontStyle: "normal",
         align: "left",
@@ -49,7 +49,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 100,
         fill: "#ffffff",
-        stroke: "#cbd5e0",
+        stroke: "#cccccc",
         strokeWidth: 1,
       },
       {
@@ -58,7 +58,7 @@ const TEMPLATES = {
         height: 40,
         offsetX: 0,
         offsetY: 152,
-        fill: "#3B82F6",
+        fill: "#000000",
       },
       {
         type: "text",
@@ -76,7 +76,7 @@ const TEMPLATES = {
 
   trafficLight: {
     name: "trafficLight",
-    description: "Traffic light with red, yellow, and green lights",
+    description: "Traffic light with three lights in different shades of grey",
     shapes: [
       {
         type: "rectangle",
@@ -84,28 +84,28 @@ const TEMPLATES = {
         height: 220,
         offsetX: 0,
         offsetY: 0,
-        fill: "#4B5563",
+        fill: "#555555",
       },
       {
         type: "circle",
         radius: 28,
         offsetX: 40,
         offsetY: 40,
-        fill: "#EF4444",
+        fill: "#3d3d3d",
       },
       {
         type: "circle",
         radius: 28,
         offsetX: 40,
         offsetY: 110,
-        fill: "#FBBF24",
+        fill: "#7d7d7d",
       },
       {
         type: "circle",
         radius: 28,
         offsetX: 40,
         offsetY: 180,
-        fill: "#10B981",
+        fill: "#c0c0c0",
       },
     ],
   },
@@ -120,7 +120,7 @@ const TEMPLATES = {
         height: 60,
         offsetX: 0,
         offsetY: 0,
-        fill: "#1F2937",
+        fill: "#222222",
       },
       {
         type: "text",
@@ -168,7 +168,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 0,
         fontSize: 14,
-        fill: "#2d3748",
+        fill: "#333333",
       },
       {
         type: "rectangle",
@@ -177,7 +177,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 24,
         fill: "#ffffff",
-        stroke: "#cbd5e0",
+        stroke: "#cccccc",
         strokeWidth: 1,
       },
       {
@@ -186,7 +186,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 76,
         fontSize: 14,
-        fill: "#2d3748",
+        fill: "#333333",
       },
       {
         type: "rectangle",
@@ -195,7 +195,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 100,
         fill: "#ffffff",
-        stroke: "#cbd5e0",
+        stroke: "#cccccc",
         strokeWidth: 1,
       },
       {
@@ -204,7 +204,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 152,
         fontSize: 14,
-        fill: "#2d3748",
+        fill: "#333333",
       },
       {
         type: "rectangle",
@@ -213,7 +213,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 176,
         fill: "#ffffff",
-        stroke: "#cbd5e0",
+        stroke: "#cccccc",
         strokeWidth: 1,
       },
       {
@@ -222,7 +222,7 @@ const TEMPLATES = {
         height: 44,
         offsetX: 0,
         offsetY: 228,
-        fill: "#10B981",
+        fill: "#000000",
       },
       {
         type: "text",
@@ -246,7 +246,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 0,
         fontSize: 24,
-        fill: "#1a202c",
+        fill: "#1a1a1a",
         fontStyle: "bold",
       },
       {
@@ -256,7 +256,7 @@ const TEMPLATES = {
         offsetX: 0,
         offsetY: 50,
         fill: "#ffffff",
-        stroke: "#e2e8f0",
+        stroke: "#e0e0e0",
         strokeWidth: 1,
       },
       {
@@ -265,7 +265,7 @@ const TEMPLATES = {
         offsetX: 60,
         offsetY: 70,
         fontSize: 14,
-        fill: "#718096",
+        fill: "#808080",
       },
       {
         type: "text",
@@ -273,7 +273,7 @@ const TEMPLATES = {
         offsetX: 50,
         offsetY: 100,
         fontSize: 28,
-        fill: "#2d3748",
+        fill: "#333333",
         fontStyle: "bold",
       },
       {
@@ -283,7 +283,7 @@ const TEMPLATES = {
         offsetX: 200,
         offsetY: 50,
         fill: "#ffffff",
-        stroke: "#e2e8f0",
+        stroke: "#e0e0e0",
         strokeWidth: 1,
       },
       {
@@ -292,7 +292,7 @@ const TEMPLATES = {
         offsetX: 250,
         offsetY: 70,
         fontSize: 14,
-        fill: "#718096",
+        fill: "#808080",
       },
       {
         type: "text",
@@ -300,7 +300,7 @@ const TEMPLATES = {
         offsetX: 235,
         offsetY: 100,
         fontSize: 28,
-        fill: "#2d3748",
+        fill: "#333333",
         fontStyle: "bold",
       },
       {
@@ -310,7 +310,7 @@ const TEMPLATES = {
         offsetX: 400,
         offsetY: 50,
         fill: "#ffffff",
-        stroke: "#e2e8f0",
+        stroke: "#e0e0e0",
         strokeWidth: 1,
       },
       {
@@ -319,7 +319,7 @@ const TEMPLATES = {
         offsetX: 455,
         offsetY: 70,
         fontSize: 14,
-        fill: "#718096",
+        fill: "#808080",
       },
       {
         type: "text",
@@ -327,7 +327,7 @@ const TEMPLATES = {
         offsetX: 455,
         offsetY: 100,
         fontSize: 28,
-        fill: "#10B981",
+        fill: "#333333",
         fontStyle: "bold",
       },
     ],

@@ -48,6 +48,70 @@ const callOpenAI = async (prompt, apiKey) => {
 };
 
 /**
+ * Check if a hex color is grayscale (black, white, or grey)
+ * @param {string} color - Hex color string (e.g., "#FF5733" or "#808080")
+ * @return {boolean} True if grayscale, false otherwise
+ */
+const isGrayscaleColor = (color) => {
+  if (!color || typeof color !== "string") return true; // Allow undefined/null
+
+  // Remove # if present
+  const hex = color.replace("#", "");
+
+  // Must be valid hex
+  // Allow invalid hex (will be caught elsewhere)
+  if (!/^[0-9A-Fa-f]{6}$/.test(hex)) return true;
+
+  // Extract RGB components
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+
+  // Grayscale means R = G = B
+  return r === g && g === b;
+};
+
+/**
+ * Validate that all colors in a parsed command are grayscale
+ * @param {Object} parsed - Parsed command object
+ * @return {Object} { isValid: boolean, invalidColors: string[] }
+ */
+const validateGrayscaleColors = (parsed) => {
+  const invalidColors = [];
+
+  // Check parameters object for color properties
+  if (parsed.parameters) {
+    const params = parsed.parameters;
+
+    // Check common color properties
+    const colorProps = ["color", "fill", "stroke"];
+
+    for (const prop of colorProps) {
+      if (params[prop] && !isGrayscaleColor(params[prop])) {
+        invalidColors.push(params[prop]);
+      }
+    }
+
+    // Check templateData if present (for complex templates)
+    if (params.templateData && params.templateData.shapes) {
+      for (const shape of params.templateData.shapes) {
+        if (shape.fill && !isGrayscaleColor(shape.fill)) {
+          invalidColors.push(shape.fill);
+        }
+        if (shape.stroke && !isGrayscaleColor(shape.stroke)) {
+          invalidColors.push(shape.stroke);
+        }
+      }
+    }
+  }
+
+  return {
+    isValid: invalidColors.length === 0,
+    invalidColors,
+  };
+};
+
+/**
  * Parse AI Command Cloud Function
  *
  * Takes natural language input and returns structured command object
@@ -125,13 +189,14 @@ Respond ONLY with valid JSON in this exact format:
 }
 
 Rules:
+- CRITICAL: Only use grayscale colors (black, white, or grey shades). RGB values must be equal (e.g., #000000, #FFFFFF, #808080). NO colored fills or strokes allowed.
 - If no position specified, shapes will be placed at viewport center: ${viewportCenter}
 - For "login form" → category: "complex", parameters: { "template": "loginForm" }
 - For "traffic light" → category: "complex", parameters: { "template": "trafficLight" }
 - For "nav bar" or "navigation" → category: "complex", parameters: { "template": "navigationBar" }
 - For "signup form" or "register" → category: "complex", parameters: { "template": "signupForm" }
 - For "dashboard" → category: "complex", parameters: { "template": "dashboard" }
-- For creation: include shapeType, color (hex), size (width/height/radius), text
+- For creation: include shapeType, color (hex - grayscale only), size (width/height/radius), text
 - For manipulation: include property and value or delta
 - For layout: include arrangement type (horizontal/vertical/grid) and spacing
 - For selection: include criteria (type/color)
@@ -180,6 +245,16 @@ Respond with ONLY the JSON, no other text.
           );
         }
 
+        // Validate colors are grayscale only
+        const colorValidation = validateGrayscaleColors(parsed);
+        if (!colorValidation.isValid) {
+          throw new HttpsError(
+              "invalid-argument",
+              "🖤 Be more goth! Only black, white, and shades of grey " +
+              "are allowed on this canvas. Choose a grayscale color instead.",
+          );
+        }
+
         // If template selected, include template data
         if (parsed.category === "complex" &&
           parsed.parameters &&
@@ -193,7 +268,9 @@ Respond with ONLY the JSON, no other text.
           }
         }
 
-        // console.log(`✅ Parsed command: ${parsed.category} - ${parsed.action}`);
+        // console.log(
+        //     `✅ Parsed command: ${parsed.category} - ${parsed.action}`,
+        // );
 
         return {
           success: true,

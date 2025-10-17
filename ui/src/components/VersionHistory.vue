@@ -101,7 +101,21 @@ export default {
 .vh-title { font-weight: 600; color: #111827; }
 .vh-sub { font-size: 12px; color: #6b7280; }
 .vh-actions { display: flex; gap: 8px; }
-.vh-btn { background: #eff6ff; border: 1px solid #dbeafe; color: #1d4ed8; padding: 6px 10px; border-radius: 6px; cursor: pointer; }
+.vh-btn { 
+  background: #000000; 
+  border: 1px solid #000000; 
+  color: #ffffff; 
+  padding: 6px 10px; 
+  border-radius: 6px; 
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.vh-btn:hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
 .vh-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>
 

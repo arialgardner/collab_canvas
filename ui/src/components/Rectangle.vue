@@ -15,6 +15,7 @@
 
 <script>
 import { computed, ref, watch } from 'vue'
+import { calculateRectPositionAfterRotation } from '../utils/rotationUtils'
 
 export default {
   name: 'Rectangle',
@@ -43,10 +44,23 @@ export default {
     const rectNode = ref(null)
 
     // Watch for rotation changes and apply them directly to the node
-    watch(() => props.rectangle.rotation, (newRotation) => {
-      if (rectNode.value && newRotation !== undefined) {
+    // Also recalculate position to maintain visual center
+    watch(() => props.rectangle.rotation, (newRotation, oldRotation) => {
+      if (rectNode.value && newRotation !== undefined && newRotation !== oldRotation) {
         const node = rectNode.value.getNode()
-        if (node && node.rotation() !== newRotation) {
+        if (node) {
+          // Calculate corrected position to maintain visual center
+          const { x: newX, y: newY } = calculateRectPositionAfterRotation(
+            props.rectangle.x,
+            props.rectangle.y,
+            props.rectangle.width,
+            props.rectangle.height,
+            newRotation
+          )
+          
+          // Update node position and rotation (using center coordinates for Konva)
+          node.x(newX + props.rectangle.width / 2)
+          node.y(newY + props.rectangle.height / 2)
           node.rotation(newRotation)
           node.getLayer()?.batchDraw()
         }

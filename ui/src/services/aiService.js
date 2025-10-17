@@ -34,7 +34,7 @@ Available command intents:
 - CREATE_SHAPE: Create a single shape (MUST include "type" or "shapeType" parameter: "rectangle", "circle", or "text" - lines NOT supported)
 - CREATE_MULTIPLE_SHAPES: Create multiple shapes (MUST include "type" or "shapeType" parameter)
 - CREATE_TEXT: Create text element (automatically sets type to "text")
-- MOVE_SHAPE: Move/position shapes
+- MOVE_SHAPE: Move/position shapes (supports moving selected shapes to viewport center)
 - RESIZE_SHAPE: Resize shapes
 - CHANGE_STYLE: Modify visual properties
 - ARRANGE_SHAPES: Layout shapes in patterns
@@ -62,6 +62,9 @@ Examples:
 - "draw a 50px circle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "circle", "radius": 50}}
 - "create a 300 by 150 rectangle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "rectangle", "width": 300, "height": 150}}
 - "create 3 circles" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "circle", "count": 3}}
+- "move selected to center" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
+- "center the selected rectangle" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
+- "move it to the middle of the screen" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
 
 IMPORTANT: If user requests to create a "line", return an error response explaining that lines are not supported.
 Only rectangles, circles, and text can be created.
@@ -93,6 +96,8 @@ Important positioning rules:
 - "at X,Y" coordinates: use exact position
 - Viewport center and bounds will be provided in context
 - Ensure shapes fit within the viewport dimensions considering their size
+- For MOVE_SHAPE intent with selected shapes: "moveTo": "center" moves shapes to viewport center
+- Commands like "move to center", "center it", "move to middle" should use moveTo parameter
 
 Color handling:
 - Support color names (red, blue, green, etc.)
@@ -111,6 +116,8 @@ Target resolution for ambiguous references:
 - "selected" → all currently selected shapes
 - "the circle" → most recently created circle
 - No target specified for modifications → use selected shapes or last created
+- "move it to center" with selected shapes → move selected shapes to viewport center
+- "center the rectangle" with selected shapes → move selected shapes to viewport center
 
 Always return pure JSON with no markdown formatting or explanations outside the JSON structure.`
 

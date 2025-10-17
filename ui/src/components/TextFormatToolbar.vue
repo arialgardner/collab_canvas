@@ -81,18 +81,30 @@
     <div class="toolbar-divider"></div>
 
     <!-- Color Picker -->
-    <input
-      type="color"
-      v-model="localFormat.fill"
-      class="toolbar-color"
-      @input="emitChange"
-      title="Text Color"
-    />
+    <div class="color-picker-wrapper">
+      <button
+        class="toolbar-color-button"
+        @click="toggleColorPicker"
+        :style="{ backgroundColor: localFormat.fill }"
+        title="Text Color"
+      >
+        <span class="color-label">A</span>
+      </button>
+      
+      <div v-if="showColorPicker" class="color-picker-dropdown" @mousedown.stop>
+        <GrayscaleColorPicker
+          :modelValue="localFormat.fill"
+          @input="handleColorChange"
+          @change="handleColorChange"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import GrayscaleColorPicker from './GrayscaleColorPicker.vue'
 
 export default {
   name: 'TextFormatToolbar',
@@ -114,6 +126,9 @@ export default {
       default: 1
     }
   },
+  components: {
+    GrayscaleColorPicker
+  },
   emits: ['format-change'],
   setup(props, { emit }) {
     const localFormat = ref({
@@ -123,6 +138,8 @@ export default {
       align: 'left',
       fill: '#000000'
     })
+
+    const showColorPicker = ref(false)
 
     // Calculate toolbar position (below text shape)
     const toolbarStyle = computed(() => {
@@ -183,15 +200,42 @@ export default {
       emit('format-change', { ...localFormat.value })
     }
 
+    const toggleColorPicker = () => {
+      showColorPicker.value = !showColorPicker.value
+    }
+
+    const handleColorChange = (color) => {
+      localFormat.value.fill = color
+      emitChange()
+    }
+
+    // Close color picker when clicking outside
+    const handleClickOutside = (e) => {
+      if (showColorPicker.value && !e.target.closest('.color-picker-wrapper')) {
+        showColorPicker.value = false
+      }
+    }
+
+    onMounted(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+    })
+
+    onUnmounted(() => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    })
+
     return {
       localFormat,
       toolbarStyle,
       isBold,
       isItalic,
+      showColorPicker,
       toggleBold,
       toggleItalic,
       setAlign,
-      emitChange
+      emitChange,
+      toggleColorPicker,
+      handleColorChange
     }
   }
 }
@@ -247,8 +291,8 @@ export default {
 }
 
 .toolbar-button.active {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: #000000;
+  border-color: #000000;
   color: white;
 }
 
@@ -259,17 +303,48 @@ export default {
   margin: 0 4px;
 }
 
-.toolbar-color {
-  width: 32px;
-  height: 28px;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  cursor: pointer;
-  padding: 2px;
+.color-picker-wrapper {
+  position: relative;
 }
 
-.toolbar-color:hover {
+.toolbar-color-button {
+  width: 32px;
+  height: 28px;
+  border: 2px solid #d1d5db;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.toolbar-color-button:hover {
   border-color: #9ca3af;
+  transform: scale(1.05);
+}
+
+.color-label {
+  font-weight: bold;
+  font-size: 16px;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8), 0 0 4px rgba(0, 0, 0, 0.6);
+  color: currentColor;
+  filter: invert(1) grayscale(1) contrast(100);
+}
+
+.color-picker-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e5e7eb;
+  padding: 8px;
+  z-index: 3000;
+  min-width: 200px;
 }
 </style>
 

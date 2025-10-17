@@ -689,8 +689,8 @@ const formatDate = (timestamp) => {
 }
 
 .owner-badge {
-  background: #dbeafe;
-  color: #1e40af;
+  background: #e5e7eb;
+  color: #374151;
 }
 
 .editor-badge {

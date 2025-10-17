@@ -138,13 +138,14 @@ export default {
 .shape { font-size: 12px; color: #334155; }
 .right { display: flex; gap: 6px; align-items: center; }
 .status { font-size: 12px; color: #64748b; margin-right: 4px; }
-.btn { background: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 6px 8px; font-size: 12px; cursor: pointer; color: #000000; }
+.btn { background: #ffffff; border: 1px solid #d1d5db; border-radius: 4px; padding: 6px 8px; font-size: 12px; cursor: pointer; color: #000000; transition: all 0.15s ease; }
 .btn:hover { background: #f3f4f6; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn:disabled:hover { background: #ffffff; }
-.btn.danger { background: #fee2e2; border-color: #fecaca; }
-.btn.danger:hover { background: #fecaca; }
-.btn.danger:disabled:hover { background: #fee2e2; }
+.btn.danger { background: #000000; border-color: #000000; color: #ffffff; }
+.btn.danger:hover { background: #1a1a1a; border-color: #1a1a1a; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
+.btn.danger:disabled { background: #000000; border-color: #000000; }
+.btn.danger:disabled:hover { background: #000000; transform: none; box-shadow: none; }
 .footer { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #e2e8f0; }
 </style>
 

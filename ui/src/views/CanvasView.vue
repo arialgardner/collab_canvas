@@ -264,6 +264,7 @@ import { useVersions } from '../composables/useVersions'
 import { useInactivityLogout } from '../composables/useInactivityLogout'
 import { useViewportCulling } from '../composables/useViewportCulling' // v5: Rendering optimization
 import { useBugFixes } from '../utils/bugFixUtils'
+import { calculateRectPositionAfterRotation } from '../utils/rotationUtils'
 import { useRoute, useRouter } from 'vue-router'
 
 export default {
@@ -1317,9 +1318,17 @@ export default {
           node.scaleX(1)
           node.scaleY(1)
         } else {
-          // Pure rotation: keep the rectangle where user left it (commit node center)
-          updates.x = node.x() - currentWidth / 2
-          updates.y = node.y() - currentHeight / 2
+          // Pure rotation: calculate correct top-left position to maintain visual center
+          const rotation = node.rotation()
+          const { x: newX, y: newY } = calculateRectPositionAfterRotation(
+            shape.x,
+            shape.y,
+            currentWidth,
+            currentHeight,
+            rotation
+          )
+          updates.x = newX
+          updates.y = newY
         }
       } else if (shape.type === 'text') {
         // Text: preserve top-left on pure rotation to avoid jumps; update only on resize
@@ -2219,7 +2228,7 @@ export default {
     })
 
     // Properties panel handlers
-    const handleUpdateProperty = ({ shapeId, property, value }) => {
+    const handleUpdateProperty = ({ shapeId, property, value, additionalUpdates }) => {
       if (!shapeId) return
       
       // Validate value based on property
@@ -2241,9 +2250,17 @@ export default {
       if (property === 'x' && validatedValue > canvasWidth.value) validatedValue = canvasWidth.value
       if (property === 'y' && validatedValue > canvasHeight.value) validatedValue = canvasHeight.value
       
+      // Build updates object with primary property
+      let updates = { [property]: validatedValue }
+      
+      // Merge additional updates (e.g., x,y from rotation calculations)
+      if (additionalUpdates) {
+        updates = { ...updates, ...additionalUpdates }
+      }
+      
       // Update the shape
       const userId = user.value?.uid || 'anonymous'
-      updateShape(shapeId, { [property]: validatedValue }, userId, canvasId.value, true, true, userName.value)
+      updateShape(shapeId, updates, userId, canvasId.value, true, true, userName.value)
     }
 
     const handleBulkUpdate = ({ shapeIds, property, value }) => {
