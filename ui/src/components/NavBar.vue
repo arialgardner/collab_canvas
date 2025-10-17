@@ -110,8 +110,10 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useAuth } from '../composables/useAuth'
 import { useRouter } from 'vue-router'
 import { usePresence } from '../composables/usePresence'
+import { usePresenceRTDB } from '../composables/usePresenceRTDB'
 import { useCursors } from '../composables/useCursors'
 import { useConnectionState, CONNECTION_STATUS } from '../composables/useConnectionState'
+import { getFeatureFlag } from '../utils/featureFlags'
 import ConnectionStatus from './ConnectionStatus.vue'
 
 export default {
@@ -133,7 +135,12 @@ export default {
   },
   setup(props) {
     const { user, signOut, isLoading } = useAuth()
-    const { activeUsers, getActiveUsers, getActiveUserCount, setUserOffline } = usePresence()
+    
+    // Use the correct presence system based on feature flag
+    const useRealtimeDB = getFeatureFlag('USE_REALTIME_DB', false)
+    const presenceComposable = useRealtimeDB ? usePresenceRTDB() : usePresence()
+    const { activeUsers, getActiveUsers, getActiveUserCount, setUserOffline } = presenceComposable
+    
     const { removeCursor } = useCursors()
     const { state: connectionState } = useConnectionState()
     const router = useRouter()
