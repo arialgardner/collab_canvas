@@ -40,6 +40,14 @@ service cloud.firestore {
         // Allow read/write if user has canvas access
         allow read, write: if hasCanvasAccess(canvasId);
       }
+      
+      // Canvas snapshot (v5: for fast bulk loading)
+      match /snapshot {
+        // Allow read if user has canvas access
+        allow read: if hasCanvasAccess(canvasId);
+        // Allow write if user has canvas access
+        allow write: if hasCanvasAccess(canvasId);
+      }
 
       // Version history (owner-only access)
       match /versions/{versionId} {
