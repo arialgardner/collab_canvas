@@ -108,14 +108,15 @@ const historyIndex = ref(-1)
 
 // Suggested commands for users to learn the format
 const suggestedCommands = [
-  { icon: '⭕', text: 'create a circle made of squares' },
-  { icon: '⭐', text: 'make a star made of circles' },
-  { icon: '💎', text: 'draw a diamond made of rectangles' },
-  { icon: '❤️', text: 'create a heart made of circles' },
-  { icon: '🔲', text: 'create a 3x3 grid of squares' },
-  { icon: '🎯', text: 'move selected to center' },
-  { icon: '📏', text: 'make selected twice as big' },
-  { icon: '🗑️', text: 'delete all selected shapes' },
+  { icon: '▪', text: "add a text layer that says 'collab canvas'" },
+  { icon: '▬', text: 'make a 200x300 rectangle' },
+  { icon: '✕', text: 'delete all selected shapes' },
+  { icon: '○', text: 'make the selected shape white' },
+  { icon: '●', text: 'resize the circle to be twice as big' },
+  { icon: '▲', text: 'move the selected shape up 40px' },
+  { icon: '◼', text: 'create a grid of 3x3 squares' },
+  { icon: '★', text: 'create a star made of circles' },
+  { icon: '○', text: 'create a circle made of squares' },
 ]
 
 // Composables

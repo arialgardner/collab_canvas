@@ -1117,11 +1117,11 @@ export default {
       // Configure based on shape type
       switch (shapeType) {
         case 'rectangle':
-          // Standard 8-handle resize + rotation
+          // Standard 8-handle resize (no rotation)
           transformerNode.enabledAnchors(['top-left', 'top-center', 'top-right', 
                                          'middle-right', 'middle-left',
                                          'bottom-left', 'bottom-center', 'bottom-right'])
-          transformerNode.rotateEnabled(true)
+          transformerNode.rotateEnabled(false)
           // Minimum size constraint
           transformerNode.boundBoxFunc((oldBox, newBox) => {
             // Minimum 10x10px
