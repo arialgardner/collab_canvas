@@ -110,11 +110,11 @@ const historyIndex = ref(-1)
 const suggestedCommands = [
   { icon: '🟢', text: 'draw three green circles' },
   { icon: '📝', text: 'add a text layer that says i am gothcollabcanvas' },
-  { icon: '▭', text: 'make a 200x300 rectangle' },
-  { icon: '⬆️', text: 'move the selected circle up 20px' },
-  { icon: '🎯', text: 'move selected to center of screen' },
-  { icon: '🔴', text: 'create a red circle at position 100, 200' },
-  { icon: '🎨', text: 'change the selected shape to blue' },
+  { icon: '🎯', text: 'move selected to center' },
+  { icon: '📏', text: 'make selected twice as big' },
+  { icon: '🔲', text: 'create a 3x3 grid of squares' },
+  { icon: '🧭', text: 'navigation bar with 5 items' },
+  { icon: '🎴', text: 'create a card layout' },
   { icon: '🗑️', text: 'delete all selected shapes' },
 ]
 

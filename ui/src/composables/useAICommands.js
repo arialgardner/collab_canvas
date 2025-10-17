@@ -34,6 +34,7 @@ export function useAICommands() {
       panOffset = { x: 0, y: 0 },
       zoomLevel = 1,
       selectedShapeIds = [],
+      selectedShape = null,
       shapes = new Map(),
       lastCreatedShape = null
     } = canvasState
@@ -54,6 +55,7 @@ export function useAICommands() {
       panOffset,
       zoomLevel,
       selectedShapeIds,
+      selectedShape,
       lastCreatedShape,
       totalShapes: shapes.size,
       canvasSize: {
@@ -304,12 +306,18 @@ export function useAICommands() {
         break
       }
       case 'RESIZE_SHAPE': {
+        // Handle legacy 'factor' parameter by mapping to sizeMultiplier
+        if (p.factor && !p.sizeMultiplier) {
+          console.log('🔄 Mapping legacy factor parameter to sizeMultiplier:', p.factor)
+          p.sizeMultiplier = p.factor
+        }
         command = {
           category: 'manipulation',
           action: 'resize',
           parameters: {
             dimensions: toSize(),
             delta: toDeltaFromScale(),
+            sizeMultiplier: p.sizeMultiplier,
           }
         }
         break

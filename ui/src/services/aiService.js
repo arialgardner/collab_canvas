@@ -35,7 +35,7 @@ Available command intents:
 - CREATE_MULTIPLE_SHAPES: Create multiple shapes (MUST include "type" or "shapeType" parameter)
 - CREATE_TEXT: Create text element (automatically sets type to "text")
 - MOVE_SHAPE: Move/position shapes (supports moving selected shapes to viewport center)
-- RESIZE_SHAPE: Resize shapes
+- RESIZE_SHAPE: Resize shapes (use "sizeMultiplier" for relative sizing: 2.0 = twice as big, 0.5 = half size, etc.)
 - CHANGE_STYLE: Modify visual properties
 - ARRANGE_SHAPES: Layout shapes in patterns
 - CHANGE_LAYER: Modify z-index
@@ -65,6 +65,10 @@ Examples:
 - "move selected to center" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
 - "center the selected rectangle" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
 - "move it to the middle of the screen" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
+- "make selected twice as big" → {"intent": "RESIZE_SHAPE", "parameters": {"target": "selected", "sizeMultiplier": 2.0}}
+- "resize to 50% larger" → {"intent": "RESIZE_SHAPE", "parameters": {"target": "selected", "sizePercent": 150}}
+- "make it half the size" → {"intent": "RESIZE_SHAPE", "parameters": {"target": "selected", "sizeMultiplier": 0.5}}
+- "double the size" → {"intent": "RESIZE_SHAPE", "parameters": {"target": "selected", "sizeMultiplier": 2.0}}
 
 IMPORTANT: If user requests to create a "line", return an error response explaining that lines are not supported.
 Only rectangles, circles, and text can be created.
@@ -119,6 +123,20 @@ Target resolution for ambiguous references:
 - "move it to center" with selected shapes → move selected shapes to viewport center
 - "center the rectangle" with selected shapes → move selected shapes to viewport center
 
+Selected shape awareness:
+- When exactly 1 shape is selected, you will receive its full details (type, position, size, color, etc.)
+- Use this information to make context-aware decisions
+- For relative commands like "move it right 100px", use the current position as reference
+- For size changes like "make it twice as big", use the current dimensions
+- For positioning like "move to 500,500", you know where it currently is
+- For color changes, you can reference the current color
+- IMPORTANT: DO NOT include shape IDs in your response parameters - the system handles targeting automatically
+- Always use "target": "selected" for operations on the selected shape
+- Examples:
+  * Current: rectangle at (100, 200), 50x50 → "move right 100" → new position (200, 200)
+  * Current: circle with radius 30 → "double the size" → sizeMultiplier: 2.0, target: "selected"
+  * Current: shape at (100, 100) → "move to 500, 500" → new position (500, 500), target: "selected"
+
 Always return pure JSON with no markdown formatting or explanations outside the JSON structure.`
 
 /**
@@ -130,7 +148,8 @@ const buildUserPrompt = (commandText, context) => {
     viewportWidth = 1920,
     viewportHeight = 1080,
     viewportBounds,
-    selectedShapeIds = [], 
+    selectedShapeIds = [],
+    selectedShape = null,
     lastCreatedShape, 
     totalShapes = 0 
   } = context
@@ -139,13 +158,39 @@ const buildUserPrompt = (commandText, context) => {
     ? `left: ${Math.round(viewportBounds.left)}, right: ${Math.round(viewportBounds.right)}, top: ${Math.round(viewportBounds.top)}, bottom: ${Math.round(viewportBounds.bottom)}`
     : 'not available'
 
+  // Build selected shape details string
+  let selectedShapeStr = `${selectedShapeIds.length} shape(s) selected`
+  if (selectedShape) {
+    const shapeDetails = []
+    shapeDetails.push(`Type: ${selectedShape.type}`)
+    shapeDetails.push(`Position: (${Math.round(selectedShape.x)}, ${Math.round(selectedShape.y)})`)
+    
+    if (selectedShape.type === 'rectangle') {
+      shapeDetails.push(`Size: ${selectedShape.width}x${selectedShape.height}`)
+    } else if (selectedShape.type === 'circle') {
+      shapeDetails.push(`Radius: ${selectedShape.radius}`)
+    } else if (selectedShape.type === 'text') {
+      shapeDetails.push(`Text: "${selectedShape.text}"`)
+      if (selectedShape.fontSize) shapeDetails.push(`Font size: ${selectedShape.fontSize}`)
+    }
+    
+    if (selectedShape.fill) shapeDetails.push(`Fill: ${selectedShape.fill}`)
+    if (selectedShape.stroke) shapeDetails.push(`Stroke: ${selectedShape.stroke}`)
+    if (selectedShape.rotation) shapeDetails.push(`Rotation: ${Math.round(selectedShape.rotation)}°`)
+    if (selectedShape.opacity !== undefined && selectedShape.opacity !== 1) {
+      shapeDetails.push(`Opacity: ${selectedShape.opacity}`)
+    }
+    
+    selectedShapeStr = `1 shape selected:\n  - ${shapeDetails.join('\n  - ')}`
+  }
+
   return `Command: "${commandText}"
 
 Current Context:
 - Viewport center: (${Math.round(viewportCenter?.x || 0)}, ${Math.round(viewportCenter?.y || 0)})
 - Viewport size: ${Math.round(viewportWidth)}x${Math.round(viewportHeight)} pixels
 - Viewport bounds: ${boundsStr}
-- Selected shapes: ${selectedShapeIds.length} shape(s) selected
+- Selected shapes: ${selectedShapeStr}
 - Last created shape: ${lastCreatedShape ? `${lastCreatedShape.type} (ID: ${lastCreatedShape.id})` : 'none'}
 - Total shapes on canvas: ${totalShapes}
 - Canvas dimensions: 3000x3000 (bounded area)

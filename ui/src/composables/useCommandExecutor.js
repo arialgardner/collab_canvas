@@ -223,6 +223,53 @@ export function useCommandExecutor() {
       if (params.size.radius !== undefined) updates.radius = params.size.radius
     }
 
+    // Handle relative size multipliers (e.g., "twice as big", "half the size")
+    if (params.sizeMultiplier !== undefined) {
+      const allShapes = getAllShapes()
+      for (const id of selectedIds) {
+        const shape = allShapes.find(s => s.id === id)
+        if (!shape) continue
+        
+        const updates = {}
+        if (shape.width !== undefined) {
+          updates.width = Math.max(10, Math.round(shape.width * params.sizeMultiplier))
+        }
+        if (shape.height !== undefined) {
+          updates.height = Math.max(10, Math.round(shape.height * params.sizeMultiplier))
+        }
+        if (shape.radius !== undefined) {
+          updates.radius = Math.max(5, Math.round(shape.radius * params.sizeMultiplier))
+        }
+        
+        await updateShape(id, updates, userId, canvasId, true, true, userName)
+      }
+      return { updatedIds: selectedIds }
+    }
+
+    // Handle percentage-based sizing (e.g., "50% larger" = 150%)
+    if (params.sizePercent !== undefined) {
+      const multiplier = params.sizePercent / 100
+      const allShapes = getAllShapes()
+      for (const id of selectedIds) {
+        const shape = allShapes.find(s => s.id === id)
+        if (!shape) continue
+        
+        const updates = {}
+        if (shape.width !== undefined) {
+          updates.width = Math.max(10, Math.round(shape.width * multiplier))
+        }
+        if (shape.height !== undefined) {
+          updates.height = Math.max(10, Math.round(shape.height * multiplier))
+        }
+        if (shape.radius !== undefined) {
+          updates.radius = Math.max(5, Math.round(shape.radius * multiplier))
+        }
+        
+        await updateShape(id, updates, userId, canvasId, true, true, userName)
+      }
+      return { updatedIds: selectedIds }
+    }
+
     // Handle moveTo: "center" - move shapes to viewport center
     if (params.moveTo === 'center' && viewportCenter) {
       console.log('🎯 Moving selected shapes to viewport center:', viewportCenter)
@@ -343,7 +390,70 @@ export function useCommandExecutor() {
     const shapeSize = { width: shapeWidth, height: shapeHeight }
     const startPos = getViewportPosition(viewportCenter, viewportBounds, shapeSize)
 
-    // Grid settings: 15 per row, with spacing
+    // Handle specific grid dimensions (e.g., "create a 3x3 grid")
+    if (params.gridRows && params.gridCols) {
+      const gridRows = params.gridRows
+      const gridCols = params.gridCols
+      const totalCount = gridRows * gridCols
+      
+      // Enforce maximum grid size (15x15 = 225 shapes)
+      if (totalCount > 225) {
+        throw new Error('Grid too large. Maximum size is 15x15 (225 shapes).')
+      }
+      
+      const spacing = params.spacing || 20
+      
+      // Calculate total grid dimensions
+      const gridWidth = gridCols * shapeWidth + (gridCols - 1) * spacing
+      const gridHeight = gridRows * shapeHeight + (gridRows - 1) * spacing
+      
+      // Center the grid at viewport center
+      const gridStartX = viewportCenter.x - gridWidth / 2
+      const gridStartY = viewportCenter.y - gridHeight / 2
+      
+      console.log('🎯 Creating specific grid layout:', {
+        gridRows,
+        gridCols,
+        totalCount,
+        gridWidth,
+        gridHeight,
+        gridStartX,
+        gridStartY,
+        spacing
+      })
+      
+      // Create shapes row by row
+      for (let row = 0; row < gridRows; row++) {
+        for (let col = 0; col < gridCols; col++) {
+          const properties = {}
+          
+          // Calculate cell position
+          const cellX = gridStartX + col * (shapeWidth + spacing)
+          const cellY = gridStartY + row * (shapeHeight + spacing)
+          
+          // Position depends on shape type (circles use center, rectangles use top-left)
+          if (shapeType === 'circle') {
+            properties.x = Math.round(cellX + shapeWidth / 2)
+            properties.y = Math.round(cellY + shapeHeight / 2)
+          } else {
+            properties.x = Math.round(cellX)
+            properties.y = Math.round(cellY)
+          }
+          
+          if (color) properties.fill = color
+          if (size?.width) properties.width = size.width
+          if (size?.height) properties.height = size.height
+          if (size?.radius) properties.radius = size.radius
+          
+          const shape = await createShape(shapeType, properties, userId, canvasId, userName)
+          createdShapes.push(shape)
+        }
+      }
+      
+      return { createdShapes }
+    }
+
+    // Default grid behavior: 15 per row, with spacing
     const colsPerRow = 15
     const spacingX = 20
     const spacingY = 20

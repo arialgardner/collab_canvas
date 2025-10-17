@@ -2497,6 +2497,33 @@ export default {
         viewportBounds
       })
       
+      // Extract single selected shape details for AI
+      let selectedShape = null
+      if (selectedShapeIds.value.length === 1) {
+        const shapeId = selectedShapeIds.value[0]
+        const shape = shapes.get(shapeId)
+        if (shape) {
+          selectedShape = {
+            id: shape.id,
+            type: shape.type,
+            x: shape.x,
+            y: shape.y,
+            width: shape.width,
+            height: shape.height,
+            radius: shape.radius,
+            fill: shape.fill,
+            stroke: shape.stroke,
+            strokeWidth: shape.strokeWidth,
+            rotation: shape.rotation,
+            opacity: shape.opacity,
+            text: shape.text,
+            fontSize: shape.fontSize,
+            fontFamily: shape.fontFamily,
+            fontStyle: shape.fontStyle
+          }
+        }
+      }
+      
       return {
         viewportCenter: {
           x: canvasX,
@@ -2511,6 +2538,7 @@ export default {
         },
         zoomLevel: zoomLevel.value,
         selectedShapeIds: selectedShapeIds.value,
+        selectedShape, // Single selected shape with all attributes
         shapes: shapes,
         lastCreatedShape: null, // TODO: Track last created shape if needed
         userId: user.value?.uid,

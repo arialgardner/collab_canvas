@@ -7,7 +7,7 @@
 
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {defineSecret} = require("firebase-functions/params");
-const {TEMPLATES} = require("./templates");
+const {TEMPLATES, generateNavigationBar} = require("./templates");
 
 // Define OpenAI API key as a Firebase secret
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
@@ -158,7 +158,7 @@ exports.parseAICommand = onCall(
 
         // Build prompt string
         const selectedShapes = JSON.stringify(
-            (canvasContext && canvasContext.selectedShapes) || [],
+            (canvasContext && canvasContext.selectedShapeIds) || [],
         );
         const viewportCenter = JSON.stringify(
             (canvasContext && canvasContext.viewportCenter) ||
@@ -175,7 +175,7 @@ Current context:
 - Viewport center (visible screen): ${viewportCenter}
 - Canvas size: 3000x3000
 - Available shape types: rectangle, circle, line, text
-- Available templates: loginForm, trafficLight, navigationBar, signupForm, dashboard
+- Available templates: loginForm, trafficLight, navigationBar, signupForm, dashboard, cardLayout
 
 User command: ${userInput}
 
@@ -194,10 +194,15 @@ Rules:
 - For "login form" → category: "complex", parameters: { "template": "loginForm" }
 - For "traffic light" → category: "complex", parameters: { "template": "trafficLight" }
 - For "nav bar" or "navigation" → category: "complex", parameters: { "template": "navigationBar" }
+- For "nav bar with X items" → category: "complex", parameters: { "template": "navigationBar", "itemCount": X }
 - For "signup form" or "register" → category: "complex", parameters: { "template": "signupForm" }
 - For "dashboard" → category: "complex", parameters: { "template": "dashboard" }
+- For "card layout" or "card" → category: "complex", parameters: { "template": "cardLayout" }
 - For creation: include shapeType, color (hex - grayscale only), size (width/height/radius), text
+- For creation with specific grid: "create a 3x3 grid of squares" → category: "creation", action: "create-multiple", parameters: { "shapeType": "rectangle", "gridRows": 3, "gridCols": 3 }
 - For manipulation: include property and value or delta
+- For manipulation on selected: "move selected to center" → category: "manipulation", parameters: { "moveTo": "center" } (requires selected shapes)
+- For relative sizing: "twice as big" → parameters: { "sizeMultiplier": 2.0 }, "50% larger" → parameters: { "sizePercent": 150 }, "half the size" → parameters: { "sizeMultiplier": 0.5 }
 - For layout: include arrangement type (horizontal/vertical/grid) and spacing
 - For selection: include criteria (type/color)
 - For deletion: include target (selected/all)
@@ -260,7 +265,17 @@ Respond with ONLY the JSON, no other text.
           parsed.parameters &&
           parsed.parameters.template) {
           const templateName = parsed.parameters.template;
-          if (TEMPLATES[templateName]) {
+
+          // Handle parameterized navigation bar
+          if (templateName === "navigationBar" &&
+              parsed.parameters.itemCount) {
+            const itemCount = Math.min(
+                Math.max(1, parsed.parameters.itemCount), 10);
+            parsed.parameters.templateData = generateNavigationBar(itemCount);
+            // console.log(
+            //     `✅ Using template: ${templateName} ` +
+            //     `with ${itemCount} items`);
+          } else if (TEMPLATES[templateName]) {
             parsed.parameters.templateData = TEMPLATES[templateName];
             // console.log(`✅ Using template: ${templateName}`);
           } else {

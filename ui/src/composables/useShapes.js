@@ -18,6 +18,20 @@ import { transform, applyTransformedOperation } from '../utils/operationalTransf
 import { useConflictDetection } from './useConflictDetection'
 import { usePrediction } from './usePrediction'
 
+// Shared state (singleton) - defined outside composable function
+// Store shapes in a reactive Map for O(1) lookups
+const shapes = reactive(new Map())
+const isLoading = ref(false)
+const error = ref(null)
+const isConnected = ref(true)
+const isSyncing = ref(false)
+const syncPaused = ref(false) // v5: Pause sync during bulk operations
+// Track local editing state and queued remote updates
+const currentlyEditing = reactive(new Set())
+const pendingRemoteUpdates = new Map()
+// Real-time listener management
+let realtimeUnsubscribe = null
+
 export const useShapes = () => {
   // Firestore integration
   const { saveShape, updateShape: updateShapeInFirestore, deleteShape: deleteShapeFromFirestore, loadShapes, subscribeToShapes } = useFirestore()
@@ -40,20 +54,6 @@ export const useShapes = () => {
     updateShapeMetrics 
   } = usePerformanceMonitoring()
   const { info, warning } = useNotifications()
-  
-  // Store shapes in a reactive Map for O(1) lookups
-  const shapes = reactive(new Map())
-  const isLoading = ref(false)
-  const error = ref(null)
-  const isConnected = ref(true)
-  const isSyncing = ref(false)
-  const syncPaused = ref(false) // v5: Pause sync during bulk operations
-  // Track local editing state and queued remote updates
-  const currentlyEditing = reactive(new Set())
-  const pendingRemoteUpdates = new Map()
-  
-  // Real-time listener management
-  let realtimeUnsubscribe = null
 
   // Create a new shape at specified position (backward compatible for rectangles)
   const createRectangle = async (x, y, userId = 'anonymous', canvasId = 'default') => {
