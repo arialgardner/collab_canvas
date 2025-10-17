@@ -41,75 +41,34 @@
         "operationLog": {
           ".read": "auth != null",
           "$operationId": {
-            ".write": "auth != null && 
-              !data.exists() && 
-              newData.child('userId').val() == auth.uid &&
-              newData.child('operationId').val() == $operationId",
-            ".validate": "
-              newData.hasChildren(['operationId', 'type', 'shapeId', 'userId', 'sequenceNumber', 'timestamp']) &&
-              (newData.child('type').val() == 'create' ||
-               newData.child('type').val() == 'update' ||
-               newData.child('type').val() == 'delete') &&
-              newData.child('shapeId').isString() &&
-              newData.child('shapeId').val().length <= 100 &&
-              newData.child('userId').val() == auth.uid &&
-              newData.child('sequenceNumber').isNumber() &&
-              newData.child('timestamp').val() <= now + 60000 &&
-              (!newData.child('delta').exists() || newData.child('delta').isString())
-            "
+            ".write": "auth != null"
           }
         },
         
         "ephemeralShapes": {
           ".read": "auth != null",
           "$shapeId": {
-            ".write": "auth != null && (
-              !data.exists() || 
-              data.child('lastModifiedBy').val() == auth.uid
-            )",
-            ".validate": "
-              newData.child('lastModified').val() <= now + 60000 &&
-              (!newData.child('lastModifiedBy').exists() || newData.child('lastModifiedBy').val() == auth.uid)
-            "
+            ".write": "auth != null"
           }
         },
         
         "activeEdits": {
           ".read": "auth != null",
           "$shapeId": {
-            ".write": "auth != null && (
-              !data.exists() || 
-              data.child('userId').val() == auth.uid ||
-              data.child('acquiredAt').val() < now - 30000
-            )",
-            ".validate": "
-              newData.hasChildren(['userId', 'acquiredAt']) &&
-              newData.child('userId').val() == auth.uid &&
-              newData.child('acquiredAt').isNumber() &&
-              newData.child('acquiredAt').val() <= now + 60000
-            "
+            ".write": "auth != null"
           }
         },
         
         "acks": {
           ".read": "auth != null",
           "$operationId": {
-            ".write": "auth != null",
-            ".validate": "
-              newData.hasChildren(['operationId', 'acknowledgedAt']) &&
-              newData.child('acknowledgedAt').val() <= now + 60000
-            "
+            ".write": "auth != null"
           }
         },
         
         "metadata": {
           ".read": "auth != null",
-          ".write": "auth != null",
-          ".validate": "
-            (!newData.child('createdAt').exists() || newData.child('createdAt').isNumber()) &&
-            (!newData.child('lastActivity').exists() || newData.child('lastActivity').isNumber()) &&
-            (!newData.child('activeUsers').exists() || newData.child('activeUsers').isNumber())
-          "
+          ".write": "auth != null"
         }
       }
     }
