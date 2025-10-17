@@ -12,22 +12,36 @@ const {TEMPLATES} = require("./templates");
 // Define OpenAI API key as a Firebase secret
 const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
-// Initialize model lazily (loaded on first use)
-let model = null;
-
-const getModel = () => {
-  if (!model) {
-    // Lazy require - only load when needed
-    const {ChatOpenAI} = require("@langchain/openai");
-    model = new ChatOpenAI({
-      modelName: "gpt-4-turbo",
+/**
+ * Call OpenAI API directly using fetch
+ */
+const callOpenAI = async (prompt, apiKey) => {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4-turbo",
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
       temperature: 0.1,
-      openAIApiKey: openaiApiKey.value(),
-      timeout: 10000,
-      maxRetries: 2,
-    });
+      max_tokens: 1000,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error?.message || "OpenAI API request failed");
   }
-  return model;
+
+  const data = await response.json();
+  return data.choices[0].message.content;
 };
 
 /**
@@ -39,7 +53,7 @@ exports.parseAICommand = onCall(
     {
     // Allow all origins for now (can be restricted later)
       cors: true,
-      memory: "512MiB", // Increased for LangChain
+      memory: "256MiB",
       timeoutSeconds: 60,
       minInstances: 0, // Cold start is OK
       maxInstances: 10,
@@ -75,39 +89,45 @@ exports.parseAICommand = onCall(
           `"${userInput}"`,
         );
 
-        // Create prompt template (lazy require)
-        const {PromptTemplate} = require("@langchain/core/prompts");
+        // Build prompt string
+        const selectedShapes = JSON.stringify(
+            (canvasContext && canvasContext.selectedShapes) || [],
+        );
+        const viewportCenter = JSON.stringify(
+            (canvasContext && canvasContext.viewportCenter) ||
+          {x: 500, y: 500},
+        );
 
         /* eslint-disable max-len */
-        const prompt = PromptTemplate.fromTemplate(`
+        const prompt = `
 You are an AI assistant for a collaborative canvas application.
 Parse the user's command into a structured JSON response.
 
 Current context:
-- Selected shapes: {selectedShapes}
-- Viewport center (visible screen): {viewportCenter}
+- Selected shapes: ${selectedShapes}
+- Viewport center (visible screen): ${viewportCenter}
 - Canvas size: 3000x3000
 - Available shape types: rectangle, circle, line, text
 - Available templates: loginForm, trafficLight, navigationBar, signupForm, dashboard
 
-User command: {userCommand}
+User command: ${userInput}
 
 Respond ONLY with valid JSON in this exact format:
-{{
+{
   "category": "creation|manipulation|layout|complex|selection|deletion|style|utility",
   "action": "brief description",
-  "parameters": {{
+  "parameters": {
     // Category-specific parameters
-  }}
-}}
+  }
+}
 
 Rules:
-- If no position specified, shapes will be placed at viewport center: {viewportCenter}
-- For "login form" → category: "complex", parameters: {{ "template": "loginForm" }}
-- For "traffic light" → category: "complex", parameters: {{ "template": "trafficLight" }}
-- For "nav bar" or "navigation" → category: "complex", parameters: {{ "template": "navigationBar" }}
-- For "signup form" or "register" → category: "complex", parameters: {{ "template": "signupForm" }}
-- For "dashboard" → category: "complex", parameters: {{ "template": "dashboard" }}
+- If no position specified, shapes will be placed at viewport center: ${viewportCenter}
+- For "login form" → category: "complex", parameters: { "template": "loginForm" }
+- For "traffic light" → category: "complex", parameters: { "template": "trafficLight" }
+- For "nav bar" or "navigation" → category: "complex", parameters: { "template": "navigationBar" }
+- For "signup form" or "register" → category: "complex", parameters: { "template": "signupForm" }
+- For "dashboard" → category: "complex", parameters: { "template": "dashboard" }
 - For creation: include shapeType, color (hex), size (width/height/radius), text
 - For manipulation: include property and value or delta
 - For layout: include arrangement type (horizontal/vertical/grid) and spacing
@@ -119,29 +139,17 @@ Rules:
 - Use reasonable defaults for unspecified properties
 
 Respond with ONLY the JSON, no other text.
-`);
+`;
         /* eslint-enable max-len */
 
-        const input = await prompt.format({
-          selectedShapes: JSON.stringify(
-              (canvasContext && canvasContext.selectedShapes) || [],
-          ),
-          viewportCenter: JSON.stringify(
-              (canvasContext && canvasContext.viewportCenter) ||
-          {x: 500, y: 500},
-          ),
-          userCommand: userInput,
-        });
-
-        // Call OpenAI
-        const aiModel = getModel();
-        const response = await aiModel.invoke(input);
+        // Call OpenAI API directly
+        const responseContent = await callOpenAI(prompt, openaiApiKey.value());
 
         // Parse JSON response
         let parsed;
         try {
         // Extract JSON from response (handle markdown code blocks if present)
-          let content = response.content;
+          let content = responseContent;
 
           // Remove markdown code blocks if present
           if (content.includes("```json")) {
@@ -154,7 +162,7 @@ Respond with ONLY the JSON, no other text.
 
           parsed = JSON.parse(content.trim());
         } catch (parseError) {
-          console.error("Failed to parse AI response:", response.content);
+          console.error("Failed to parse AI response:", responseContent);
           throw new HttpsError(
               "internal",
               "AI returned invalid response format",

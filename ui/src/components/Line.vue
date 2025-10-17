@@ -23,6 +23,10 @@ export default {
     isSelected: {
       type: Boolean,
       default: false
+    },
+    disableDrag: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['update', 'select'],
@@ -34,7 +38,7 @@ export default {
       stroke: props.line.stroke,
       strokeWidth: props.line.strokeWidth,
       rotation: props.line.rotation || 0,
-      draggable: true,
+      draggable: !props.disableDrag,
       // Line specific properties
       lineCap: 'round',
       lineJoin: 'round',

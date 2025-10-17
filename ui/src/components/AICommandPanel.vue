@@ -266,6 +266,7 @@ onUnmounted(() => {
   outline: none;
   transition: all 0.2s ease;
   background-color: #ffffff;
+  color: #000000; /* Ensure typed text is black */
 }
 
 .command-input:focus {

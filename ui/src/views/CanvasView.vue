@@ -60,6 +60,7 @@
               v-if="shape.type === 'rectangle'"
               :rectangle="shape"
               :is-selected="selectedShapeIds.includes(shape.id)"
+              :disable-drag="selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id)"
               @update="handleShapeUpdate"
               @select="handleShapeSelect"
             />
@@ -69,6 +70,7 @@
               v-if="shape.type === 'circle'"
               :circle="shape"
               :is-selected="selectedShapeIds.includes(shape.id)"
+              :disable-drag="selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id)"
               @update="handleShapeUpdate"
               @select="handleShapeSelect"
             />
@@ -78,6 +80,7 @@
               v-if="shape.type === 'line'"
               :line="shape"
               :is-selected="selectedShapeIds.includes(shape.id)"
+              :disable-drag="selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id)"
               @update="handleShapeUpdate"
               @select="handleShapeSelect"
             />
@@ -87,6 +90,7 @@
               v-if="shape.type === 'text'"
               :text="shape"
               :is-selected="selectedShapeIds.includes(shape.id)"
+              :disable-drag="selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id)"
               @update="handleShapeUpdate"
               @edit="handleTextEdit"
               @select="handleShapeSelect"
@@ -398,6 +402,8 @@ export default {
 
     const zoomLevel = ref(1)
     const isDragging = ref(false)
+    const isPanning = ref(false) // Separate panning state
+    const isSpacebarPressed = ref(false) // Track spacebar for pan mode
     const lastPointerPosition = reactive({ x: 0, y: 0 })
     const showVersionHistory = ref(false)
     const canRestoreVersions = computed(() => true) // owner-only checked via NavBar button visibility
@@ -436,6 +442,11 @@ export default {
       height: 0,
       visible: false
     })
+    
+    // Group dragging state
+    const isDraggingGroup = ref(false)
+    const groupDragStart = reactive({ x: 0, y: 0 })
+    const groupDragInitialPositions = ref(new Map())
 
     // Context menu state
     const contextMenuVisible = ref(false)
@@ -635,17 +646,42 @@ export default {
     const handleMouseDown = async (e) => {
       const clickedOnEmpty = e.target === stage.value.getNode()
       
+      // Get click position
+      const pointer = stage.value.getNode().getPointerPosition()
+      const stageAttrs = stage.value.getNode().attrs
+      
+      // Convert screen coordinates to canvas coordinates
+      const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
+      const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
+      
+      // Check if clicking on a selected shape to start group drag
+      if (!clickedOnEmpty && selectedShapeIds.value.length > 0 && activeTool.value === 'select') {
+        // Get the clicked shape ID
+        const clickedShapeId = e.target.id()
+        
+        // If clicking on a selected shape, start group drag
+        if (clickedShapeId && selectedShapeIds.value.includes(clickedShapeId)) {
+          isDraggingGroup.value = true
+          groupDragStart.x = canvasX
+          groupDragStart.y = canvasY
+          
+          // Store initial positions of all selected shapes
+          groupDragInitialPositions.value.clear()
+          selectedShapeIds.value.forEach(shapeId => {
+            const shape = shapes.get(shapeId)
+            if (shape) {
+              groupDragInitialPositions.value.set(shapeId, { x: shape.x, y: shape.y })
+            }
+          })
+          
+          canvasWrapper.value.style.cursor = 'grabbing'
+          return
+        }
+      }
+      
       if (clickedOnEmpty) {
         // Clear selection when clicking on empty canvas
         clearSelection()
-        
-        // Get click position relative to the stage (accounting for pan/zoom)
-        const pointer = stage.value.getNode().getPointerPosition()
-        const stageAttrs = stage.value.getNode().attrs
-        
-        // Convert screen coordinates to canvas coordinates
-        const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
-        const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
         
         const userId = user.value?.uid || 'anonymous'
         
@@ -681,50 +717,73 @@ export default {
           }
           return
         } else if (activeTool.value === 'select') {
-          // Check if Shift key is held for marquee selection
-          if (e.evt && e.evt.shiftKey) {
-            // Start marquee selection
+          // Check if Spacebar is held for panning, or middle mouse button
+          const isMiddleButton = e.evt && e.evt.button === 1
+          
+          if (isMiddleButton || isSpacebarPressed.value) {
+            // Start panning
+            isPanning.value = true
+            isDragging.value = true
+            lastPointerPosition.x = pointer.x
+            lastPointerPosition.y = pointer.y
+            canvasWrapper.value.style.cursor = 'grabbing'
+          } else {
+            // Start marquee selection by default when clicking empty canvas
             isSelecting.value = true
             selectionRect.x = canvasX
             selectionRect.y = canvasY
             selectionRect.width = 0
             selectionRect.height = 0
             selectionRect.visible = true
-          } else {
-            // Start panning
-            isDragging.value = true
-            lastPointerPosition.x = pointer.x
-            lastPointerPosition.y = pointer.y
-            canvasWrapper.value.style.cursor = 'grabbing'
           }
         }
       }
     }
 
     const handleMouseMove = (e) => {
+      const pointer = stage.value.getNode().getPointerPosition()
+      const stageAttrs = stage.value.getNode().attrs
+      const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
+      const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
+      
+      // Handle group dragging
+      if (isDraggingGroup.value) {
+        const deltaX = canvasX - groupDragStart.x
+        const deltaY = canvasY - groupDragStart.y
+        
+        const userId = user.value?.uid || 'anonymous'
+        
+        // Update all selected shapes with the delta
+        selectedShapeIds.value.forEach(shapeId => {
+          const initialPos = groupDragInitialPositions.value.get(shapeId)
+          if (initialPos) {
+            const newX = initialPos.x + deltaX
+            const newY = initialPos.y + deltaY
+            
+            // Update local state immediately (optimistic update)
+            updateShape(shapeId, { x: newX, y: newY }, userId, canvasId.value, false, false, userName.value)
+          }
+        })
+        return
+      }
+      
       // Handle marquee selection update
       if (isSelecting.value) {
-        const pointer = stage.value.getNode().getPointerPosition()
-        const stageAttrs = stage.value.getNode().attrs
-        const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
-        const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
-        
         // Update selection rectangle dimensions
         selectionRect.width = canvasX - selectionRect.x
         selectionRect.height = canvasY - selectionRect.y
         return
       }
       
-      if (!isDragging.value) {
+      if (!isPanning.value) {
         // Change cursor based on what's under the mouse
         if (e.target === stage.value.getNode()) {
-          canvasWrapper.value.style.cursor = 'grab'
+          canvasWrapper.value.style.cursor = 'default'
         }
         return
       }
 
       // Pan the stage
-      const pointer = stage.value.getNode().getPointerPosition()
       const deltaX = pointer.x - lastPointerPosition.x
       const deltaY = pointer.y - lastPointerPosition.y
 
@@ -789,7 +848,7 @@ export default {
       // Update cursor - add null check to prevent errors during mount
       if (canvasWrapper.value) {
         if (toolName === 'select') {
-          canvasWrapper.value.style.cursor = 'grab'
+          canvasWrapper.value.style.cursor = 'default'
         } else if (toolName === 'text') {
           canvasWrapper.value.style.cursor = 'text'
         } else {
@@ -1389,6 +1448,56 @@ export default {
     }
 
     const handleMouseUp = async (e) => {
+      // Handle group drag completion
+      if (isDraggingGroup.value) {
+        const pointer = stage.value.getNode().getPointerPosition()
+        const stageAttrs = stage.value.getNode().attrs
+        const canvasX = (pointer.x - stageAttrs.x) / stageAttrs.scaleX
+        const canvasY = (pointer.y - stageAttrs.y) / stageAttrs.scaleY
+        
+        const deltaX = canvasX - groupDragStart.x
+        const deltaY = canvasY - groupDragStart.y
+        
+        // Only save if there was actual movement (at least 1px)
+        if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
+          const userId = user.value?.uid || 'anonymous'
+          
+          // Begin grouped operation for undo/redo
+          beginGroup()
+          
+          // Save all shape positions to Firestore and track for undo
+          for (const shapeId of selectedShapeIds.value) {
+            const initialPos = groupDragInitialPositions.value.get(shapeId)
+            if (initialPos) {
+              const newX = initialPos.x + deltaX
+              const newY = initialPos.y + deltaY
+              
+              // Track for undo (old and new values)
+              addAction({
+                type: 'update',
+                data: {
+                  id: shapeId,
+                  oldValues: { x: initialPos.x, y: initialPos.y },
+                  newValues: { x: newX, y: newY }
+                }
+              })
+              
+              // Save final position to Firestore
+              await updateShape(shapeId, { x: newX, y: newY }, userId, canvasId.value, true, true, userName.value)
+            }
+          }
+          
+          // End grouped operation
+          endGroup()
+        }
+        
+        // Reset group drag state
+        isDraggingGroup.value = false
+        groupDragInitialPositions.value.clear()
+        canvasWrapper.value.style.cursor = 'default'
+        return
+      }
+      
       // Handle line creation completion
       if (isCreatingLine.value && lineStartPoint.value) {
         const pointer = stage.value.getNode().getPointerPosition()
@@ -1475,9 +1584,10 @@ export default {
       
       // Handle panning end
       isDragging.value = false
+      isPanning.value = false
       if (canvasWrapper.value) {
         if (activeTool.value === 'select') {
-          canvasWrapper.value.style.cursor = 'grab'
+          canvasWrapper.value.style.cursor = 'default'
         } else if (activeTool.value === 'text') {
           canvasWrapper.value.style.cursor = 'text'
         } else {
@@ -1611,6 +1721,40 @@ export default {
       }
     }
 
+    // Keyboard handler for spacebar panning
+    const handleSpacebarDown = (e) => {
+      // Check if spacebar is pressed (and not in a text input)
+      if (e.code === 'Space' && !e.repeat) {
+        const activeElement = document.activeElement
+        const isTyping = activeElement && (
+          activeElement.tagName === 'INPUT' ||
+          activeElement.tagName === 'TEXTAREA' ||
+          activeElement.isContentEditable
+        )
+        
+        if (!isTyping) {
+          e.preventDefault() // Prevent page scroll
+          isSpacebarPressed.value = true
+          
+          // Update cursor if hovering over canvas
+          if (canvasWrapper.value && activeTool.value === 'select') {
+            canvasWrapper.value.style.cursor = 'grab'
+          }
+        }
+      }
+    }
+    
+    const handleSpacebarUp = (e) => {
+      if (e.code === 'Space') {
+        isSpacebarPressed.value = false
+        
+        // Restore normal cursor
+        if (canvasWrapper.value && activeTool.value === 'select' && !isPanning.value) {
+          canvasWrapper.value.style.cursor = 'default'
+        }
+      }
+    }
+    
     // Keyboard handler for global shortcuts
     const handleKeyDown = async (e) => {
       // Detect platform (Mac uses Cmd, others use Ctrl)
@@ -1856,7 +2000,9 @@ export default {
       // Add resize listener
       window.addEventListener('resize', handleResize)
       
-      // Add keyboard listener
+      // Add keyboard listeners
+      window.addEventListener('keydown', handleSpacebarDown)
+      window.addEventListener('keyup', handleSpacebarUp)
       window.addEventListener('keydown', handleKeyDown)
 
       await updateHistoryFromRoute()
@@ -1872,7 +2018,7 @@ export default {
       
       // Set initial cursor - add null check
       if (canvasWrapper.value) {
-        canvasWrapper.value.style.cursor = 'grab'
+        canvasWrapper.value.style.cursor = 'default'
       }
       
       // Set up transformer event listeners
@@ -2023,6 +2169,8 @@ export default {
 
     onUnmounted(() => {
       window.removeEventListener('resize', handleResize)
+      window.removeEventListener('keydown', handleSpacebarDown)
+      window.removeEventListener('keyup', handleSpacebarUp)
       window.removeEventListener('keydown', handleKeyDown)
       
       // Clean up canvas subscription
@@ -2308,33 +2456,36 @@ export default {
       const canvasX = (centerScreenX - stagePosition.x) / zoomLevel.value
       const canvasY = (centerScreenY - stagePosition.y) / zoomLevel.value
       
-      // Get selected shapes info for AI context
-      const selectedShapesInfo = selectedShapeIds.value.map(id => {
-        const shape = shapes.get(id)
-        if (!shape) return null
-        return {
-          id: shape.id,
-          type: shape.type,
-          fill: shape.fill,
-          x: shape.x,
-          y: shape.y
-        }
-      }).filter(Boolean)
+      // Calculate viewport dimensions in canvas coordinates
+      const viewportWidth = stageSize.width / zoomLevel.value
+      const viewportHeight = stageSize.height / zoomLevel.value
+      
+      console.log('🎯 Viewport center calculated:', { 
+        screenCenter: { x: centerScreenX, y: centerScreenY },
+        stagePosition: { x: stagePosition.x, y: stagePosition.y },
+        zoomLevel: zoomLevel.value,
+        canvasCenter: { x: canvasX, y: canvasY },
+        viewportDimensions: { width: viewportWidth, height: viewportHeight }
+      })
       
       return {
-        selectedShapes: selectedShapesInfo,
         viewportCenter: {
           x: canvasX,
           y: canvasY
         },
-        canvasSize: {
-          width: CANVAS_SIZE,
-          height: CANVAS_SIZE
+        viewportWidth,
+        viewportHeight,
+        panOffset: {
+          x: stagePosition.x,
+          y: stagePosition.y
         },
+        zoomLevel: zoomLevel.value,
+        selectedShapeIds: selectedShapeIds.value,
+        shapes: shapes,
+        lastCreatedShape: null, // TODO: Track last created shape if needed
         userId: user.value?.uid,
         canvasId: canvasId.value,
-        userName: userName.value,
-        selectedShapeIds: selectedShapeIds.value
+        userName: userName.value
       }
     })
     

@@ -24,6 +24,10 @@ export default {
     isSelected: {
       type: Boolean,
       default: false
+    },
+    disableDrag: {
+      type: Boolean,
+      default: false
     }
   },
   emits: ['update', 'select', 'edit'],
@@ -41,7 +45,7 @@ export default {
       align: props.text.align,
       width: props.text.width || undefined,
       rotation: props.text.rotation || 0,
-      draggable: true,
+      draggable: !props.disableDrag,
       // Visual feedback for selection
       shadowBlur: props.isSelected ? 10 : 0,
       shadowColor: props.isSelected ? '#3b82f6' : 'transparent',

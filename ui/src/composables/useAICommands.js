@@ -157,8 +157,10 @@ export function useAICommands() {
    * { intent, parameters } → { category, action, parameters }
    */
   const mapIntentToCommand = (llm) => {
+    console.log('🔍 AI raw response (llm):', JSON.stringify(llm, null, 2))
     const intent = llm.intent
     const p = llm.parameters || {}
+    console.log('🔍 Intent:', intent, 'Parameters:', p)
 
     // Helpers
     const toPosition = () => {
@@ -171,14 +173,38 @@ export function useAICommands() {
     }
 
     const toSize = () => {
+      console.log('🔍 toSize() called with p.width:', p.width, 'p.height:', p.height, 'p.radius:', p.radius)
+      console.log('🔍 Type check - p.width type:', typeof p.width, 'p.height type:', typeof p.height, 'p.radius type:', typeof p.radius)
+      
       const size = {}
-      if (typeof p.width === 'number' || typeof p.height === 'number' || typeof p.radius === 'number') {
-        if (typeof p.width === 'number') size.width = p.width
-        if (typeof p.height === 'number') size.height = p.height
-        if (typeof p.radius === 'number') size.radius = p.radius
+      
+      // Try to parse string numbers as well
+      const parseNum = (val) => {
+        if (typeof val === 'number') return val
+        if (typeof val === 'string') {
+          const parsed = parseInt(val, 10)
+          if (!isNaN(parsed)) return parsed
+        }
+        return undefined
+      }
+      
+      const width = parseNum(p.width)
+      const height = parseNum(p.height)
+      const radius = parseNum(p.radius)
+      
+      if (width !== undefined || height !== undefined || radius !== undefined) {
+        if (width !== undefined) size.width = width
+        if (height !== undefined) size.height = height
+        if (radius !== undefined) size.radius = radius
+        console.log('🔍 toSize() returning:', size)
         return size
       }
-      if (p.size && (p.size.width || p.size.height || p.size.radius)) return p.size
+      
+      if (p.size && (p.size.width || p.size.height || p.size.radius)) {
+        console.log('🔍 toSize() returning p.size:', p.size)
+        return p.size
+      }
+      console.log('🔍 toSize() returning undefined')
       return undefined
     }
 

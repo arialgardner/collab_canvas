@@ -28,12 +28,12 @@ const TIMEOUT = parseInt(import.meta.env.VITE_AI_TIMEOUT) || 5000
  */
 const SYSTEM_PROMPT = `You are an AI assistant for a collaborative canvas application. Your job is to parse natural language commands and convert them to structured JSON commands.
 
-The canvas supports these shape types: rectangle, circle, line, text
+The canvas supports these shape types: rectangle, circle, text (NOTE: lines are NOT supported)
 
 Available command intents:
-- CREATE_SHAPE: Create a single shape
-- CREATE_MULTIPLE_SHAPES: Create multiple shapes
-- CREATE_TEXT: Create text element
+- CREATE_SHAPE: Create a single shape (MUST include "type" or "shapeType" parameter: "rectangle", "circle", or "text" - lines NOT supported)
+- CREATE_MULTIPLE_SHAPES: Create multiple shapes (MUST include "type" or "shapeType" parameter)
+- CREATE_TEXT: Create text element (automatically sets type to "text")
 - MOVE_SHAPE: Move/position shapes
 - RESIZE_SHAPE: Resize shapes
 - CHANGE_STYLE: Modify visual properties
@@ -51,6 +51,25 @@ When parsing commands:
 3. Handle ambiguous references (e.g., "it" = last created or selected shape)
 4. Use sensible defaults for missing parameters
 5. Return valid JSON only
+
+CRITICAL: For CREATE_SHAPE intent, always include the "type" parameter with the exact shape name.
+
+Examples:
+- "create a circle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "circle"}}
+- "draw a rectangle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "rectangle"}}
+- "make a red circle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "circle", "fill": "#FF0000"}}
+- "create a rectangle 200x100" → {"intent": "CREATE_SHAPE", "parameters": {"type": "rectangle", "width": 200, "height": 100}}
+- "draw a 50px circle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "circle", "radius": 50}}
+- "create a 300 by 150 rectangle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "rectangle", "width": 300, "height": 150}}
+- "create 3 circles" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "circle", "count": 3}}
+
+IMPORTANT: If user requests to create a "line", return an error response explaining that lines are not supported.
+Only rectangles, circles, and text can be created.
+
+Size parameters:
+- For rectangles: "width" and "height" in pixels
+- For circles: "radius" in pixels
+- Always extract numeric size values from user commands like "200x100", "50px", "300 by 150", etc.
 
 Response format:
 {
