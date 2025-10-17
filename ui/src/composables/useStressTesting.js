@@ -3,7 +3,7 @@ export const useStressTesting = () => {
   
   // Create multiple rectangles for load testing
   const createMultipleRectangles = async (count = 100, canvasId = 'default') => {
-    console.log(`🧪 Stress Test: Creating ${count} rectangles...`)
+    // console.log(`🧪 Stress Test: Creating ${count} rectangles...`)
     
     const startTime = Date.now()
     const promises = []
@@ -31,15 +31,15 @@ export const useStressTesting = () => {
     const rectangles = await Promise.all(promises)
     const duration = Date.now() - startTime
     
-    console.log(`✅ Created ${count} rectangles in ${duration}ms`)
-    console.log(`📊 Average: ${(duration / count).toFixed(2)}ms per rectangle`)
+    // console.log(`✅ Created ${count} rectangles in ${duration}ms`)
+    // console.log(`📊 Average: ${(duration / count).toFixed(2)}ms per rectangle`)
     
     return rectangles
   }
 
   // Simulate multiple users with cursor movement
   const simulateMultipleUsers = (userCount = 5, duration = 30000) => {
-    console.log(`👥 Simulating ${userCount} users for ${duration/1000}s...`)
+    // console.log(`👥 Simulating ${userCount} users for ${duration/1000}s...`)
     
     const intervals = []
     
@@ -61,7 +61,7 @@ export const useStressTesting = () => {
     // Clean up after duration
     setTimeout(() => {
       intervals.forEach(interval => clearInterval(interval))
-      console.log(`🛑 Stopped simulating ${userCount} users`)
+      // console.log(`🛑 Stopped simulating ${userCount} users`)
     }, duration)
     
     return intervals
@@ -69,7 +69,7 @@ export const useStressTesting = () => {
 
   // Rapid rectangle creation test
   const rapidCreationTest = async (count = 30, timeWindow = 10000) => {
-    console.log(`⚡ Rapid Creation Test: ${count} rectangles in ${timeWindow/1000}s`)
+    // console.log(`⚡ Rapid Creation Test: ${count} rectangles in ${timeWindow/1000}s`)
     
     const startTime = Date.now()
     const interval = timeWindow / count
@@ -78,7 +78,7 @@ export const useStressTesting = () => {
     const createNext = () => {
       if (created >= count) {
         const duration = Date.now() - startTime
-        console.log(`⚡ Rapid test complete: ${created} rectangles in ${duration}ms`)
+        // console.log(`⚡ Rapid test complete: ${created} rectangles in ${duration}ms`)
         return
       }
       
@@ -96,7 +96,7 @@ export const useStressTesting = () => {
 
   // Test drag performance with multiple rectangles
   const dragPerformanceTest = () => {
-    console.log(`🖱️ Drag Performance Test: Simulating rapid drags...`)
+    // console.log(`🖱️ Drag Performance Test: Simulating rapid drags...`)
     
     let dragCount = 0
     const startTime = Date.now()
@@ -104,8 +104,8 @@ export const useStressTesting = () => {
     const simulateDrag = () => {
       if (dragCount >= 100) {
         const duration = Date.now() - startTime
-        console.log(`🖱️ Drag test complete: ${dragCount} drags in ${duration}ms`)
-        console.log(`📊 Average: ${(duration / dragCount).toFixed(2)}ms per drag`)
+        // console.log(`🖱️ Drag test complete: ${dragCount} drags in ${duration}ms`)
+        // console.log(`📊 Average: ${(duration / dragCount).toFixed(2)}ms per drag`)
         return
       }
       
@@ -123,7 +123,7 @@ export const useStressTesting = () => {
 
   // Memory usage monitor
   const monitorMemory = (duration = 60000, interval = 5000) => {
-    console.log(`💾 Memory Monitor: Tracking for ${duration/1000}s...`)
+    // console.log(`💾 Memory Monitor: Tracking for ${duration/1000}s...`)
     
     const measurements = []
     
@@ -137,7 +137,7 @@ export const useStressTesting = () => {
         }
         
         measurements.push(memory)
-        console.log(`💾 Memory: ${memory.used}MB used / ${memory.total}MB total`)
+        // console.log(`💾 Memory: ${memory.used}MB used / ${memory.total}MB total`)
         
         // Warning if memory usage is high
         if (memory.used > memory.limit * 0.8) {
@@ -150,12 +150,12 @@ export const useStressTesting = () => {
     
     setTimeout(() => {
       clearInterval(monitorInterval)
-      console.log(`💾 Memory monitoring complete. Collected ${measurements.length} measurements.`)
+      // console.log(`💾 Memory monitoring complete. Collected ${measurements.length} measurements.`)
       
       if (measurements.length > 0) {
         const maxMemory = Math.max(...measurements.map(m => m.used))
         const avgMemory = measurements.reduce((sum, m) => sum + m.used, 0) / measurements.length
-        console.log(`💾 Peak memory: ${maxMemory}MB, Average: ${avgMemory.toFixed(1)}MB`)
+        // console.log(`💾 Peak memory: ${maxMemory}MB, Average: ${avgMemory.toFixed(1)}MB`)
       }
     }, duration)
     

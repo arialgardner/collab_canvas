@@ -49,7 +49,7 @@ export const usePresence = () => {
       await setDoc(docRef, presenceData)
       
       isOnline.value = true
-      console.log(`User ${userName} set online`)
+      // console.log(`User ${userName} set online`)
       
       // Start heartbeat to keep presence alive
       startHeartbeat(canvasId, userId)
@@ -76,7 +76,7 @@ export const usePresence = () => {
       await deleteDoc(docRef)
       
       isOnline.value = false
-      console.log(`User ${userId} set offline`)
+      // console.log(`User ${userId} set offline`)
       
     } catch (error) {
       console.error('Error setting user offline:', error)
@@ -125,7 +125,7 @@ export const usePresence = () => {
     
     for (const [userId, presence] of activeUsers.entries()) {
       if (presence.lastSeen && (now - presence.lastSeen > STALE_THRESHOLD)) {
-        console.log(`Removing stale presence for user: ${presence.userName || userId}`)
+        // console.log(`Removing stale presence for user: ${presence.userName || userId}`)
         activeUsers.delete(userId)
       }
     }
@@ -138,7 +138,7 @@ export const usePresence = () => {
     
     // Check for stale presence every 30 seconds
     cleanupInterval = setInterval(cleanupStalePresence, 30000)
-    console.log('Started periodic presence cleanup')
+    // console.log('Started periodic presence cleanup')
   }
 
   // Stop periodic cleanup
@@ -153,7 +153,7 @@ export const usePresence = () => {
   const subscribeToPresence = (canvasId = 'default', currentUserId) => {
     // If there's an existing subscription, unsubscribe first
     if (presenceUnsubscribe) {
-      console.log('Unsubscribing from previous presence subscription')
+      // console.log('Unsubscribing from previous presence subscription')
       presenceUnsubscribe()
       presenceUnsubscribe = null
       // Clear old users when switching canvases
@@ -185,17 +185,17 @@ export const usePresence = () => {
             // Only add users who are marked as online
             if (presence.online) {
               activeUsers.set(userId, presence)
-              console.log(`✅ User ${presence.userName} joined canvas ${canvasId} (total: ${activeUsers.size})`)
+              // console.log(`✅ User ${presence.userName} joined canvas ${canvasId} (total: ${activeUsers.size})`)
             } else {
               // User marked as offline, remove them
               activeUsers.delete(userId)
-              console.log(`⚠️ User ${presence.userName} marked offline, removing (total: ${activeUsers.size})`)
+              // console.log(`⚠️ User ${presence.userName} marked offline, removing (total: ${activeUsers.size})`)
             }
           }
           
           if (change.type === 'removed') {
             activeUsers.delete(userId)
-            console.log(`👋 User ${presenceData.userName || userId} left canvas ${canvasId} (total: ${activeUsers.size})`)
+            // console.log(`👋 User ${presenceData.userName || userId} left canvas ${canvasId} (total: ${activeUsers.size})`)
           }
         })
       })
@@ -203,7 +203,7 @@ export const usePresence = () => {
       // Start periodic cleanup of stale presence
       startPresenceCleanup()
       
-      console.log(`Presence subscription started for canvas: ${canvasId}`)
+      // console.log(`Presence subscription started for canvas: ${canvasId}`)
       return presenceUnsubscribe
       
     } catch (error) {
@@ -252,7 +252,7 @@ export const usePresence = () => {
     
     // Add the event listener
     window.addEventListener('beforeunload', beforeUnloadHandler)
-    console.log('Setup beforeunload handler for presence cleanup')
+    // console.log('Setup beforeunload handler for presence cleanup')
   }
 
   // Remove beforeunload handler
@@ -289,7 +289,7 @@ export const usePresence = () => {
     activeUsers.clear()
     isOnline.value = false
     
-    console.log('Presence tracking cleaned up')
+    // console.log('Presence tracking cleaned up')
   }
 
   // Auto-cleanup on component unmount

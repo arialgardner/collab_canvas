@@ -12,26 +12,6 @@
         <span class="tool-label">{{ tool.label }}</span>
       </button>
     </div>
-    <div class="toolbar-group">
-      <button
-        class="tool-button"
-        :disabled="!canUndo"
-        title="Undo"
-        @click="$emit('undo')"
-      >
-        <span class="tool-icon">↶</span>
-        <span class="tool-label">Undo</span>
-      </button>
-      <button
-        class="tool-button"
-        :disabled="!canRedo"
-        title="Redo"
-        @click="$emit('redo')"
-      >
-        <span class="tool-icon">↷</span>
-        <span class="tool-label">Redo</span>
-      </button>
-    </div>
   </div>
 </template>
 
@@ -40,16 +20,14 @@ import { ref } from 'vue'
 
 export default {
   name: 'Toolbar',
-  props: {
-    canUndo: { type: Boolean, default: false },
-    canRedo: { type: Boolean, default: false }
-  },
-  emits: ['tool-selected', 'undo', 'redo'],
+  props: {},
+  emits: ['tool-selected'],
   setup(props, { emit }) {
     const activeTool = ref('select')
     
     const tools = [
       { name: 'select', label: 'Select', icon: '↖' },
+      { name: 'pan', label: 'Pan', icon: '✋' },
       { name: 'rectangle', label: 'Rectangle', icon: '▭' },
       { name: 'circle', label: 'Circle', icon: '○' },
       { name: 'line', label: 'Line', icon: '╱' },

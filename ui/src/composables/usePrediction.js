@@ -71,7 +71,7 @@ export function usePrediction() {
       checkPredictionTimeout(predictionId)
     }, PREDICTION_TIMEOUT)
 
-    console.log(`[Prediction] Created prediction ${predictionId} for shape ${shapeId}`)
+    // console.log(`[Prediction] Created prediction ${predictionId} for shape ${shapeId}`)
     
     return predictionId
   }
@@ -98,7 +98,7 @@ export function usePrediction() {
       predictions.delete(predictionId)
     }, 1000)
 
-    console.log(`[Prediction] Confirmed prediction ${predictionId}`)
+    // console.log(`[Prediction] Confirmed prediction ${predictionId}`)
   }
 
   /**
@@ -224,7 +224,7 @@ export function usePrediction() {
    */
   function clearPredictions() {
     predictions.clear()
-    console.log('[Prediction] Cleared all predictions')
+    // console.log('[Prediction] Cleared all predictions')
   }
 
   /**
@@ -235,7 +235,7 @@ export function usePrediction() {
     predictionStats.confirmed = 0
     predictionStats.rolledBack = 0
     predictionStats.accuracy = 100
-    console.log('[Prediction] Reset statistics')
+    // console.log('[Prediction] Reset statistics')
   }
 
   /**
@@ -244,7 +244,7 @@ export function usePrediction() {
    */
   function setEnabled(enabled) {
     isEnabled.value = enabled
-    console.log(`[Prediction] ${enabled ? 'Enabled' : 'Disabled'}`)
+    // console.log(`[Prediction] ${enabled ? 'Enabled' : 'Disabled'}`)
   }
 
   /**

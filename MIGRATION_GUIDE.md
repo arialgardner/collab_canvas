@@ -500,14 +500,14 @@ npm run validate:operations
 **Diagnosis**:
 ```javascript
 // Check throttle settings
-console.log('Cursor throttle:', CURSOR_THROTTLE)
+// console.log('Cursor throttle:', CURSOR_THROTTLE)
 // Should be 16ms for active, 50ms for idle
 
 // Check connection state
-console.log('Realtime DB connected:', connectionState)
+// console.log('Realtime DB connected:', connectionState)
 
 // Check network
-console.log('Network latency:', measureLatency())
+// console.log('Network latency:', measureLatency())
 ```
 
 **Solutions**:

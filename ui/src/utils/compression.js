@@ -20,7 +20,7 @@ export const compressShapes = (shapes) => {
     const compressedSize = new Blob([compressed]).size
     const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1)
     
-    console.log(`📦 Compressed ${shapes.length} shapes: ${originalSize} → ${compressedSize} bytes (${ratio}% reduction)`)
+    // console.log(`📦 Compressed ${shapes.length} shapes: ${originalSize} → ${compressedSize} bytes (${ratio}% reduction)`)
     
     return compressed
   } catch (error) {
@@ -52,7 +52,7 @@ export const decompressShapes = (compressed) => {
       throw new Error('Decompressed data is not an array')
     }
     
-    console.log(`📦 Decompressed ${shapes.length} shapes`)
+    // console.log(`📦 Decompressed ${shapes.length} shapes`)
     
     return shapes
   } catch (error) {

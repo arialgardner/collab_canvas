@@ -222,7 +222,7 @@ onMounted(() => {
   // Add keyboard listener
   window.addEventListener('keydown', handleKeyDown)
   
-  console.log('💡 Performance Monitor loaded - Press Shift+P to toggle')
+  // console.log('💡 Performance Monitor loaded - Press Shift+P to toggle')
 })
 
 onUnmounted(() => {

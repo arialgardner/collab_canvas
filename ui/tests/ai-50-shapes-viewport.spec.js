@@ -66,7 +66,7 @@ test.describe('AI 50 Shapes in Viewport', () => {
       }
     })
 
-    console.log('Initial viewport:', viewportSize)
+    // console.log('Initial viewport:', viewportSize)
 
     // Use AI to create 50 shapes
     const aiInput = page.locator('[data-testid="ai-command-input"]')
@@ -147,7 +147,7 @@ test.describe('AI 50 Shapes in Viewport', () => {
       }
     })
 
-    console.log('Shapes analysis:', shapesAnalysis)
+    // console.log('Shapes analysis:', shapesAnalysis)
 
     // Verify 50 circles were created
     expect(shapesAnalysis.totalCircles).toBe(50)
@@ -207,7 +207,7 @@ test.describe('AI 50 Shapes in Viewport', () => {
       }
     })
 
-    console.log('Layout analysis:', layoutAnalysis)
+    // console.log('Layout analysis:', layoutAnalysis)
 
     // Verify 50 rectangles were created
     expect(layoutAnalysis.totalRectangles).toBe(50)

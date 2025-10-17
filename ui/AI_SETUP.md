@@ -66,7 +66,7 @@ This will install the OpenAI SDK (`openai@^4.20.0`) along with other dependencie
    
    // Parse a command
    const result = await aiService.parseNaturalLanguageCommand('draw a circle', context)
-   console.log('Result:', result)
+   // console.log('Result:', result)
    ```
 
 ### Manual Test Commands

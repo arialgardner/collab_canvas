@@ -28,7 +28,7 @@ export function useInactivityLogout(canvasId = 'default') {
     const inactiveTime = now - lastActivityTime.value
     
     if (inactiveTime >= INACTIVITY_TIMEOUT) {
-      console.log('⏰ User inactive for 10 minutes - logging out')
+      // console.log('⏰ User inactive for 10 minutes - logging out')
       await handleAutoLogout()
     }
   }
@@ -39,7 +39,7 @@ export function useInactivityLogout(canvasId = 'default') {
       const userId = user.value?.uid
       
       if (userId) {
-        console.log('🔐 Auto-logout: Cleaning up presence and cursor')
+        // console.log('🔐 Auto-logout: Cleaning up presence and cursor')
         
         // Clean up presence and cursor before signing out
         // This ensures other users see the user go offline
@@ -74,7 +74,7 @@ export function useInactivityLogout(canvasId = 'default') {
   
   // Start tracking inactivity
   const startTracking = () => {
-    console.log('👀 Started inactivity tracking (10 minute timeout)')
+    // console.log('👀 Started inactivity tracking (10 minute timeout)')
     
     // Add event listeners for user activity
     activityEvents.forEach(event => {
@@ -90,7 +90,7 @@ export function useInactivityLogout(canvasId = 'default') {
   
   // Stop tracking inactivity
   const stopTracking = () => {
-    console.log('🛑 Stopped inactivity tracking')
+    // console.log('🛑 Stopped inactivity tracking')
     
     // Remove event listeners
     activityEvents.forEach(event => {

@@ -14,7 +14,8 @@
               @input="handleCanvasSizeChange('width', $event)"
               min="100"
               max="10000"
-              class="property-input"
+              readonly
+              class="property-input readonly-arrows"
             />
           </div>
           <div class="property-input-group">
@@ -25,7 +26,8 @@
               @input="handleCanvasSizeChange('height', $event)"
               min="100"
               max="10000"
-              class="property-input"
+              readonly
+              class="property-input readonly-arrows"
             />
           </div>
         </div>
@@ -61,7 +63,8 @@
                 @input="handlePropertyChange('x', parseFloat($event.target.value))"
                 min="0"
                 :max="canvasWidth"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
             <div class="property-input-group">
@@ -72,7 +75,8 @@
                 @input="handlePropertyChange('y', parseFloat($event.target.value))"
                 min="0"
                 :max="canvasHeight"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
           </div>
@@ -88,7 +92,8 @@
                 :value="Math.round(selectedShapes[0].width)"
                 @input="handlePropertyChange('width', parseFloat($event.target.value))"
                 min="10"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
             <div class="property-input-group">
@@ -98,7 +103,8 @@
                 :value="Math.round(selectedShapes[0].height)"
                 @input="handlePropertyChange('height', parseFloat($event.target.value))"
                 min="10"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
           </div>
@@ -157,7 +163,8 @@
                 @input="handlePropertyChange('x', parseFloat($event.target.value))"
                 min="0"
                 :max="canvasWidth"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
             <div class="property-input-group">
@@ -168,7 +175,8 @@
                 @input="handlePropertyChange('y', parseFloat($event.target.value))"
                 min="0"
                 :max="canvasHeight"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
           </div>
@@ -181,7 +189,8 @@
             :value="Math.round(selectedShapes[0].radius)"
             @input="handlePropertyChange('radius', parseFloat($event.target.value))"
             min="5"
-            class="property-input"
+            readonly
+            class="property-input readonly-arrows"
           />
           <span class="property-unit">px</span>
         </div>
@@ -200,35 +209,6 @@
               <button v-for="c in mruFill" :key="'text-fill-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyFill(c)"></button>
             </div>
           </div>
-        </div>
-
-        <div class="property-group">
-          <label class="property-label">Stroke Color</label>
-          <div class="property-row" style="grid-template-columns: 1fr; gap: 8px;">
-            <input
-              type="color"
-              :value="selectedShapes[0].stroke || '#000000'"
-              @input="onStrokeInput($event.target.value)"
-              @change="onStrokeChange($event.target.value)"
-              class="property-color"
-            />
-            <div class="mru-row" v-if="mruStroke.length">
-              <button v-for="c in mruStroke" :key="'circle-stroke-'+c" class="mru-swatch" :style="{ backgroundColor: c }" :title="c" @click="applyStroke(c)"></button>
-            </div>
-          </div>
-        </div>
-
-        <div class="property-group">
-          <label class="property-label">Stroke Width</label>
-          <input
-            type="number"
-            :value="selectedShapes[0].strokeWidth || 0"
-            @input="handlePropertyChange('strokeWidth', parseFloat($event.target.value))"
-            min="0"
-            max="20"
-            class="property-input"
-          />
-          <span class="property-unit">px</span>
         </div>
 
         <div class="property-group">
@@ -255,7 +235,8 @@
                 @input="handleLinePointChange(0, parseFloat($event.target.value))"
                 min="0"
                 :max="canvasWidth"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
             <div class="property-input-group">
@@ -266,7 +247,8 @@
                 @input="handleLinePointChange(1, parseFloat($event.target.value))"
                 min="0"
                 :max="canvasHeight"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
           </div>
@@ -283,7 +265,8 @@
                 @input="handleLinePointChange(2, parseFloat($event.target.value))"
                 min="0"
                 :max="canvasWidth"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
             <div class="property-input-group">
@@ -294,7 +277,8 @@
                 @input="handleLinePointChange(3, parseFloat($event.target.value))"
                 min="0"
                 :max="canvasHeight"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
           </div>
@@ -322,11 +306,26 @@
             type="number"
             :value="selectedShapes[0].strokeWidth"
             @input="handlePropertyChange('strokeWidth', parseFloat($event.target.value))"
+            @keydown="preventTyping"
             min="1"
             max="10"
-            class="property-input"
+            step="1"
+            class="property-input readonly-arrows"
           />
           <span class="property-unit">px</span>
+        </div>
+
+        <div class="property-group">
+          <label class="property-label">Rotation</label>
+          <input
+            type="number"
+            :value="Math.round(selectedShapes[0].rotation || 0)"
+            @input="handlePropertyChange('rotation', parseFloat($event.target.value) % 360)"
+            min="0"
+            max="360"
+            class="property-input"
+          />
+          <span class="property-unit">degrees</span>
         </div>
 
         <div class="property-group">
@@ -353,7 +352,8 @@
                 @input="handlePropertyChange('x', parseFloat($event.target.value))"
                 min="0"
                 :max="canvasWidth"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
             <div class="property-input-group">
@@ -364,7 +364,8 @@
                 @input="handlePropertyChange('y', parseFloat($event.target.value))"
                 min="0"
                 :max="canvasHeight"
-                class="property-input"
+                readonly
+                class="property-input readonly-arrows"
               />
             </div>
           </div>
@@ -502,7 +503,8 @@
             :value="Math.round(selectedShapes[0].width)"
             @input="handlePropertyChange('width', parseFloat($event.target.value) || null)"
             min="20"
-            class="property-input"
+            readonly
+            class="property-input readonly-arrows"
           />
           <span class="property-unit">px</span>
         </div>
@@ -566,16 +568,17 @@
         <span v-if="!isValueConsistent('stroke')" class="mixed-label">Mixed</span>
       </div>
 
-      <div v-if="hasCommonProperty('strokeWidth')" class="property-group">
+      <div v-if="hasCommonProperty('strokeWidth') && areAllLines" class="property-group">
         <label class="property-label">Stroke Width</label>
         <input
           type="number"
           :value="getCommonValue('strokeWidth')"
           @input="handleBulkPropertyChange('strokeWidth', parseFloat($event.target.value))"
-          :class="{ mixed: !isValueConsistent('strokeWidth') }"
-          min="0"
-          max="20"
-          class="property-input"
+          @keydown="preventTyping"
+          :class="{ 'property-input': true, 'readonly-arrows': true, mixed: !isValueConsistent('strokeWidth') }"
+          min="1"
+          max="10"
+          step="1"
         />
         <span class="property-unit">px</span>
         <span v-if="!isValueConsistent('strokeWidth')" class="mixed-label">Mixed</span>
@@ -710,6 +713,10 @@ const uniqueShapeTypes = computed(() => {
   return types.map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(', ');
 });
 
+const areAllLines = computed(() => {
+  return props.selectedShapes.length > 0 && props.selectedShapes.every(s => s.type === 'line');
+});
+
 // Debounce timers
 let debounceTimer = null;
 let mruDebounceTimer = null;
@@ -779,6 +786,18 @@ const handleBulkPropertyChange = (property, value) => {
       value
     });
   }, 300);
+};
+
+const preventTyping = (event) => {
+  // Allow: arrow keys, tab, backspace, delete
+  const allowedKeys = ['ArrowUp', 'ArrowDown', 'Tab', 'Backspace', 'Delete'];
+  
+  if (allowedKeys.includes(event.key)) {
+    return; // Allow these keys
+  }
+  
+  // Prevent all other keys (typing numbers, letters, etc.)
+  event.preventDefault();
 };
 </script>
 
@@ -879,6 +898,12 @@ const handleBulkPropertyChange = (property, value) => {
 .property-input.readonly {
   background: #f3f4f6;
   cursor: not-allowed;
+  color: #000000;
+}
+
+.property-input.readonly-arrows {
+  background: #f9fafb;
+  cursor: default;
   color: #000000;
 }
 

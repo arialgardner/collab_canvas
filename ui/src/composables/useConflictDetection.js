@@ -134,7 +134,7 @@ export function useConflictDetection() {
       conflictStats.delete++
     }
     
-    console.log(`[ConflictDetection] Detected ${conflict.conflictType} conflict on shape ${conflict.localOp.shapeId}`)
+    // console.log(`[ConflictDetection] Detected ${conflict.conflictType} conflict on shape ${conflict.localOp.shapeId}`)
   }
 
   /**
@@ -176,7 +176,7 @@ export function useConflictDetection() {
     conflictStats.property = 0
     conflictStats.delete = 0
     conflictStats.resolved = 0
-    console.log('[ConflictDetection] Reset')
+    // console.log('[ConflictDetection] Reset')
   }
 
   /**
@@ -185,7 +185,7 @@ export function useConflictDetection() {
    */
   function setEnabled(enabled) {
     isEnabled.value = enabled
-    console.log(`[ConflictDetection] ${enabled ? 'Enabled' : 'Disabled'}`)
+    // console.log(`[ConflictDetection] ${enabled ? 'Enabled' : 'Disabled'}`)
   }
 
   return {

@@ -116,7 +116,7 @@ export function parseOperationId(operationId) {
  */
 export function resetSequenceNumber() {
   localStorage.setItem('sequenceNumber', '0')
-  console.log('[SequenceNumbers] Reset to 0')
+  // console.log('[SequenceNumbers] Reset to 0')
 }
 
 /**

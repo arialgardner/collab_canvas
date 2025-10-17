@@ -626,7 +626,7 @@ onSnapshot(shapesRef, (snapshot) => {
         }
       } else {
         // Local is newer - ignore (shouldn't happen often)
-        console.log('Ignoring older remote update', remoteShape.id)
+        // console.log('Ignoring older remote update', remoteShape.id)
       }
     }
   })
@@ -637,7 +637,7 @@ onSnapshot(shapesRef, (snapshot) => {
 
 ```javascript
 async function reconcileCanvasState(canvasId) {
-  console.log('🔄 Starting state reconciliation...')
+  // console.log('🔄 Starting state reconciliation...')
   
   // 1. Fetch authoritative state from Firestore
   const firestoreShapes = await loadShapesFromFirestore(canvasId)
@@ -681,7 +681,7 @@ async function reconcileCanvasState(canvasId) {
   const totalChanges = added + removed + updated
   
   if (totalChanges > 0) {
-    console.log(`✅ Reconciliation: +${added} -${removed} ~${updated}`)
+    // console.log(`✅ Reconciliation: +${added} -${removed} ~${updated}`)
     
     // Notify user if significant
     if (totalChanges >= 5) {

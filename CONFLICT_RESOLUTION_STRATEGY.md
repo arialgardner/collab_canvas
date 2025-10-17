@@ -604,10 +604,10 @@ if (shape.lastModifiedBy !== currentUserId) {
 
 ```javascript
 if (hasConflict(opA, opB)) {
-  console.log(`[Conflict] ${getConflictType(opA, opB)} on shape ${opA.shapeId}`)
-  console.log(`- User A: ${opA.userId}`)
-  console.log(`- User B: ${opB.userId}`)
-  console.log(`- Resolution: ${getResolutionStrategy(opA, opB)}`)
+  // console.log(`[Conflict] ${getConflictType(opA, opB)} on shape ${opA.shapeId}`)
+  // console.log(`- User A: ${opA.userId}`)
+  // console.log(`- User B: ${opB.userId}`)
+  // console.log(`- Resolution: ${getResolutionStrategy(opA, opB)}`)
 }
 ```
 

@@ -179,13 +179,13 @@ export const useErrorHandling = () => {
       isOnline.value = true
       clearErrorsByType(ERROR_TYPES.NETWORK)
       addError('Connection restored', ERROR_TYPES.NETWORK, 2000, false)
-      console.log('🟢 Connection restored')
+      // console.log('🟢 Connection restored')
     }
     
     const handleOffline = () => {
       isOnline.value = false
       addError('Connection lost. Some features may not work.', ERROR_TYPES.NETWORK, 0, false)
-      console.log('🔴 Connection lost')
+      // console.log('🔴 Connection lost')
     }
     
     window.addEventListener('online', handleOnline)

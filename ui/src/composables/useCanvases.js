@@ -247,7 +247,7 @@ export function useCanvases() {
   // Grant access from shared link
   const grantAccessFromLink = async (canvasId, userId) => {
     try {
-      console.log(`🔗 Granting editor access to user ${userId} for canvas ${canvasId}`)
+      // console.log(`🔗 Granting editor access to user ${userId} for canvas ${canvasId}`)
       await updatePermissions(canvasId, userId, 'editor')
       
       // Reload canvas to get updated permissions

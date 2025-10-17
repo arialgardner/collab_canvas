@@ -191,7 +191,7 @@ test.describe('Viewport Culling - New Shapes Visibility Bug', () => {
     const canvas = page.locator('canvas').first()
     
     // Create 101 rectangles in a grid pattern
-    console.log('Creating 101 rectangles to test viewport culling...')
+    // console.log('Creating 101 rectangles to test viewport culling...')
     for (let i = 0; i < 101; i++) {
       const x = 100 + (i % 10) * 150
       const y = 100 + Math.floor(i / 10) * 150
@@ -200,11 +200,11 @@ test.describe('Viewport Culling - New Shapes Visibility Bug', () => {
       // Speed up creation (don't wait as long)
       if (i % 10 === 0) {
         await page.waitForTimeout(500)
-        console.log(`Created ${i + 1} rectangles...`)
+        // console.log(`Created ${i + 1} rectangles...`)
       }
     }
     
-    console.log('All 101 rectangles created')
+    // console.log('All 101 rectangles created')
     
     // Wait for all shapes to sync
     await page.waitForTimeout(2000)

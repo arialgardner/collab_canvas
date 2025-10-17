@@ -481,7 +481,7 @@ export class AdaptiveQuality {
   }
   
   degradeQuality() {
-    console.log('[AdaptiveQuality] Degrading to low quality')
+    // console.log('[AdaptiveQuality] Degrading to low quality')
     this.qualityLevel = 'low'
     
     // Reduce cursor update rate
@@ -493,7 +493,7 @@ export class AdaptiveQuality {
   }
   
   improveQuality() {
-    console.log('[AdaptiveQuality] Improving to high quality')
+    // console.log('[AdaptiveQuality] Improving to high quality')
     this.qualityLevel = 'high'
     
     cursorThrottle = 16
@@ -589,7 +589,7 @@ export function setupCleanup(component) {
   
   // Cleanup on unmount
   onBeforeUnmount(() => {
-    console.log(`[Cleanup] Running ${cleanupTasks.length} cleanup tasks`)
+    // console.log(`[Cleanup] Running ${cleanupTasks.length} cleanup tasks`)
     
     for (const task of cleanupTasks) {
       try {

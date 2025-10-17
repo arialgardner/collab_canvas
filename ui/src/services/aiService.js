@@ -87,10 +87,12 @@ If you cannot parse the command with >70% confidence, return:
 }
 
 Important positioning rules:
-- If no position specified: use viewport center (default)
+- Shapes should be positioned within the current viewport (visible screen area)
+- If no position specified: shapes will be placed within the viewport bounds
 - "at center" or "in the center": use viewport center
 - "at X,Y" coordinates: use exact position
-- Viewport center will be provided in context
+- Viewport center and bounds will be provided in context
+- Ensure shapes fit within the viewport dimensions considering their size
 
 Color handling:
 - Support color names (red, blue, green, etc.)
@@ -116,12 +118,26 @@ Always return pure JSON with no markdown formatting or explanations outside the 
  * Build user prompt with command and context
  */
 const buildUserPrompt = (commandText, context) => {
-  const { viewportCenter, selectedShapeIds = [], lastCreatedShape, totalShapes = 0 } = context
+  const { 
+    viewportCenter, 
+    viewportWidth = 1920,
+    viewportHeight = 1080,
+    viewportBounds,
+    selectedShapeIds = [], 
+    lastCreatedShape, 
+    totalShapes = 0 
+  } = context
+
+  const boundsStr = viewportBounds 
+    ? `left: ${Math.round(viewportBounds.left)}, right: ${Math.round(viewportBounds.right)}, top: ${Math.round(viewportBounds.top)}, bottom: ${Math.round(viewportBounds.bottom)}`
+    : 'not available'
 
   return `Command: "${commandText}"
 
 Current Context:
-- Viewport center: (${viewportCenter?.x || 0}, ${viewportCenter?.y || 0})
+- Viewport center: (${Math.round(viewportCenter?.x || 0)}, ${Math.round(viewportCenter?.y || 0)})
+- Viewport size: ${Math.round(viewportWidth)}x${Math.round(viewportHeight)} pixels
+- Viewport bounds: ${boundsStr}
 - Selected shapes: ${selectedShapeIds.length} shape(s) selected
 - Last created shape: ${lastCreatedShape ? `${lastCreatedShape.type} (ID: ${lastCreatedShape.id})` : 'none'}
 - Total shapes on canvas: ${totalShapes}

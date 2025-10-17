@@ -12,7 +12,7 @@ export function useNetworkResilience() {
 
   // Update online status
   const handleOnline = () => {
-    console.log('📡 Network connection restored')
+    // console.log('📡 Network connection restored')
     isOnline.value = true
     connectionQuality.value = 'good'
     retryFailedOperations()
@@ -28,7 +28,7 @@ export function useNetworkResilience() {
   const retryFailedOperations = async () => {
     if (failedOperations.value.length === 0) return
     
-    console.log(`🔄 Retrying ${failedOperations.value.length} failed operations...`)
+    // console.log(`🔄 Retrying ${failedOperations.value.length} failed operations...`)
     
     const operations = [...failedOperations.value]
     failedOperations.value = []
@@ -36,7 +36,7 @@ export function useNetworkResilience() {
     for (const operation of operations) {
       try {
         await operation.fn()
-        console.log('✅ Retry successful:', operation.name)
+        // console.log('✅ Retry successful:', operation.name)
       } catch (error) {
         console.error('❌ Retry failed:', operation.name, error)
         // Re-add to failed queue if still failing
@@ -48,7 +48,7 @@ export function useNetworkResilience() {
   // Add operation to retry queue
   const queueFailedOperation = (name, fn) => {
     failedOperations.value.push({ name, fn, timestamp: Date.now() })
-    console.log(`➕ Queued failed operation: ${name}`)
+    // console.log(`➕ Queued failed operation: ${name}`)
   }
 
   // Track sync start
@@ -102,7 +102,7 @@ export function useNetworkResilience() {
         
         if (attempt < maxRetries) {
           const delay = baseDelay * Math.pow(2, attempt - 1)
-          console.log(`⏳ Waiting ${delay}ms before retry...`)
+          // console.log(`⏳ Waiting ${delay}ms before retry...`)
           await new Promise(resolve => setTimeout(resolve, delay))
         }
       }
@@ -154,7 +154,7 @@ export function useNetworkResilience() {
     // Check connection quality every 5 seconds
     connectionCheckInterval = setInterval(checkConnectionQuality, 5000)
     
-    console.log('🌐 Network resilience initialized')
+    // console.log('🌐 Network resilience initialized')
   })
 
   // Cleanup

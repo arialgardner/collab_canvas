@@ -140,7 +140,7 @@ export const useCursorsRTDB = () => {
   const subscribeToCursors = (canvasId = 'default', currentUserId) => {
     // If there's an existing subscription, unsubscribe first
     if (cursorUnsubscribe) {
-      console.log('Unsubscribing from previous cursor subscription (RTDB)')
+      // console.log('Unsubscribing from previous cursor subscription (RTDB)')
       cursorUnsubscribe()
       cursorUnsubscribe = null
       cursors.clear()
@@ -214,7 +214,7 @@ export const useCursorsRTDB = () => {
       // Set up periodic cleanup of stale cursors
       const cleanupInterval = setInterval(cleanupStaleCursors, 10000) // Every 10 seconds
       
-      console.log(`Cursor subscription started (RTDB) for canvas: ${canvasId}`)
+      // console.log(`Cursor subscription started (RTDB) for canvas: ${canvasId}`)
       
       // Return wrapped unsubscribe
       return () => {
@@ -247,7 +247,7 @@ export const useCursorsRTDB = () => {
       // Clean up disconnect handler
       disconnectHandlers.delete(userId)
       
-      console.log(`Cursor removed (RTDB) for user: ${userId}`)
+      // console.log(`Cursor removed (RTDB) for user: ${userId}`)
     } catch (error) {
       console.error('Error removing cursor (RTDB):', error)
       rtdbMonitoring.recordError('cursor-remove', error)
@@ -261,7 +261,7 @@ export const useCursorsRTDB = () => {
     
     for (const [userId, cursor] of cursors.entries()) {
       if (cursor.timestamp && (now - cursor.timestamp > STALE_THRESHOLD)) {
-        console.log(`Removing stale cursor (RTDB) for user: ${userId}`)
+        // console.log(`Removing stale cursor (RTDB) for user: ${userId}`)
         cursors.delete(userId)
         interpolator.removeCursor(userId)
       }
@@ -300,7 +300,7 @@ export const useCursorsRTDB = () => {
     interpolator.clear()
     disconnectHandlers.clear()
     
-    console.log('Cursor tracking cleaned up (RTDB)')
+    // console.log('Cursor tracking cleaned up (RTDB)')
   }
 
   // Convert screen coordinates to canvas coordinates

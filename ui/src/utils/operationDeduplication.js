@@ -27,7 +27,7 @@ class OperationCache {
     
     if (this.cache.has(opId)) {
       this.hits++
-      console.log(`🔄 Skipped duplicate operation: ${opId}`)
+      // console.log(`🔄 Skipped duplicate operation: ${opId}`)
       return true
     }
     

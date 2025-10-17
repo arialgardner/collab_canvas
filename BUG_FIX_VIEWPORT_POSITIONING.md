@@ -50,12 +50,12 @@ const aiContext = computed(() => {
   const canvasX = (centerScreenX - stagePosition.x) / zoomLevel.value
   const canvasY = (centerScreenY - stagePosition.y) / zoomLevel.value
   
-  console.log('🎯 Viewport center calculated:', { 
-    screenCenter: { x: centerScreenX, y: centerScreenY },
-    stagePosition: { x: stagePosition.x, y: stagePosition.y },
-    zoomLevel: zoomLevel.value,
-    canvasCenter: { x: canvasX, y: canvasY }
-  })
+  // console.log('🎯 Viewport center calculated:', { 
+//     screenCenter: { x: centerScreenX, y: centerScreenY },
+//     stagePosition: { x: stagePosition.x, y: stagePosition.y },
+//     zoomLevel: zoomLevel.value,
+//     canvasCenter: { x: canvasX, y: canvasY }
+//   })
   
   return {
     viewportCenter: {

@@ -5,7 +5,7 @@ export const useBugFixes = () => {
   
   // Fix 1: Rectangle Sync Issues
   const fixRectangleSync = () => {
-    console.log('🔧 Applying Rectangle Sync Fixes...')
+    // console.log('🔧 Applying Rectangle Sync Fixes...')
     
     // Check for duplicate rectangles
     const rectangleElements = document.querySelectorAll('[data-testid="rectangle"]')
@@ -26,18 +26,18 @@ export const useBugFixes = () => {
       return { issue: 'duplicates', count: duplicates.length }
     }
     
-    console.log('✅ No rectangle sync issues detected')
+    // console.log('✅ No rectangle sync issues detected')
     return { issue: null }
   }
 
   // Fix 2: Cursor Cleanup
   const fixCursorCleanup = () => {
-    console.log('🔧 Cleaning up stale cursors...')
+    // console.log('🔧 Cleaning up stale cursors...')
     
     // This would call the actual cleanup function from useCursors
     if (window.cleanupStaleCursors) {
       window.cleanupStaleCursors()
-      console.log('✅ Cursor cleanup completed')
+      // console.log('✅ Cursor cleanup completed')
       return { fixed: true }
     }
     
@@ -47,7 +47,7 @@ export const useBugFixes = () => {
 
   // Fix 3: Performance Issues
   const fixPerformanceIssues = () => {
-    console.log('🔧 Optimizing performance...')
+    // console.log('🔧 Optimizing performance...')
     
     const fixes = []
     
@@ -78,7 +78,7 @@ export const useBugFixes = () => {
 
   // Fix 4: Presence Issues
   const fixPresenceIssues = () => {
-    console.log('🔧 Fixing presence issues...')
+    // console.log('🔧 Fixing presence issues...')
     
     // Check presence list accuracy
     const presenceElements = document.querySelectorAll('[data-testid="presence-user"]')
@@ -92,13 +92,13 @@ export const useBugFixes = () => {
       return { issue: 'mismatch', presenceCount: presenceElements.length, cursorCount: cursorElements.length }
     }
     
-    console.log('✅ Presence system appears healthy')
+    // console.log('✅ Presence system appears healthy')
     return { issue: null }
   }
 
   // Fix 5: Connection Issues
   const fixConnectionIssues = () => {
-    console.log('🔧 Diagnosing connection issues...')
+    // console.log('🔧 Diagnosing connection issues...')
     
     const diagnostics = {
       online: navigator.onLine,
@@ -126,7 +126,7 @@ export const useBugFixes = () => {
 
   // Comprehensive Health Check
   const runHealthCheck = () => {
-    console.log('🏥 Running Comprehensive Health Check...')
+    // console.log('🏥 Running Comprehensive Health Check...')
     
     const results = {
       rectangleSync: fixRectangleSync(),
@@ -144,14 +144,14 @@ export const useBugFixes = () => {
       results.connection.issues.length
     ].reduce((a, b) => a + b, 0)
     
-    console.log('📊 Health Check Results:')
-    console.log(`Total Issues Found: ${totalIssues}`)
-    console.log('Detailed Results:', results)
+    // console.log('📊 Health Check Results:')
+    // console.log(`Total Issues Found: ${totalIssues}`)
+    // console.log('Detailed Results:', results)
     
     if (totalIssues === 0) {
-      console.log('✅ System appears healthy!')
+      // console.log('✅ System appears healthy!')
     } else {
-      console.log('⚠️ Issues detected. Review the detailed results above.')
+      // console.log('⚠️ Issues detected. Review the detailed results above.')
     }
     
     return results
@@ -159,7 +159,7 @@ export const useBugFixes = () => {
 
   // Auto-fix common issues
   const autoFix = () => {
-    console.log('🤖 Running Auto-Fix...')
+    // console.log('🤖 Running Auto-Fix...')
     
     const fixes = []
     
@@ -178,7 +178,7 @@ export const useBugFixes = () => {
     // Clear console (optional)
     if (fixes.length > 0) {
       console.clear()
-      console.log('🤖 Auto-fix completed:', fixes)
+      // console.log('🤖 Auto-fix completed:', fixes)
     }
     
     return { fixes, count: fixes.length }
@@ -186,7 +186,7 @@ export const useBugFixes = () => {
 
   // Performance monitoring
   const startPerformanceMonitoring = (duration = 60000) => {
-    console.log(`📊 Starting performance monitoring for ${duration/1000}s...`)
+    // console.log(`📊 Starting performance monitoring for ${duration/1000}s...`)
     
     const startTime = Date.now()
     const measurements = []
@@ -200,21 +200,21 @@ export const useBugFixes = () => {
       }
       
       measurements.push(measurement)
-      console.log('📊 Measurement:', measurement)
+      // console.log('📊 Measurement:', measurement)
     }
     
     const interval = setInterval(measure, 5000) // Every 5 seconds
     
     setTimeout(() => {
       clearInterval(interval)
-      console.log('📊 Performance monitoring complete')
-      console.log('📈 Summary:', {
-        duration: duration / 1000,
-        measurements: measurements.length,
-        avgRectangles: measurements.reduce((sum, m) => sum + m.rectangles, 0) / measurements.length,
-        avgCursors: measurements.reduce((sum, m) => sum + m.cursors, 0) / measurements.length,
-        peakMemory: Math.max(...measurements.filter(m => m.memory).map(m => m.memory))
-      })
+      // console.log('📊 Performance monitoring complete')
+      // console.log('📈 Summary:', {
+      //   duration: duration / 1000,
+      //   measurements: measurements.length,
+      //   avgRectangles: measurements.reduce((sum, m) => sum + m.rectangles, 0) / measurements.length,
+      //   avgCursors: measurements.reduce((sum, m) => sum + m.cursors, 0) / measurements.length,
+      //   peakMemory: Math.max(...measurements.filter(m => m.memory).map(m => m.memory))
+      // })
     }, duration)
     
     // Initial measurement
@@ -242,21 +242,21 @@ export const useBugFixes = () => {
 if (typeof window !== 'undefined') {
   window.bugFixes = useBugFixes()
   
-  console.log(`
-🔧 Bug Fix Utilities Available:
+  // console.log(`
+// 🔧 Bug Fix Utilities Available:
 
-// Individual Fixes:
-window.bugFixes.fixRectangleSync()
-window.bugFixes.fixCursorCleanup()
-window.bugFixes.fixPerformanceIssues()
-window.bugFixes.fixPresenceIssues()
-window.bugFixes.fixConnectionIssues()
+// // Individual Fixes:
+// window.bugFixes.fixRectangleSync()
+// window.bugFixes.fixCursorCleanup()
+// window.bugFixes.fixPerformanceIssues()
+// window.bugFixes.fixPresenceIssues()
+// window.bugFixes.fixConnectionIssues()
 
-// Comprehensive Tools:
-window.bugFixes.runHealthCheck()
-window.bugFixes.autoFix()
-window.bugFixes.startPerformanceMonitoring(60000)
+// // Comprehensive Tools:
+// window.bugFixes.runHealthCheck()
+// window.bugFixes.autoFix()
+// window.bugFixes.startPerformanceMonitoring(60000)
 
-Use these in the browser console to diagnose and fix issues!
-  `)
+// Use these in the browser console to diagnose and fix issues!
+//   `)
 }

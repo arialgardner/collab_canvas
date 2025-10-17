@@ -262,7 +262,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2d2d2d 0%, #000000 100%);
   padding: 20px;
   overflow: hidden;
 }
@@ -325,7 +325,7 @@ export default {
 }
 
 .auth-toggle button.active {
-  background: #667eea;
+  background: linear-gradient(135deg, #2d2d2d 0%, #000000 100%);
   color: white;
 }
 
@@ -376,7 +376,7 @@ export default {
 
 .form-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #2d2d2d;
 }
 
 .form-input:disabled {
@@ -417,12 +417,12 @@ export default {
 }
 
 .auth-button.primary {
-  background: #667eea;
+  background: linear-gradient(135deg, #2d2d2d 0%, #000000 100%);
   color: white;
 }
 
 .auth-button.primary:hover:not(:disabled) {
-  background: #5a67d8;
+  background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
 }
 
 .auth-button.google {

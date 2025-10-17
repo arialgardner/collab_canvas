@@ -29,6 +29,8 @@ export function useAICommands() {
   const gatherContext = (canvasState) => {
     const {
       viewportCenter = { x: 1500, y: 1500 },
+      viewportWidth = 1920,
+      viewportHeight = 1080,
       panOffset = { x: 0, y: 0 },
       zoomLevel = 1,
       selectedShapeIds = [],
@@ -36,8 +38,19 @@ export function useAICommands() {
       lastCreatedShape = null
     } = canvasState
 
+    // Calculate viewport bounds in canvas coordinates
+    const viewportBounds = {
+      left: viewportCenter.x - viewportWidth / 2,
+      right: viewportCenter.x + viewportWidth / 2,
+      top: viewportCenter.y - viewportHeight / 2,
+      bottom: viewportCenter.y + viewportHeight / 2
+    }
+
     return {
       viewportCenter,
+      viewportWidth,
+      viewportHeight,
+      viewportBounds,
       panOffset,
       zoomLevel,
       selectedShapeIds,

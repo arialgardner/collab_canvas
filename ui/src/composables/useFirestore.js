@@ -100,7 +100,7 @@ export const useFirestore = () => {
       if (id) {
         const { markCompleted } = useOperationQueue()
         await markCompleted(id)
-        console.log(`✅ Operation ${id} completed and removed from queue`)
+        // console.log(`✅ Operation ${id} completed and removed from queue`)
       }
       
       return true
@@ -125,7 +125,7 @@ export const useFirestore = () => {
     
     // Check for duplicates (v3)
     if (isDuplicateOperation(shape.id, Date.now(), shape.createdBy, 'create')) {
-      console.log(`Skipping duplicate create for shape ${shape.id}`)
+      // console.log(`Skipping duplicate create for shape ${shape.id}`)
       return true
     }
     
@@ -141,7 +141,7 @@ export const useFirestore = () => {
       }
       await bridgeEnqueue(op, priority)
       
-      console.log(`Shape ${shape.id} (${shape.type}) queued for save (${priority} priority)`)
+      // console.log(`Shape ${shape.id} (${shape.type}) queued for save (${priority} priority)`)
       return true
     }
     
@@ -158,7 +158,7 @@ export const useFirestore = () => {
       const docRef = getShapeDocRef(canvasId, shape.id)
       await setDoc(docRef, shapeData)
       
-      console.log(`Shape ${shape.id} (${shape.type}) saved to Firestore`)
+      // console.log(`Shape ${shape.id} (${shape.type}) saved to Firestore`)
       return true
     }
 
@@ -191,7 +191,7 @@ export const useFirestore = () => {
     
     // Check for duplicates (v3)
     if (isDuplicateOperation(shapeId, Date.now(), userId, 'update')) {
-      console.log(`Skipping duplicate update for shape ${shapeId}`)
+      // console.log(`Skipping duplicate update for shape ${shapeId}`)
       return true
     }
     
@@ -207,7 +207,7 @@ export const useFirestore = () => {
       }
       await bridgeEnqueue(op, actualPriority)
       
-      console.log(`Shape ${shapeId} update queued (${actualPriority} priority, final: ${isFinal})`)
+      // console.log(`Shape ${shapeId} update queued (${actualPriority} priority, final: ${isFinal})`)
       return true
     }
     
@@ -223,7 +223,7 @@ export const useFirestore = () => {
         lastModifiedBy: userId
       })
       
-      console.log(`Shape ${shapeId} updated in Firestore`)
+      // console.log(`Shape ${shapeId} updated in Firestore`)
       return true
     } catch (error) {
       console.error('Error updating shape:', error)
@@ -242,7 +242,7 @@ export const useFirestore = () => {
       const docRef = getShapeDocRef(canvasId, shapeId)
       await deleteDoc(docRef)
       
-      console.log(`Shape ${shapeId} deleted from Firestore`)
+      // console.log(`Shape ${shapeId} deleted from Firestore`)
       return true
     } catch (error) {
       console.error('Error deleting shape:', error)
@@ -265,7 +265,7 @@ export const useFirestore = () => {
         lastModifiedBy: userId
       })
       
-      console.log(`Shape ${shapeId} position updated in Firestore`)
+      // console.log(`Shape ${shapeId} position updated in Firestore`)
       return true
     } catch (error) {
       console.error('Error updating shape position:', error)
@@ -300,7 +300,7 @@ export const useFirestore = () => {
         })
       })
       
-      console.log(`Loaded ${shapes.length} shapes from Firestore`)
+      // console.log(`Loaded ${shapes.length} shapes from Firestore`)
       return shapes
     } catch (error) {
       console.error('Error loading shapes:', error)
@@ -334,7 +334,7 @@ export const useFirestore = () => {
         trackFirestoreListener('remove')  // v3 tracking
       })
       
-      console.log(`Subscribed to shape changes for canvas: ${canvasId}`)
+      // console.log(`Subscribed to shape changes for canvas: ${canvasId}`)
       
       // Return wrapped unsubscribe that tracks listener removal
       return () => {
@@ -361,7 +361,7 @@ export const useFirestore = () => {
       // Try to read a small collection to test connection
       const testRef = getCanvasShapesRef('default')
       await getDocs(testRef)
-      console.log('Firestore connection successful')
+      // console.log('Firestore connection successful')
       return true
     } catch (error) {
       console.error('Firestore connection failed:', error)
@@ -374,7 +374,7 @@ export const useFirestore = () => {
     const { onProgress } = options
     
     try {
-      console.log(`📦 Starting batch save of ${shapes.length} shapes`)
+      // console.log(`📦 Starting batch save of ${shapes.length} shapes`)
       trackFirestoreOpV3('batch_write')
       
       // Split into 500-operation chunks (Firestore batch limit)
@@ -383,7 +383,7 @@ export const useFirestore = () => {
         chunks.push(shapes.slice(i, i + 500))
       }
       
-      console.log(`Split into ${chunks.length} batches`)
+      // console.log(`Split into ${chunks.length} batches`)
       
       // Execute batches in parallel
       let processedCount = 0
@@ -408,10 +408,10 @@ export const useFirestore = () => {
           onProgress(processedCount, shapes.length)
         }
         
-        console.log(`✅ Batch ${chunkIndex + 1}/${chunks.length} committed (${chunk.length} shapes)`)
+        // console.log(`✅ Batch ${chunkIndex + 1}/${chunks.length} committed (${chunk.length} shapes)`)
       }))
       
-      console.log(`✅ Batch save complete: ${shapes.length} shapes saved`)
+      // console.log(`✅ Batch save complete: ${shapes.length} shapes saved`)
       return true
     } catch (error) {
       console.error('Error in batch save:', error)
@@ -425,7 +425,7 @@ export const useFirestore = () => {
     const { onProgress } = options
     
     try {
-      console.log(`🗑️ Starting batch delete of ${shapeIds.length} shapes`)
+      // console.log(`🗑️ Starting batch delete of ${shapeIds.length} shapes`)
       trackFirestoreOpV3('batch_delete')
       
       // Split into 500-operation chunks (Firestore batch limit)
@@ -434,7 +434,7 @@ export const useFirestore = () => {
         chunks.push(shapeIds.slice(i, i + 500))
       }
       
-      console.log(`Split into ${chunks.length} batches`)
+      // console.log(`Split into ${chunks.length} batches`)
       
       // Execute batches in parallel
       let processedCount = 0
@@ -454,13 +454,58 @@ export const useFirestore = () => {
           onProgress(processedCount, shapeIds.length)
         }
         
-        console.log(`✅ Delete batch ${chunkIndex + 1}/${chunks.length} committed (${chunk.length} shapes)`)
+        // console.log(`✅ Delete batch ${chunkIndex + 1}/${chunks.length} committed (${chunk.length} shapes)`)
       }))
       
-      console.log(`✅ Batch delete complete: ${shapeIds.length} shapes deleted`)
+      // console.log(`✅ Batch delete complete: ${shapeIds.length} shapes deleted`)
       return true
     } catch (error) {
       console.error('Error in batch delete:', error)
+      trackFirestoreError()
+      throw error
+    }
+  }
+
+  // Batch update operations for bulk shape updates
+  const updateShapesBatch = async (canvasId, shapeUpdates, options = {}) => {
+    const { onProgress } = options
+    
+    try {
+      // shapeUpdates is an array of { id, updates } objects
+      trackFirestoreOpV3('batch_update')
+      
+      // Split into 500-operation chunks (Firestore batch limit)
+      const chunks = []
+      for (let i = 0; i < shapeUpdates.length; i += 500) {
+        chunks.push(shapeUpdates.slice(i, i + 500))
+      }
+      
+      // Execute batches in parallel
+      let processedCount = 0
+      await Promise.all(chunks.map(async (chunk, chunkIndex) => {
+        const batch = writeBatch(db)
+        
+        chunk.forEach(({ id, updates }) => {
+          const ref = getShapeDocRef(canvasId, id)
+          const updateData = {
+            ...updates,
+            lastModified: serverTimestamp()
+          }
+          batch.update(ref, updateData)
+        })
+        
+        await batch.commit()
+        processedCount += chunk.length
+        
+        // Report progress if callback provided
+        if (onProgress) {
+          onProgress(processedCount, shapeUpdates.length)
+        }
+      }))
+      
+      return true
+    } catch (error) {
+      console.error('Error in batch update:', error)
       trackFirestoreError()
       throw error
     }
@@ -480,7 +525,7 @@ export const useFirestore = () => {
       // Import compression utility dynamically to avoid circular dependency
       const { compressShapes, canFitInSnapshot } = await import('../utils/compression.js')
       
-      console.log(`📸 Creating snapshot for ${shapes.length} shapes`)
+      // console.log(`📸 Creating snapshot for ${shapes.length} shapes`)
       
       // Check if shapes will fit within Firestore 1MB limit
       if (!canFitInSnapshot(shapes)) {
@@ -502,7 +547,7 @@ export const useFirestore = () => {
       
       await setDoc(snapshotRef, snapshotData)
       
-      console.log(`✅ Snapshot created successfully (${shapes.length} shapes)`)
+      // console.log(`✅ Snapshot created successfully (${shapes.length} shapes)`)
       trackFirestoreOpV3('snapshot_write')
       
       return true
@@ -524,13 +569,13 @@ export const useFirestore = () => {
       // Import compression utility dynamically
       const { decompressShapes } = await import('../utils/compression.js')
       
-      console.log(`📸 Loading snapshot for canvas ${canvasId}`)
+      // console.log(`📸 Loading snapshot for canvas ${canvasId}`)
       
       const snapshotRef = doc(db, 'canvases', canvasId, 'snapshot')
       const snapshotDoc = await getDoc(snapshotRef)
       
       if (!snapshotDoc.exists()) {
-        console.log('No snapshot found for canvas')
+        // console.log('No snapshot found for canvas')
         return null
       }
       
@@ -545,7 +590,7 @@ export const useFirestore = () => {
       // Decompress shapes
       const shapes = decompressShapes(data.shapes)
       
-      console.log(`✅ Snapshot loaded successfully (${shapes.length} shapes)`)
+      // console.log(`✅ Snapshot loaded successfully (${shapes.length} shapes)`)
       trackFirestoreOpV3('snapshot_read')
       
       return shapes
@@ -568,6 +613,7 @@ export const useFirestore = () => {
     
     // Batch operations (v5)
     saveShapesBatch,
+    updateShapesBatch,
     deleteShapesBatch,
     
     // Snapshot operations (v5)

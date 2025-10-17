@@ -123,7 +123,7 @@ test.describe('AI Command - Circle Creation Bug', () => {
     await page.waitForTimeout(3000)
 
     // Log captured messages for debugging
-    console.log('Captured logs:', logs)
+    // console.log('Captured logs:', logs)
   })
 })
 

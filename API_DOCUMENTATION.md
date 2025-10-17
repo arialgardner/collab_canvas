@@ -207,7 +207,7 @@ Fetches canvas metadata.
 **Example:**
 ```javascript
 const canvas = await getCanvas('canvas-123')
-console.log(canvas.name, canvas.permissions)
+// console.log(canvas.name, canvas.permissions)
 ```
 
 #### `updateCanvas(canvasId, updates)`

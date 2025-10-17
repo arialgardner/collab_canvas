@@ -51,8 +51,8 @@ test.describe('Auth Card Size and Layout', () => {
     expect(signupWidth).toBe(loginWidth);
     expect(signupWidth).toBe(signupWidth2);
 
-    console.log(`Signup height: ${signupHeight}px, Login height: ${loginHeight}px`);
-    console.log(`Height difference: ${Math.abs(signupHeight - loginHeight)}px`);
+    // console.log(`Signup height: ${signupHeight}px, Login height: ${loginHeight}px`);
+    // console.log(`Height difference: ${Math.abs(signupHeight - loginHeight)}px`);
   });
 
   test('display name field should not exist in login mode', async ({ page }) => {

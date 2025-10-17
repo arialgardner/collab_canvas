@@ -55,8 +55,8 @@ const toSize = () => {
 **After:**
 ```javascript
 const toSize = () => {
-  console.log('🔍 toSize() called with p.width:', p.width, 'p.height:', p.height, 'p.radius:', p.radius)
-  console.log('🔍 Type check - p.width type:', typeof p.width, 'p.height type:', typeof p.height, 'p.radius type:', typeof p.radius)
+  // console.log('🔍 toSize() called with p.width:', p.width, 'p.height:', p.height, 'p.radius:', p.radius)
+  // console.log('🔍 Type check - p.width type:', typeof p.width, 'p.height type:', typeof p.height, 'p.radius type:', typeof p.radius)
   
   const size = {}
   
@@ -78,15 +78,15 @@ const toSize = () => {
     if (width !== undefined) size.width = width
     if (height !== undefined) size.height = height
     if (radius !== undefined) size.radius = radius
-    console.log('🔍 toSize() returning:', size)
+    // console.log('🔍 toSize() returning:', size)
     return size
   }
   
   if (p.size && (p.size.width || p.size.height || p.size.radius)) {
-    console.log('🔍 toSize() returning p.size:', p.size)
+    // console.log('🔍 toSize() returning p.size:', p.size)
     return p.size
   }
-  console.log('🔍 toSize() returning undefined')
+  // console.log('🔍 toSize() returning undefined')
   return undefined
 }
 ```
@@ -97,22 +97,22 @@ Added detailed logging in `executeCreation()` to trace size application:
 
 ```javascript
 // Add size properties
-console.log('🔍 Size parameter:', size)
+// console.log('🔍 Size parameter:', size)
 if (size) {
   if (size.width !== undefined) {
     properties.width = size.width
-    console.log('🔍 Setting width:', size.width)
+    // console.log('🔍 Setting width:', size.width)
   }
   if (size.height !== undefined) {
     properties.height = size.height
-    console.log('🔍 Setting height:', size.height)
+    // console.log('🔍 Setting height:', size.height)
   }
   if (size.radius !== undefined) {
     properties.radius = size.radius
-    console.log('🔍 Setting radius:', size.radius)
+    // console.log('🔍 Setting radius:', size.radius)
   }
 }
-console.log('🔍 Final properties:', properties)
+// console.log('🔍 Final properties:', properties)
 ```
 
 ## AI Prompt Enhancement

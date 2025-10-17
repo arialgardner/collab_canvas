@@ -1,24 +1,24 @@
 // Simple test script to verify error handling
 // Run this in the browser console to test error handling
 
-console.log('🧪 Testing Error Handling System...')
+// console.log('🧪 Testing Error Handling System...')
 
 // Import error handling (this would work in the actual app context)
 // For testing, we'll simulate the errors
 
 const testErrorHandling = () => {
-  console.log('1. Testing network error simulation...')
+  // console.log('1. Testing network error simulation...')
   
   // Simulate going offline
   window.dispatchEvent(new Event('offline'))
   
   setTimeout(() => {
-    console.log('2. Testing online restoration...')
+    // console.log('2. Testing online restoration...')
     // Simulate coming back online
     window.dispatchEvent(new Event('online'))
   }, 3000)
   
-  console.log('3. Testing Firebase error simulation...')
+  // console.log('3. Testing Firebase error simulation...')
   
   // Simulate a Firebase error
   const mockFirebaseError = {
@@ -26,9 +26,9 @@ const testErrorHandling = () => {
     message: 'Missing or insufficient permissions.'
   }
   
-  console.log('Mock Firebase Error:', mockFirebaseError)
+  // console.log('Mock Firebase Error:', mockFirebaseError)
   
-  console.log('4. Testing auth error simulation...')
+  // console.log('4. Testing auth error simulation...')
   
   // Simulate an auth error
   const mockAuthError = {
@@ -36,13 +36,13 @@ const testErrorHandling = () => {
     message: 'The password is invalid or the user does not have a password.'
   }
   
-  console.log('Mock Auth Error:', mockAuthError)
+  // console.log('Mock Auth Error:', mockAuthError)
   
-  console.log('✅ Error handling tests completed. Check the UI for error notifications!')
+  // console.log('✅ Error handling tests completed. Check the UI for error notifications!')
 }
 
 // Instructions for manual testing
-console.log(`
+// console.log(`
 🎯 Manual Error Handling Tests:
 
 1. **Network Errors:**

@@ -6,7 +6,6 @@
  */
 
 import { useShapes } from './useShapes'
-import { useUndoRedo } from './useUndoRedo'
 import { useNotifications } from './useNotifications'
 
 export function useCommandExecutor() {
@@ -22,7 +21,6 @@ export function useCommandExecutor() {
     duplicateShapes,
   } = useShapes()
 
-  const { beginGroup, endGroup } = useUndoRedo()
   const { info, error: notifyError } = useNotifications()
 
   /**
@@ -34,20 +32,18 @@ export function useCommandExecutor() {
    */
   const executeCommand = async (command, context) => {
     const { category, action, parameters } = command
-    const { userId, canvasId, userName, viewportCenter, selectedShapeIds } = context
+    const { userId, canvasId, userName, viewportCenter, viewportBounds, selectedShapeIds } = context
 
     try {
-      beginGroup() // Group all actions for undo/redo
-
       let result = null
 
       switch (category) {
         case 'creation':
           if (action === 'create-multiple') {
-            result = await executeCreateMultiple(parameters, userId, canvasId, userName, viewportCenter, context)
+            result = await executeCreateMultiple(parameters, userId, canvasId, userName, viewportCenter, viewportBounds, context)
             info(`Created ${parameters.count || 0} ${parameters.shapeType || 'shapes'}`)
           } else {
-            result = await executeCreation(parameters, userId, canvasId, userName, viewportCenter)
+            result = await executeCreation(parameters, userId, canvasId, userName, viewportCenter, viewportBounds)
             info(`Created ${parameters.shapeType || 'shape'}`)
           }
           break
@@ -63,7 +59,7 @@ export function useCommandExecutor() {
           break
 
         case 'complex':
-          result = await executeComplex(parameters, userId, canvasId, userName, viewportCenter)
+          result = await executeComplex(parameters, userId, canvasId, userName, viewportCenter, viewportBounds)
           info(`Created ${parameters.template || 'layout'}`)
           break
 
@@ -91,10 +87,8 @@ export function useCommandExecutor() {
           throw new Error(`Unknown command category: ${category}`)
       }
 
-      endGroup()
       return { success: true, ...result }
     } catch (err) {
-      endGroup() // End group even on error to clean up
       console.error('Command execution failed:', err)
       notifyError(err.message || 'Failed to execute command')
       throw err
@@ -102,9 +96,43 @@ export function useCommandExecutor() {
   }
 
   /**
+   * Calculate random position within viewport bounds
+   */
+  const getViewportPosition = (viewportCenter, viewportBounds, shapeSize = { width: 100, height: 100 }) => {
+    // If no viewport bounds provided, use center
+    if (!viewportBounds) {
+      console.log('⚠️ No viewport bounds, using center')
+      return { x: viewportCenter.x, y: viewportCenter.y }
+    }
+
+    console.log('🎯 Calculating position within bounds:', { viewportBounds, shapeSize })
+
+    // Add padding to keep shapes fully visible (20px margin in canvas coordinates)
+    const padding = 20
+    const minX = viewportBounds.left + padding + (shapeSize.width / 2)
+    const maxX = viewportBounds.right - padding - (shapeSize.width / 2)
+    const minY = viewportBounds.top + padding + (shapeSize.height / 2)
+    const maxY = viewportBounds.bottom - padding - (shapeSize.height / 2)
+
+    // If shape is too large for viewport, center it
+    if (minX >= maxX || minY >= maxY) {
+      console.log('⚠️ Shape too large for viewport, centering')
+      return { x: viewportCenter.x, y: viewportCenter.y }
+    }
+
+    // Generate random position within bounds
+    const x = minX + Math.random() * (maxX - minX)
+    const y = minY + Math.random() * (maxY - minY)
+
+    const result = { x: Math.round(x), y: Math.round(y) }
+    console.log('✅ Position calculated:', result)
+    return result
+  }
+
+  /**
    * Execute creation command
    */
-  const executeCreation = async (params, userId, canvasId, userName, viewportCenter) => {
+  const executeCreation = async (params, userId, canvasId, userName, viewportCenter, viewportBounds) => {
     const { shapeType, color, size, position, text, fontSize, fontFamily, fontStyle, points, length, angle } = params
 
     // Debug logging to trace shapeType
@@ -116,10 +144,26 @@ export function useCommandExecutor() {
       throw new Error('Lines are not supported. Only rectangles, circles, and text can be created.')
     }
 
-    // Use viewport center (visible screen area) as default position
+    // Determine shape size for positioning
+    const shapeSize = {
+      width: size?.width || (size?.radius ? size.radius * 2 : 100),
+      height: size?.height || (size?.radius ? size.radius * 2 : 100)
+    }
+
+    console.log('🔍 viewportBounds received:', viewportBounds)
+    console.log('🔍 viewportCenter received:', viewportCenter)
+
+    // Use viewport-aware positioning if no position specified
+    let finalPosition
+    if (position?.x !== undefined && position?.y !== undefined) {
+      finalPosition = position
+    } else {
+      finalPosition = getViewportPosition(viewportCenter, viewportBounds, shapeSize)
+    }
+
     const properties = {
-      x: position?.x ?? viewportCenter.x,
-      y: position?.y ?? viewportCenter.y,
+      x: finalPosition.x,
+      y: finalPosition.y,
     }
 
     // Add color if specified
@@ -235,7 +279,7 @@ export function useCommandExecutor() {
   /**
    * Execute multiple creations with arrangements
    */
-  const executeCreateMultiple = async (params, userId, canvasId, userName, viewportCenter, context) => {
+  const executeCreateMultiple = async (params, userId, canvasId, userName, viewportCenter, viewportBounds, context) => {
     const {
       shapeType = 'rectangle',
       count = 1,
@@ -251,105 +295,48 @@ export function useCommandExecutor() {
 
     const createdShapes = []
     
-    // Get viewport dimensions from context (default to reasonable values)
-    const viewportWidth = context?.viewportWidth || 1280
-    const viewportHeight = context?.viewportHeight || 720
-    
-    // Use 80% of viewport to leave some padding
-    const usableWidth = viewportWidth * 0.8
-    const usableHeight = viewportHeight * 0.8
-
-    const baseX = viewportCenter.x
-    const baseY = viewportCenter.y
-
     // Determine default shape size
-    const shapeWidth = size?.width || size?.radius * 2 || 100
-    const shapeHeight = size?.height || size?.radius * 2 || 100
+    const shapeWidth = size?.width || (size?.radius ? size.radius * 2 : 100)
+    const shapeHeight = size?.height || (size?.radius ? size.radius * 2 : 100)
 
-    // Layout helpers
-    const positions = []
+    // Calculate starting position within viewport (we'll build a grid around this)
+    const shapeSize = { width: shapeWidth, height: shapeHeight }
+    const startPos = getViewportPosition(viewportCenter, viewportBounds, shapeSize)
 
-    // For large counts, always use grid layout within viewport
-    if (count > 10 || arrangement === 'grid') {
-      // Calculate grid that fits in viewport
-      const cols = Math.ceil(Math.sqrt(count))
-      const rows = Math.ceil(count / cols)
-      
-      // Calculate spacing to fit all shapes in viewport
-      const horizontalSpacing = Math.max(20, Math.min(120, usableWidth / cols - shapeWidth))
-      const verticalSpacing = Math.max(20, Math.min(120, usableHeight / rows - shapeHeight))
-      
-      const gridWidth = cols * (shapeWidth + horizontalSpacing)
-      const gridHeight = rows * (shapeHeight + verticalSpacing)
-      
-      const startX = baseX - gridWidth / 2
-      const startY = baseY - gridHeight / 2
-      
-      console.log('🎯 Grid layout:', { 
-        count, 
-        cols, 
-        rows, 
-        horizontalSpacing, 
-        verticalSpacing,
-        gridWidth,
-        gridHeight,
-        viewportWidth,
-        viewportHeight
-      })
-      
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (positions.length >= count) break
-          positions.push({ 
-            x: startX + c * (shapeWidth + horizontalSpacing), 
-            y: startY + r * (shapeHeight + verticalSpacing) 
-          })
-        }
-      }
-    } else if (arrangement === 'horizontal') {
-      const spacing = Math.max(20, Math.min(120, usableWidth / count - shapeWidth))
-      const startX = baseX - (count * (shapeWidth + spacing)) / 2
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: startX + i * (shapeWidth + spacing), y: baseY })
-      }
-    } else if (arrangement === 'vertical') {
-      const spacing = Math.max(20, Math.min(120, usableHeight / count - shapeHeight))
-      const startY = baseY - (count * (shapeHeight + spacing)) / 2
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: baseX, y: startY + i * (shapeHeight + spacing) })
-      }
-    } else if (arrangement === 'scattered') {
-      // Scatter within viewport bounds
-      for (let i = 0; i < count; i++) {
-        positions.push({
-          x: baseX + (Math.random() * usableWidth - usableWidth / 2),
-          y: baseY + (Math.random() * usableHeight - usableHeight / 2)
-        })
-      }
-    } else {
-      // Default to grid for better viewport fitting
-      const cols = Math.ceil(Math.sqrt(count))
-      const rows = Math.ceil(count / cols)
-      const horizontalSpacing = Math.max(20, Math.min(120, usableWidth / cols - shapeWidth))
-      const verticalSpacing = Math.max(20, Math.min(120, usableHeight / rows - shapeHeight))
-      const gridWidth = cols * (shapeWidth + horizontalSpacing)
-      const gridHeight = rows * (shapeHeight + verticalSpacing)
-      const startX = baseX - gridWidth / 2
-      const startY = baseY - gridHeight / 2
-      
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          if (positions.length >= count) break
-          positions.push({ 
-            x: startX + c * (shapeWidth + horizontalSpacing), 
-            y: startY + r * (shapeHeight + verticalSpacing) 
-          })
-        }
-      }
-    }
+    // Grid settings: 15 per row, with spacing
+    const colsPerRow = 15
+    const spacingX = 20
+    const spacingY = 20
 
-    for (const pos of positions) {
-      const properties = { x: pos.x, y: pos.y }
+    // Convert start position (center) to top-left origin for the first cell
+    const baseTopLeftX = startPos.x - shapeWidth / 2
+    const baseTopLeftY = startPos.y - shapeHeight / 2
+
+    console.log('🎯 Creating grid layout:', {
+      count,
+      startPos,
+      colsPerRow,
+      spacingX,
+      spacingY,
+      cellSize: shapeSize
+    })
+
+    // Create shapes in rows of 15
+    for (let i = 0; i < count; i++) {
+      const col = i % colsPerRow
+      const row = Math.floor(i / colsPerRow)
+      const cellX = baseTopLeftX + col * (shapeWidth + spacingX)
+      const cellY = baseTopLeftY + row * (shapeHeight + spacingY)
+
+      const properties = {}
+      // Position depends on shape type semantics (rectangles use top-left, circles use center)
+      if (shapeType === 'circle') {
+        properties.x = Math.round(cellX + shapeWidth / 2)
+        properties.y = Math.round(cellY + shapeHeight / 2)
+      } else {
+        properties.x = Math.round(cellX)
+        properties.y = Math.round(cellY)
+      }
       
       if (color) properties.fill = color
       if (size) {
@@ -499,7 +486,7 @@ export function useCommandExecutor() {
   /**
    * Execute complex template command
    */
-  const executeComplex = async (params, userId, canvasId, userName, viewportCenter) => {
+  const executeComplex = async (params, userId, canvasId, userName, viewportCenter, viewportBounds) => {
     const { templateData } = params
 
     if (!templateData || !templateData.shapes) {
@@ -509,6 +496,7 @@ export function useCommandExecutor() {
     const createdShapes = []
 
     // Calculate base position (center the template at viewport center)
+    // Templates are already designed to fit, so we keep them centered
     const templateBounds = getTemplateBounds(templateData.shapes)
     const baseX = viewportCenter.x - templateBounds.width / 2
     const baseY = viewportCenter.y - templateBounds.height / 2

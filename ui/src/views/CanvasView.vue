@@ -14,7 +14,7 @@
     </div>
 
     <!-- Toolbar -->
-      <Toolbar @tool-selected="handleToolSelected" :can-undo="canUndo" :can-redo="canRedo" @undo="handleUndo" @redo="handleRedo" />
+      <Toolbar @tool-selected="handleToolSelected" />
 
     <!-- Zoom Controls -->
     <ZoomControls 
@@ -60,7 +60,7 @@
               v-if="shape.type === 'rectangle'"
               :rectangle="shape"
               :is-selected="selectedShapeIds.includes(shape.id)"
-              :disable-drag="selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id)"
+              :disable-drag="activeTool === 'pan' || (selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id))"
               @update="handleShapeUpdate"
               @select="handleShapeSelect"
             />
@@ -70,7 +70,7 @@
               v-if="shape.type === 'circle'"
               :circle="shape"
               :is-selected="selectedShapeIds.includes(shape.id)"
-              :disable-drag="selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id)"
+              :disable-drag="activeTool === 'pan' || (selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id))"
               @update="handleShapeUpdate"
               @select="handleShapeSelect"
             />
@@ -80,7 +80,7 @@
               v-if="shape.type === 'line'"
               :line="shape"
               :is-selected="selectedShapeIds.includes(shape.id)"
-              :disable-drag="selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id)"
+              :disable-drag="activeTool === 'pan' || (selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id))"
               @update="handleShapeUpdate"
               @select="handleShapeSelect"
             />
@@ -90,7 +90,7 @@
               v-if="shape.type === 'text'"
               :text="shape"
               :is-selected="selectedShapeIds.includes(shape.id)"
-              :disable-drag="selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id)"
+              :disable-drag="activeTool === 'pan' || (selectedShapeIds.length > 1 && selectedShapeIds.includes(shape.id))"
               @update="handleShapeUpdate"
               @edit="handleTextEdit"
               @select="handleShapeSelect"
@@ -240,7 +240,7 @@ import VersionHistory from '../components/VersionHistory.vue'
 import AICommandPanel from '../components/AICommandPanel.vue'
 import { useShapes } from '../composables/useShapes'
 import { useFirestore } from '../composables/useFirestore' // v5: Batch operations
-import { getMaxZIndex } from '../types/shapes'
+import { getMaxZIndex, DEFAULT_SHAPE_PROPERTIES } from '../types/shapes'
 import { useAuth } from '../composables/useAuth'
 import { useCanvases } from '../composables/useCanvases'
 import { useCursors } from '../composables/useCursors'
@@ -250,7 +250,6 @@ import { usePresenceRTDB } from '../composables/usePresenceRTDB'
 import { getFeatureFlag } from '../utils/featureFlags'
 import { usePerformance } from '../composables/usePerformance'
 import { usePerformanceMonitoring } from '../composables/usePerformanceMonitoring'
-import { useUndoRedo } from '../composables/useUndoRedo'
 import { useConnectionState } from '../composables/useConnectionState'
 import { useQueueProcessor } from '../composables/useQueueProcessor'
 import { useStateReconciliation } from '../composables/useStateReconciliation'
@@ -351,7 +350,7 @@ export default {
     } = useShapes()
     
     // v5: Batch operations and snapshot support for version restore
-    const { saveShapesBatch, deleteShapesBatch, loadCanvasSnapshot, updateCanvasSnapshot } = useFirestore()
+    const { saveShapesBatch, updateShapesBatch, deleteShapesBatch, loadCanvasSnapshot, updateCanvasSnapshot } = useFirestore()
     
     // v8: Feature flag controlled dual-mode (Firestore vs Realtime DB)
     const useRealtimeDB = getFeatureFlag('USE_REALTIME_DB', false)
@@ -385,7 +384,6 @@ export default {
     const { reconcile, startPeriodic, stopPeriodic, triggerOnVisibilityChange } = useStateReconciliation()
     const { saveSnapshot, loadSnapshot, clearSnapshot } = useCrashRecovery()
     const { isLoading: versionsLoading, versions: versionsList, listVersions, createVersion } = useVersions()
-    const { canUndo, canRedo, addAction, undo, redo, setUndoRedoFlag, beginGroup, endGroup, clear } = useUndoRedo()
 
     // Inactivity tracking - auto logout after 10 minutes
     useInactivityLogout(canvasId)
@@ -419,10 +417,6 @@ export default {
     const lastPointerPosition = reactive({ x: 0, y: 0 })
     const showVersionHistory = ref(false)
     const canRestoreVersions = computed(() => true) // owner-only checked via NavBar button visibility
-
-    // Grouping state for arrow-key nudges
-    const nudgeGroupActive = ref(false)
-    let nudgeGroupTimer = null
 
     // Tool state management
     const activeTool = ref('select')
@@ -564,6 +558,9 @@ export default {
       } catch {}
     }, { immediate: true })
     const isMouseOverCanvas = ref(false)
+    // Debounced keyboard nudge commit state
+    let keyboardNudgeTimer = null
+    const keyboardNudgePending = new Map()
 
     // Stage configuration
     const stageConfig = computed(() => ({
@@ -704,11 +701,24 @@ export default {
         }
         
         // Route to appropriate shape creator based on active tool
-        if (activeTool.value === 'rectangle' && canUserEdit.value) {
-          await createShape('rectangle', { x: canvasX, y: canvasY }, userId, canvasId.value, userName.value)
+        if (activeTool.value === 'pan') {
+          // Start panning immediately on left-click in pan mode
+          isPanning.value = true
+          isDragging.value = true
+          lastPointerPosition.x = pointer.x
+          lastPointerPosition.y = pointer.y
+          canvasWrapper.value.style.cursor = 'grabbing'
+          return
+        } else if (activeTool.value === 'rectangle' && canUserEdit.value) {
+          // Create rectangle with click treated as center (convert to model's top-left)
+          const w = DEFAULT_SHAPE_PROPERTIES.rectangle.width
+          const h = DEFAULT_SHAPE_PROPERTIES.rectangle.height
+          await createShape('rectangle', { x: canvasX - w / 2, y: canvasY - h / 2 }, userId, canvasId.value, userName.value)
           return
         } else if (activeTool.value === 'circle' && canUserEdit.value) {
-          await createShape('circle', { x: canvasX, y: canvasY }, userId, canvasId.value, userName.value)
+          // Create circle with click treated as top-left of its bounding box
+          const r = DEFAULT_SHAPE_PROPERTIES.circle.radius
+          await createShape('circle', { x: canvasX + r, y: canvasY + r }, userId, canvasId.value, userName.value)
           return
         } else if (activeTool.value === 'line' && canUserEdit.value) {
           // Start line creation
@@ -789,7 +799,9 @@ export default {
       
       if (!isPanning.value) {
         // Change cursor based on what's under the mouse
-        if (e.target === stage.value.getNode()) {
+        if (activeTool.value === 'pan') {
+          canvasWrapper.value.style.cursor = 'grab'
+        } else if (e.target === stage.value.getNode()) {
           canvasWrapper.value.style.cursor = 'default'
         }
         return
@@ -861,6 +873,8 @@ export default {
       if (canvasWrapper.value) {
         if (toolName === 'select') {
           canvasWrapper.value.style.cursor = 'default'
+        } else if (toolName === 'pan') {
+          canvasWrapper.value.style.cursor = 'grab'
         } else if (toolName === 'text') {
           canvasWrapper.value.style.cursor = 'text'
         } else {
@@ -871,6 +885,10 @@ export default {
 
     // Shape selection handlers
     const handleShapeSelect = (shapeId, event) => {
+      // Ignore selection while pan tool is active
+      if (activeTool.value === 'pan') {
+        return
+      }
       // Check if Shift key is pressed for multi-select
       const isShiftKey = event?.shiftKey || false
       
@@ -1007,7 +1025,7 @@ export default {
       // Show confirmation modal if >5 shapes are selected
       if (selectedShapeIds.value.length > 5) {
         pendingDeleteIds.value = [...selectedShapeIds.value]
-        confirmModalMessage.value = `Are you sure you want to delete ${selectedShapeIds.value.length} shapes? This action can be undone with Cmd+Z.`
+        confirmModalMessage.value = `Are you sure you want to delete ${selectedShapeIds.value.length} shapes? `
         confirmModalVisible.value = true
       } else {
         // Delete immediately if <=5 shapes
@@ -1016,17 +1034,6 @@ export default {
     }
     
     const performDelete = async (shapeIds) => {
-      // Track deletion for undo
-      shapeIds.forEach(id => {
-        const shape = shapes.get(id)
-        if (shape) {
-          addAction({
-            type: 'delete',
-            data: { ...shape }
-          })
-        }
-      })
-      
       await deleteShapes(shapeIds, canvasId.value)
       clearSelection()
     }
@@ -1285,32 +1292,45 @@ export default {
       // Clear resize tracking for this shape
       resizingShapes.value.delete(shapeId)
       
-      if (shape.type === 'rectangle' || shape.type === 'text') {
-        // For rectangles/text, node position is at center (due to offset in component)
-        // During rotation, Konva updates node.x/y to keep shape visually in place
-        // We need to convert this center position back to top-left for our data model
-        
-        // Handle negative scaling (when user drags past opposite corner)
+      if (shape.type === 'rectangle') {
+        // For rectangles, always commit visual position after transform (rotate or resize)
         const currentWidth = wasResized ? Math.abs(node.width() * scaleX) : node.width()
         const currentHeight = wasResized ? Math.abs(node.height() * scaleY) : node.height()
-        
-        // Calculate position accounting for potential flip
-        const offsetX = (wasResized && scaleX < 0) ? -currentWidth / 2 : currentWidth / 2
-        const offsetY = (wasResized && scaleY < 0) ? -currentHeight / 2 : currentHeight / 2
-        
-        // Convert center position back to top-left
-        updates.x = node.x() - offsetX
-        updates.y = node.y() - offsetY
-        
+
+        // Convert center position back to top-left (accounting for potential flip on resize)
         if (wasResized) {
+          const offsetX = scaleX < 0 ? -currentWidth / 2 : currentWidth / 2
+          const offsetY = scaleY < 0 ? -currentHeight / 2 : currentHeight / 2
+          updates.x = node.x() - offsetX
+          updates.y = node.y() - offsetY
           updates.width = currentWidth
           updates.height = currentHeight
-          // Update node dimensions and offset
           node.width(currentWidth)
           node.height(currentHeight)
           node.offsetX(currentWidth / 2)
           node.offsetY(currentHeight / 2)
-          // Reset scale after applying to width/height
+          node.scaleX(1)
+          node.scaleY(1)
+        } else {
+          // Pure rotation: keep the rectangle where user left it (commit node center)
+          updates.x = node.x() - currentWidth / 2
+          updates.y = node.y() - currentHeight / 2
+        }
+      } else if (shape.type === 'text') {
+        // Text: preserve top-left on pure rotation to avoid jumps; update only on resize
+        const currentWidth = wasResized ? Math.abs(node.width() * scaleX) : node.width()
+        const currentHeight = wasResized ? Math.abs(node.height() * scaleY) : node.height()
+        if (wasResized) {
+          const offsetX = scaleX < 0 ? -currentWidth / 2 : currentWidth / 2
+          const offsetY = scaleY < 0 ? -currentHeight / 2 : currentHeight / 2
+          updates.x = node.x() - offsetX
+          updates.y = node.y() - offsetY
+          updates.width = currentWidth
+          updates.height = currentHeight
+          node.width(currentWidth)
+          node.height(currentHeight)
+          node.offsetX(currentWidth / 2)
+          node.offsetY(currentHeight / 2)
           node.scaleX(1)
           node.scaleY(1)
         }
@@ -1336,10 +1356,6 @@ export default {
           node.y(updates.y)
           node.scaleX(1)
           node.scaleY(1)
-        } else {
-          // Rotation without resize - update position
-          updates.x = node.x()
-          updates.y = node.y()
         }
       } else if (shape.type === 'line') {
         if (wasResized) {
@@ -1351,10 +1367,6 @@ export default {
           )
           node.scaleX(1)
           node.scaleY(1)
-        } else {
-          // Rotation without resize - update position
-          updates.x = node.x()
-          updates.y = node.y()
         }
       }
       
@@ -1474,39 +1486,39 @@ export default {
         if (Math.abs(deltaX) > 0.5 || Math.abs(deltaY) > 0.5) {
           const userId = user.value?.uid || 'anonymous'
           
-          // Begin grouped operation for undo/redo
-          beginGroup()
-          
-          // Save all shape positions to Firestore and track for undo
-          for (const shapeId of selectedShapeIds.value) {
+          // Prepare batch update for all shape positions
+          const shapeUpdates = selectedShapeIds.value.map(shapeId => {
             const initialPos = groupDragInitialPositions.value.get(shapeId)
             if (initialPos) {
-              const newX = initialPos.x + deltaX
-              const newY = initialPos.y + deltaY
-              
-              // Track for undo (old and new values)
-              addAction({
-                type: 'update',
-                data: {
-                  id: shapeId,
-                  oldValues: { x: initialPos.x, y: initialPos.y },
-                  newValues: { x: newX, y: newY }
+              return {
+                id: shapeId,
+                updates: {
+                  x: initialPos.x + deltaX,
+                  y: initialPos.y + deltaY,
+                  lastModifiedBy: userId,
+                  lastModifiedByName: userName.value
                 }
-              })
-              
-              // Save final position to Firestore
-              await updateShape(shapeId, { x: newX, y: newY }, userId, canvasId.value, true, true, userName.value)
+              }
+            }
+            return null
+          }).filter(Boolean)
+          
+          // Save all shape positions as a single batch operation
+          if (shapeUpdates.length > 0) {
+            try {
+              await updateShapesBatch(canvasId.value, shapeUpdates)
+            } catch (error) {
+              console.error('Error updating group positions:', error)
             }
           }
-          
-          // End grouped operation
-          endGroup()
         }
         
         // Reset group drag state
         isDraggingGroup.value = false
         groupDragInitialPositions.value.clear()
         canvasWrapper.value.style.cursor = 'default'
+        // Keep selection active and refresh transformer handles
+        updateTransformer()
         return
       }
       
@@ -1551,8 +1563,8 @@ export default {
         const selWidth = Math.abs(selectionRect.width)
         const selHeight = Math.abs(selectionRect.height)
         
-        // Find shapes that intersect with selection rectangle
-        const intersectingShapes = shapesList.value.filter(shape => {
+        // Find shapes that intersect with selection rectangle (any overlap)
+        const containedShapes = shapesList.value.filter(shape => {
           // Get shape bounds based on type
           let shapeX, shapeY, shapeWidth, shapeHeight
           
@@ -1577,15 +1589,17 @@ export default {
             shapeHeight = Math.max(...allY) - shapeY
           }
           
-          // Check for intersection
-          return !(shapeX + shapeWidth < selX || 
-                   shapeX > selX + selWidth ||
-                   shapeY + shapeHeight < selY ||
-                   shapeY > selY + selHeight)
+          // Check for intersection (any overlap between rectangles)
+          return (
+            shapeX < selX + selWidth &&
+            shapeX + shapeWidth > selX &&
+            shapeY < selY + selHeight &&
+            shapeY + shapeHeight > selY
+          )
         })
         
         // Update selection
-        selectedShapeIds.value = intersectingShapes.map(s => s.id)
+        selectedShapeIds.value = containedShapes.map(s => s.id)
         updateTransformer()
         
         // Hide selection rectangle
@@ -1600,6 +1614,8 @@ export default {
       if (canvasWrapper.value) {
         if (activeTool.value === 'select') {
           canvasWrapper.value.style.cursor = 'default'
+        } else if (activeTool.value === 'pan') {
+          canvasWrapper.value.style.cursor = 'grab'
         } else if (activeTool.value === 'text') {
           canvasWrapper.value.style.cursor = 'text'
         } else {
@@ -1608,12 +1624,77 @@ export default {
       }
     }
 
+    // Global mouseup to finalize selection if user releases outside the stage
+    const handleWindowMouseUp = async (e) => {
+      // Mirror finalize logic so selection commits on release without extra click
+      if (isSelecting.value) {
+        // Normalize selection rectangle
+        const selX = selectionRect.width < 0 ? selectionRect.x + selectionRect.width : selectionRect.x
+        const selY = selectionRect.height < 0 ? selectionRect.y + selectionRect.height : selectionRect.y
+        const selWidth = Math.abs(selectionRect.width)
+        const selHeight = Math.abs(selectionRect.height)
+
+        const containedShapes = shapesList.value.filter(shape => {
+          let shapeX, shapeY, shapeWidth, shapeHeight
+          if (shape.type === 'rectangle' || shape.type === 'text') {
+            shapeX = shape.x
+            shapeY = shape.y
+            shapeWidth = shape.width
+            shapeHeight = shape.height
+          } else if (shape.type === 'circle') {
+            shapeX = shape.x - shape.radius
+            shapeY = shape.y - shape.radius
+            shapeWidth = shape.radius * 2
+            shapeHeight = shape.radius * 2
+          } else if (shape.type === 'line') {
+            const points = shape.points || []
+            const allX = [shape.x || 0, ...points.filter((_, i) => i % 2 === 0).map(x => (shape.x || 0) + x)]
+            const allY = [shape.y || 0, ...points.filter((_, i) => i % 2 === 1).map(y => (shape.y || 0) + y)]
+            shapeX = Math.min(...allX)
+            shapeY = Math.min(...allY)
+            shapeWidth = Math.max(...allX) - shapeX
+            shapeHeight = Math.max(...allY) - shapeY
+          }
+
+          // Check for intersection (any overlap between rectangles)
+          return (
+            shapeX < selX + selWidth &&
+            shapeX + shapeWidth > selX &&
+            shapeY < selY + selHeight &&
+            shapeY + shapeHeight > selY
+          )
+        })
+
+        selectedShapeIds.value = containedShapes.map(s => s.id)
+        updateTransformer()
+        isSelecting.value = false
+        selectionRect.visible = false
+      }
+
+      // End any panning state
+      if (isPanning.value || isDragging.value) {
+        isDragging.value = false
+        isPanning.value = false
+        if (canvasWrapper.value) {
+          if (activeTool.value === 'select') {
+            canvasWrapper.value.style.cursor = 'default'
+          } else if (activeTool.value === 'pan') {
+            canvasWrapper.value.style.cursor = 'grab'
+          } else if (activeTool.value === 'text') {
+            canvasWrapper.value.style.cursor = 'text'
+          } else {
+            canvasWrapper.value.style.cursor = 'crosshair'
+          }
+        }
+      }
+    }
+
     // Handle double-click for text creation
     const handleDoubleClick = async (e) => {
       const clickedOnEmpty = e.target === stage.value.getNode()
       
-      // Only create text on double-click if in select or text mode
-      if (clickedOnEmpty && (activeTool.value === 'select' || activeTool.value === 'text') && canUserEdit.value) {
+      // Only create text on double-click when in text mode
+      if (clickedOnEmpty && activeTool.value === 'text' && canUserEdit.value) {
         // Double-click on empty canvas - create new text
         const pointer = stage.value.getNode().getPointerPosition()
         const stageAttrs = stage.value.getNode().attrs
@@ -1644,92 +1725,6 @@ export default {
       if (remoteCursors.value) {
         // Access remoteCursors to trigger recomputation
         remoteCursors.value.length
-      }
-    }
-
-    // Undo/Redo handlers
-    const handleUndo = async () => {
-      const action = undo()
-      if (!action || !user.value) return
-      
-      setUndoRedoFlag(true) // Prevent tracking undo as a new action
-      
-      try {
-        if (action.type === 'group') {
-          // Undo grouped actions in reverse order
-          for (let i = action.actions.length - 1; i >= 0; i--) {
-            const a = action.actions[i]
-            if (a.type === 'create') {
-              await deleteShapes([a.data.id], canvasId.value)
-            } else if (a.type === 'delete') {
-              const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = a.data
-              await createShape(a.data.type, shapeProps, user.value.uid, canvasId.value, userName.value)
-            } else if (a.type === 'update') {
-              await updateShape(a.data.id, a.data.oldValues, user.value.uid, canvasId.value, true, true, userName.value)
-            } else if (a.type === 'property_change') {
-              const { shapeId, property, oldValue } = a
-              await updateShape(shapeId, { [property]: oldValue }, user.value.uid, canvasId.value, true, true, userName.value)
-            }
-          }
-        } else if (action.type === 'create') {
-          // Undo create = delete
-          await deleteShapes([action.data.id], canvasId.value)
-        } else if (action.type === 'delete') {
-          // Undo delete = recreate with original properties
-          const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
-          const recreatedShape = await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value, userName.value)
-          // Note: recreated shape will have a new ID, not the original ID
-        } else if (action.type === 'update') {
-          // Undo update = restore old values
-          await updateShape(action.data.id, action.data.oldValues, user.value.uid, canvasId.value, true, true, userName.value)
-        } else if (action.type === 'property_change') {
-          const { shapeId, property, oldValue } = action
-          await updateShape(shapeId, { [property]: oldValue }, user.value.uid, canvasId.value, true, true, userName.value)
-        }
-      } finally {
-        setUndoRedoFlag(false)
-      }
-    }
-
-    const handleRedo = async () => {
-      const action = redo()
-      if (!action || !user.value) return
-      
-      setUndoRedoFlag(true) // Prevent tracking redo as a new action
-      
-      try {
-        if (action.type === 'group') {
-          // Redo grouped actions in recorded order
-          for (let i = 0; i < action.actions.length; i++) {
-            const a = action.actions[i]
-            if (a.type === 'create') {
-              const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = a.data
-              await createShape(a.data.type, shapeProps, user.value.uid, canvasId.value, userName.value)
-            } else if (a.type === 'delete') {
-              await deleteShapes([a.data.id], canvasId.value)
-            } else if (a.type === 'update') {
-              await updateShape(a.data.id, a.data.newValues, user.value.uid, canvasId.value, true, true, userName.value)
-            } else if (a.type === 'property_change') {
-              const { shapeId, property, newValue } = a
-              await updateShape(shapeId, { [property]: newValue }, user.value.uid, canvasId.value, true, true, userName.value)
-            }
-          }
-        } else if (action.type === 'create') {
-          // Redo create with original properties
-          const { id, createdBy, createdAt, lastModified, lastModifiedBy, ...shapeProps } = action.data
-          await createShape(action.data.type, shapeProps, user.value.uid, canvasId.value, userName.value)
-        } else if (action.type === 'delete') {
-          // Redo delete
-          await deleteShapes([action.data.id], canvasId.value)
-        } else if (action.type === 'update') {
-          // Redo update = reapply new values
-          await updateShape(action.data.id, action.data.newValues, user.value.uid, canvasId.value, true, true, userName.value)
-        } else if (action.type === 'property_change') {
-          const { shapeId, property, newValue } = action
-          await updateShape(shapeId, { [property]: newValue }, user.value.uid, canvasId.value, true, true, userName.value)
-        }
-      } finally {
-        setUndoRedoFlag(false)
       }
     }
 
@@ -1786,60 +1781,31 @@ export default {
       if (selectedShapeIds.value.length > 0 && user.value) {
         const userId = user.value.uid
         
-        // Cmd+] or Ctrl+]: Bring to front (grouped)
+        // Cmd+] or Ctrl+]: Bring to front
         if (modKey && e.key === ']' && !e.shiftKey) {
           e.preventDefault()
-          beginGroup()
           await bringToFront(selectedShapeIds.value, userId, canvasId.value)
-          // Track as updates
-          for (const id of selectedShapeIds.value) {
-            const shape = shapes.get(id)
-            if (!shape) continue
-            addAction({ type: 'update', data: { id, oldValues: { zIndex: shape.zIndex - 1 }, newValues: { zIndex: shape.zIndex } } })
-          }
-          endGroup()
           return
         }
         
-        // Cmd+[ or Ctrl+[: Send to back (grouped)
+        // Cmd+[ or Ctrl+[: Send to back
         if (modKey && e.key === '[' && !e.shiftKey) {
           e.preventDefault()
-          beginGroup()
           await sendToBack(selectedShapeIds.value, userId, canvasId.value)
-          for (const id of selectedShapeIds.value) {
-            const shape = shapes.get(id)
-            if (!shape) continue
-            addAction({ type: 'update', data: { id, oldValues: { zIndex: shape.zIndex + 1 }, newValues: { zIndex: shape.zIndex } } })
-          }
-          endGroup()
           return
         }
         
-        // Cmd+Shift+] or Ctrl+Shift+]: Bring forward (grouped)
+        // Cmd+Shift+] or Ctrl+Shift+]: Bring forward
         if (modKey && e.shiftKey && e.key === ']') {
           e.preventDefault()
-          beginGroup()
           await bringForward(selectedShapeIds.value, userId, canvasId.value)
-          for (const id of selectedShapeIds.value) {
-            const shape = shapes.get(id)
-            if (!shape) continue
-            addAction({ type: 'update', data: { id, oldValues: { zIndex: (shape.zIndex || 0) - 1 }, newValues: { zIndex: (shape.zIndex || 0) } } })
-          }
-          endGroup()
           return
         }
         
-        // Cmd+Shift+[ or Ctrl+Shift+[: Send backward (grouped)
+        // Cmd+Shift+[ or Ctrl+Shift+[: Send backward
         if (modKey && e.shiftKey && e.key === '[') {
           e.preventDefault()
-          beginGroup()
           await sendBackward(selectedShapeIds.value, userId, canvasId.value)
-          for (const id of selectedShapeIds.value) {
-            const shape = shapes.get(id)
-            if (!shape) continue
-            addAction({ type: 'update', data: { id, oldValues: { zIndex: (shape.zIndex || 0) + 1 }, newValues: { zIndex: (shape.zIndex || 0) } } })
-          }
-          endGroup()
           return
         }
       }
@@ -1850,22 +1816,6 @@ export default {
         selectedShapeIds.value = getAllShapes().map(s => s.id)
         updateTransformer()
         return
-      }
-      
-      // Cmd+Z or Ctrl+Z: Undo
-      if (modKey && e.key === 'z' && !e.shiftKey && canUndo.value) {
-        e.preventDefault()
-        await handleUndo()
-        return
-      }
-      
-      // Cmd+Y or Ctrl+Y or Cmd+Shift+Z: Redo
-      if ((modKey && e.key === 'y') || (modKey && e.shiftKey && e.key === 'z')) {
-        if (canRedo.value) {
-          e.preventDefault()
-          await handleRedo()
-          return
-        }
       }
       
       // Cmd+C or Ctrl+C: Copy selected shapes
@@ -1885,17 +1835,8 @@ export default {
       // Cmd+D or Ctrl+D: Duplicate selected shapes
       if (modKey && e.key === 'd' && selectedShapeIds.value.length > 0 && !showTextEditor.value) {
         e.preventDefault()
-        beginGroup()
         const userId = user.value?.uid || 'anonymous'
         const duplicatedIds = await duplicateShapes(selectedShapeIds.value, userId, canvasId.value)
-        // Track as create actions so undo deletes them
-        for (const id of duplicatedIds) {
-          const shape = shapes.get(id)
-          if (shape) {
-            addAction({ type: 'create', data: { ...shape } })
-          }
-        }
-        endGroup()
         
         // Select duplicated shapes (deselect originals)
         selectedShapeIds.value = duplicatedIds
@@ -1918,19 +1859,17 @@ export default {
         // Show confirmation modal if >5 shapes are selected
         if (selectedShapeIds.value.length > 5) {
           pendingDeleteIds.value = [...selectedShapeIds.value]
-          confirmModalMessage.value = `Are you sure you want to delete ${selectedShapeIds.value.length} shapes? This action can be undone with Cmd+Z.`
+          confirmModalMessage.value = `Are you sure you want to delete ${selectedShapeIds.value.length} shapes? `
           confirmModalVisible.value = true
         } else {
           // Delete immediately if <=5 shapes
-          beginGroup()
           await performDelete(selectedShapeIds.value)
-          endGroup()
         }
       }
 
-      // Arrow keys: Nudge selected shapes (1px, or 10px with Shift)
+      // Arrow keys: Nudge selected shapes (2px, or 10px with Shift) with local-only update then debounced batch commit
       if (!modKey && selectedShapeIds.value.length > 0 && !showTextEditor.value) {
-        const step = e.shiftKey ? 10 : 1
+        const step = e.shiftKey ? 10 : 2
         let dx = 0, dy = 0
         if (e.key === 'ArrowLeft') dx = -step
         if (e.key === 'ArrowRight') dx = step
@@ -1938,20 +1877,51 @@ export default {
         if (e.key === 'ArrowDown') dy = step
         if (dx !== 0 || dy !== 0) {
           e.preventDefault()
-          if (!nudgeGroupActive.value) {
-            nudgeGroupActive.value = true
-            beginGroup()
-          }
-          clearTimeout(nudgeGroupTimer)
           const userId = user.value?.uid || 'anonymous'
-          for (const id of selectedShapeIds.value) {
+
+          // Local-only optimistic movement for instantaneous visual shift
+          selectedShapeIds.value.forEach(id => {
             const shape = shapes.get(id)
-            if (!shape) continue
-            const oldValues = { x: shape.x || 0, y: shape.y || 0 }
-            const updates = { x: (shape.x || 0) + dx, y: (shape.y || 0) + dy }
-            await updateShape(id, updates, userId, canvasId.value, true, true, userName.value)
-            addAction({ type: 'update', data: { id, oldValues, newValues: updates } })
+            if (!shape) return
+            const updates = {}
+            if (dx !== 0) updates.x = (shape.x || 0) + dx
+            if (dy !== 0) updates.y = (shape.y || 0) + dy
+            updateShape(id, updates, userId, canvasId.value, false, false, userName.value)
+
+            // Record pending final value for debounced commit
+            const pending = keyboardNudgePending.get(id) || {}
+            if (updates.x !== undefined) pending.x = updates.x
+            if (updates.y !== undefined) pending.y = updates.y
+            keyboardNudgePending.set(id, pending)
+          })
+
+          // Debounce a single batch commit to avoid stutter from remote echo
+          if (keyboardNudgeTimer) {
+            clearTimeout(keyboardNudgeTimer)
           }
+          keyboardNudgeTimer = window.setTimeout(async () => {
+            try {
+              if (keyboardNudgePending.size > 0) {
+                const shapeUpdates = Array.from(keyboardNudgePending.entries()).map(([id, updates]) => ({ id, updates }))
+                await updateShapesBatch(canvasId.value, shapeUpdates)
+                keyboardNudgePending.clear()
+              }
+            } catch (err) {
+              console.error('Keyboard nudge batch update failed:', err)
+            } finally {
+              try {
+                versionOpsCounter += selectedShapeIds.value.length
+                if (versionOpsCounter >= 10 && user.value?.uid) {
+                  const shapesArray = Array.from(shapes.values())
+                  if (shapesArray.length > 0) {
+                    await createVersion(canvasId.value, user.value.uid, userName.value, shapesArray, 'threshold')
+                    versionOpsCounter = 0
+                  }
+                }
+              } catch {}
+            }
+          }, 150)
+          
           // Increment version ops counter and snapshot after >=10 ops
           try {
             versionOpsCounter += selectedShapeIds.value.length
@@ -1963,12 +1933,6 @@ export default {
               }
             }
           } catch {}
-          nudgeGroupTimer = setTimeout(() => {
-            if (nudgeGroupActive.value) {
-              endGroup()
-              nudgeGroupActive.value = false
-            }
-          }, 300)
           return
         }
       }
@@ -2016,6 +1980,7 @@ export default {
       window.addEventListener('keydown', handleSpacebarDown)
       window.addEventListener('keyup', handleSpacebarUp)
       window.addEventListener('keydown', handleKeyDown)
+      window.addEventListener('mouseup', handleWindowMouseUp)
 
       await updateHistoryFromRoute()
       // Initial snapshot on open
@@ -2184,6 +2149,7 @@ export default {
       window.removeEventListener('keydown', handleSpacebarDown)
       window.removeEventListener('keyup', handleSpacebarUp)
       window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('mouseup', handleWindowMouseUp)
       
       // Clean up canvas subscription
       unsubscribeFromCanvas()
@@ -2275,19 +2241,6 @@ export default {
       // Update the shape
       const userId = user.value?.uid || 'anonymous'
       updateShape(shapeId, { [property]: validatedValue }, userId, canvasId.value, true, true, userName.value)
-      
-      // Track undo/redo
-      const shape = shapes.get(shapeId)
-      if (shape) {
-        addAction({
-          type: 'property_change',
-          shapeId,
-          property,
-          oldValue: shape[property],
-          newValue: validatedValue,
-          timestamp: Date.now()
-        })
-      }
     }
 
     const handleUpdateCanvasSize = async ({ width, height }) => {
@@ -2472,12 +2425,21 @@ export default {
       const viewportWidth = stageSize.width / zoomLevel.value
       const viewportHeight = stageSize.height / zoomLevel.value
       
+      // Calculate viewport bounds for shape positioning
+      const viewportBounds = {
+        left: canvasX - viewportWidth / 2,
+        right: canvasX + viewportWidth / 2,
+        top: canvasY - viewportHeight / 2,
+        bottom: canvasY + viewportHeight / 2
+      }
+      
       console.log('🎯 Viewport center calculated:', { 
         screenCenter: { x: centerScreenX, y: centerScreenY },
         stagePosition: { x: stagePosition.x, y: stagePosition.y },
         zoomLevel: zoomLevel.value,
         canvasCenter: { x: canvasX, y: canvasY },
-        viewportDimensions: { width: viewportWidth, height: viewportHeight }
+        viewportDimensions: { width: viewportWidth, height: viewportHeight },
+        viewportBounds
       })
       
       return {
@@ -2487,6 +2449,7 @@ export default {
         },
         viewportWidth,
         viewportHeight,
+        viewportBounds,
         panOffset: {
           x: stagePosition.x,
           y: stagePosition.y
@@ -2522,12 +2485,6 @@ export default {
           break
         case 'center':
           handleZoomReset()
-          break
-        case 'undo':
-          if (canUndo.value) handleUndo()
-          break
-        case 'redo':
-          if (canRedo.value) handleRedo()
           break
         case 'clear-selection':
           clearSelection()
@@ -2629,11 +2586,6 @@ export default {
       canRestoreVersions,
       handleRestoreVersion,
       handleCloseVersionHistory,
-      // Undo/Redo exposure for Toolbar
-      handleUndo,
-      handleRedo,
-      canUndo,
-      canRedo,
       // V6: AI Command System
       aiContext,
       handleAICommandExecuted,

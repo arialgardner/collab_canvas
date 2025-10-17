@@ -42,7 +42,7 @@ export function subscribe(path, callback) {
     subscription.listeners.add(callback)
     totalListeners++
     
-    console.log(`[ConnectionPool] Reusing connection for ${path} (${subscription.listeners.size} listeners)`)
+    // console.log(`[ConnectionPool] Reusing connection for ${path} (${subscription.listeners.size} listeners)`)
   } else {
     // Create new subscription
     const listeners = new Set([callback])
@@ -69,7 +69,7 @@ export function subscribe(path, callback) {
     totalSubscriptions++
     totalListeners++
     
-    console.log(`[ConnectionPool] New connection for ${path} (total: ${totalSubscriptions} subscriptions)`)
+    // console.log(`[ConnectionPool] New connection for ${path} (total: ${totalSubscriptions} subscriptions)`)
   }
   
   // Increment ref count
@@ -105,9 +105,9 @@ export function unsubscribe(path, callback) {
     refCounts.delete(path)
     totalSubscriptions--
     
-    console.log(`[ConnectionPool] Closed connection for ${path} (total: ${totalSubscriptions} subscriptions)`)
+    // console.log(`[ConnectionPool] Closed connection for ${path} (total: ${totalSubscriptions} subscriptions)`)
   } else {
-    console.log(`[ConnectionPool] Removed listener from ${path} (${subscription.listeners.size} remaining)`)
+    // console.log(`[ConnectionPool] Removed listener from ${path} (${subscription.listeners.size} remaining)`)
   }
 }
 
@@ -127,7 +127,7 @@ export function unsubscribeAll(path) {
   totalSubscriptions--
   totalListeners -= listenerCount
   
-  console.log(`[ConnectionPool] Forcefully closed connection for ${path}`)
+  // console.log(`[ConnectionPool] Forcefully closed connection for ${path}`)
 }
 
 /**
@@ -175,7 +175,7 @@ export function getConnectionPoolStats() {
  * Clean up all subscriptions (use sparingly, e.g., on app unmount)
  */
 export function cleanupAll() {
-  console.log(`[ConnectionPool] Cleaning up ${totalSubscriptions} subscriptions...`)
+  // console.log(`[ConnectionPool] Cleaning up ${totalSubscriptions} subscriptions...`)
   
   subscriptions.forEach((subscription, path) => {
     subscription.unsubscribe()
@@ -186,7 +186,7 @@ export function cleanupAll() {
   totalSubscriptions = 0
   totalListeners = 0
   
-  console.log('[ConnectionPool] All connections closed')
+  // console.log('[ConnectionPool] All connections closed')
 }
 
 /**
@@ -247,7 +247,7 @@ export function startLeakDetection(intervalMs = 30000, threshold = 20) {
     checkForLeaks(threshold)
   }, intervalMs)
   
-  console.log(`[ConnectionPool] Started leak detection (every ${intervalMs}ms, threshold: ${threshold})`)
+  // console.log(`[ConnectionPool] Started leak detection (every ${intervalMs}ms, threshold: ${threshold})`)
 }
 
 /**
@@ -257,7 +257,7 @@ export function stopLeakDetection() {
   if (leakCheckInterval) {
     clearInterval(leakCheckInterval)
     leakCheckInterval = null
-    console.log('[ConnectionPool] Stopped leak detection')
+    // console.log('[ConnectionPool] Stopped leak detection')
   }
 }
 

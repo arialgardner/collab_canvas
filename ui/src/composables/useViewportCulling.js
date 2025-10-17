@@ -101,7 +101,7 @@ export function useViewportCulling(stage) {
     // Log culling stats
     const culled = shapes.length - newVisible.size
     if (culled > 0) {
-      console.log(`🔍 Viewport culling: ${newVisible.size}/${shapes.length} visible (${culled} culled)`)
+      // console.log(`🔍 Viewport culling: ${newVisible.size}/${shapes.length} visible (${culled} culled)`)
     }
   }
   

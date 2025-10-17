@@ -127,10 +127,10 @@ export function useOperationLog() {
         const fullSize = getDeltaSize({ ...operation.baseState, ...operation.delta })
         const deltaSize = getDeltaSize(operation.delta)
         const reduction = ((fullSize - deltaSize) / fullSize * 100).toFixed(1)
-        console.log(`[OperationLog] Delta reduction: ${reduction}% (${fullSize}→${deltaSize} bytes)`)
+        // console.log(`[OperationLog] Delta reduction: ${reduction}% (${fullSize}→${deltaSize} bytes)`)
       }
       
-      console.log(`[OperationLog] Appended operation: ${operation.operationId} (${operation.type})`)
+      // console.log(`[OperationLog] Appended operation: ${operation.operationId} (${operation.type})`)
       
     } catch (error) {
       console.error('[OperationLog] Error appending operation:', error)
@@ -177,7 +177,7 @@ export function useOperationLog() {
       })
       
       isSubscribed.value = true
-      console.log(`[OperationLog] Subscribed to operations for canvas: ${canvasId}`)
+      // console.log(`[OperationLog] Subscribed to operations for canvas: ${canvasId}`)
       
       return () => {
         if (operationUnsubscribe) {
@@ -217,7 +217,7 @@ export function useOperationLog() {
         acknowledgedOperations.set(operationId, Date.now())
         pendingOperations.delete(operationId)
         
-        console.log(`[OperationLog] Acknowledged operation: ${operationId}`)
+        // console.log(`[OperationLog] Acknowledged operation: ${operationId}`)
       }
       
     } catch (error) {
@@ -259,7 +259,7 @@ export function useOperationLog() {
         rtdbMonitoring.recordError('ack-subscription', error)
       })
       
-      console.log(`[OperationLog] Subscribed to acknowledgments for canvas: ${canvasId}`)
+      // console.log(`[OperationLog] Subscribed to acknowledgments for canvas: ${canvasId}`)
       
       return () => {
         if (ackUnsubscribe) {
@@ -341,7 +341,7 @@ export function useOperationLog() {
       }
       
       if (operationsToPrune.length > 0) {
-        console.log(`[OperationLog] Pruned ${operationsToPrune.length} operations`)
+        // console.log(`[OperationLog] Pruned ${operationsToPrune.length} operations`)
       }
       
     } catch (error) {
@@ -364,7 +364,7 @@ export function useOperationLog() {
       pruneOperations(canvasId)
     }, 5 * 60 * 1000)
     
-    console.log('[OperationLog] Started auto-pruning (5 min interval)')
+    // console.log('[OperationLog] Started auto-pruning (5 min interval)')
   }
 
   /**
@@ -374,7 +374,7 @@ export function useOperationLog() {
     if (pruneInterval) {
       clearInterval(pruneInterval)
       pruneInterval = null
-      console.log('[OperationLog] Stopped auto-pruning')
+      // console.log('[OperationLog] Stopped auto-pruning')
     }
   }
 
@@ -398,7 +398,7 @@ export function useOperationLog() {
     acknowledgedOperations.clear()
     isSubscribed.value = false
     
-    console.log('[OperationLog] Cleaned up')
+    // console.log('[OperationLog] Cleaned up')
   }
 
   // Auto-cleanup on unmount

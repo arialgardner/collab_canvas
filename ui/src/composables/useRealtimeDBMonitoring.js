@@ -40,10 +40,10 @@ export function useRealtimeDBMonitoring() {
       connectionState.value = isConnected ? 'connected' : 'disconnected'
       lastConnectionChange.value = Date.now()
       
-      console.log(`[RTDB Monitoring] Connection state: ${connectionState.value}`)
+      // console.log(`[RTDB Monitoring] Connection state: ${connectionState.value}`)
     })
     
-    console.log('[RTDB Monitoring] Initialized')
+    // console.log('[RTDB Monitoring] Initialized')
   }
   
   /**
@@ -269,7 +269,7 @@ export function useRealtimeDBMonitoring() {
     errors.value = []
     operationTimestamps.clear()
     
-    console.log('[RTDB Monitoring] Metrics reset')
+    // console.log('[RTDB Monitoring] Metrics reset')
   }
   
   /**
@@ -277,7 +277,7 @@ export function useRealtimeDBMonitoring() {
    */
   function logMetrics() {
     const summary = getMonitoringSummary()
-    console.log('[RTDB Monitoring] Metrics Summary:', summary)
+    // console.log('[RTDB Monitoring] Metrics Summary:', summary)
   }
   
   return {

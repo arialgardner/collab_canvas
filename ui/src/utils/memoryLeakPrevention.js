@@ -115,14 +115,14 @@ export function cleanupElement(element) {
   })
   
   activeListeners.delete(element)
-  console.log(`[MemoryLeak] Cleaned up ${listeners.size} listeners for element`)
+  // console.log(`[MemoryLeak] Cleaned up ${listeners.size} listeners for element`)
 }
 
 /**
  * Clear all active timers
  */
 export function clearAllTimers() {
-  console.log(`[MemoryLeak] Clearing ${activeTimers.size} active timers`)
+  // console.log(`[MemoryLeak] Clearing ${activeTimers.size} active timers`)
   activeTimers.forEach(timerId => clearTimeout(timerId))
   activeTimers.clear()
 }
@@ -131,7 +131,7 @@ export function clearAllTimers() {
  * Clear all active intervals
  */
 export function clearAllIntervals() {
-  console.log(`[MemoryLeak] Clearing ${activeIntervals.size} active intervals`)
+  // console.log(`[MemoryLeak] Clearing ${activeIntervals.size} active intervals`)
   activeIntervals.forEach(intervalId => clearInterval(intervalId))
   activeIntervals.clear()
 }
@@ -150,7 +150,7 @@ export function clearAllListeners() {
   })
   
   activeListeners.clear()
-  console.log(`[MemoryLeak] Cleared ${totalListeners} active listeners`)
+  // console.log(`[MemoryLeak] Cleared ${totalListeners} active listeners`)
 }
 
 /**
@@ -160,7 +160,7 @@ export function cleanupAll() {
   clearAllTimers()
   clearAllIntervals()
   clearAllListeners()
-  console.log('[MemoryLeak] All resources cleaned up')
+  // console.log('[MemoryLeak] All resources cleaned up')
 }
 
 /**
@@ -299,7 +299,7 @@ export function startLeakDetection(intervalMs = 30000) {
     }
   }, intervalMs)
   
-  console.log(`[MemoryLeak] Started leak detection (every ${intervalMs}ms)`)
+  // console.log(`[MemoryLeak] Started leak detection (every ${intervalMs}ms)`)
 }
 
 /**
@@ -309,7 +309,7 @@ export function stopLeakDetection() {
   if (leakDetectionInterval) {
     clearInterval(leakDetectionInterval)
     leakDetectionInterval = null
-    console.log('[MemoryLeak] Stopped leak detection')
+    // console.log('[MemoryLeak] Stopped leak detection')
   }
 }
 

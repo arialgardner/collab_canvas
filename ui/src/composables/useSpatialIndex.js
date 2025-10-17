@@ -145,7 +145,7 @@ export function useSpatialIndex(gridSize = 200) {
   const rebuild = (shapes) => {
     clear()
     shapes.forEach(shape => addShape(shape))
-    console.log(`🔍 Spatial index rebuilt: ${shapes.length} shapes, ${grid.value.size} cells`)
+    // console.log(`🔍 Spatial index rebuilt: ${shapes.length} shapes, ${grid.value.size} cells`)
   }
   
   // Clear entire index

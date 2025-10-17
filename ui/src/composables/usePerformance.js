@@ -149,11 +149,11 @@ export const usePerformance = () => {
     const stats = getPerformanceStats()
     
     console.group('🎯 Performance Summary')
-    console.log(`📦 Rectangle Sync: ${stats.rectangleSync.average}ms avg (target: ${stats.rectangleSync.target}ms)`)
-    console.log(`🖱️ Cursor Sync: ${stats.cursorSync.average}ms avg (target: ${stats.cursorSync.target}ms)`)
-    console.log(`🖥️ Render Time: ${stats.rendering.average}ms avg (target: ${stats.rendering.target}ms)`)
-    console.log(`🔥 Firestore Ops: ${stats.system.firestoreOperations}`)
-    console.log(`👂 Active Listeners: ${stats.system.activeListeners}`)
+    // console.log(`📦 Rectangle Sync: ${stats.rectangleSync.average}ms avg (target: ${stats.rectangleSync.target}ms)`)
+    // console.log(`🖱️ Cursor Sync: ${stats.cursorSync.average}ms avg (target: ${stats.cursorSync.target}ms)`)
+    // console.log(`🖥️ Render Time: ${stats.rendering.average}ms avg (target: ${stats.rendering.target}ms)`)
+    // console.log(`🔥 Firestore Ops: ${stats.system.firestoreOperations}`)
+    // console.log(`👂 Active Listeners: ${stats.system.activeListeners}`)
     console.groupEnd()
     
     return stats

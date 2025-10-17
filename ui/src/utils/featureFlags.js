@@ -63,7 +63,7 @@ export function initializeFeatureFlags() {
     }
   }
   
-  console.log('[FeatureFlags] Initialized:', flagCache)
+  // console.log('[FeatureFlags] Initialized:', flagCache)
   return flagCache
 }
 
@@ -102,7 +102,7 @@ export function setFeatureFlag(flagName, value) {
   // Notify listeners
   notifyListeners(flagName, value)
   
-  console.log(`[FeatureFlags] Set ${flagName} = ${value}`)
+  // console.log(`[FeatureFlags] Set ${flagName} = ${value}`)
 }
 
 /**
@@ -159,7 +159,7 @@ export function getAllFeatureFlags() {
 export function resetFeatureFlags() {
   flagCache = { ...defaultFlags }
   localStorage.removeItem('featureFlags')
-  console.log('[FeatureFlags] Reset to defaults')
+  // console.log('[FeatureFlags] Reset to defaults')
 }
 
 /**
@@ -209,7 +209,7 @@ export function shouldUseRealtimeDB(userId) {
  */
 export function enableRealtimeDB() {
   setFeatureFlag('USE_REALTIME_DB', true)
-  console.log('[FeatureFlags] Realtime DB enabled for this session')
+  // console.log('[FeatureFlags] Realtime DB enabled for this session')
 }
 
 /**
@@ -217,7 +217,7 @@ export function enableRealtimeDB() {
  */
 export function disableRealtimeDB() {
   setFeatureFlag('USE_REALTIME_DB', false)
-  console.log('[FeatureFlags] Realtime DB disabled for this session')
+  // console.log('[FeatureFlags] Realtime DB disabled for this session')
 }
 
 // Initialize on module load

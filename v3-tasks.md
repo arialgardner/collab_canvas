@@ -819,7 +819,7 @@
   - `useStateReconciliation.js` → Reconciliation events
   - `useShapes.js` → Shape operation events
   - `usePresence.js` → User join/leave events
-- Replace existing console.log and alert calls
+- Replace existing // console.log and alert calls
 - Consistent messaging across app
 
 **Deliverable:**

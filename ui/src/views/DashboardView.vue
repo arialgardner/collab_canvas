@@ -357,9 +357,9 @@ onMounted(async () => {
   }
   
   if (user.value) {
-    console.log('Loading canvases for user:', user.value.uid)
+    // console.log('Loading canvases for user:', user.value.uid)
     await getUserCanvases(user.value.uid)
-    console.log('Loaded canvases:', canvases.value.size)
+    // console.log('Loaded canvases:', canvases.value.size)
   } else {
     console.error('User not loaded after waiting')
   }
@@ -367,7 +367,7 @@ onMounted(async () => {
 
 // Navigation
 const openCanvas = (canvasId) => {
-  console.log('[Dashboard] Opening canvas:', canvasId)
+  // console.log('[Dashboard] Opening canvas:', canvasId)
   try {
     router.push({ name: 'Canvas', params: { canvasId } })
   } catch (error) {
@@ -614,7 +614,7 @@ const formatDate = (timestamp) => {
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background: #3b82f6;
+  background: linear-gradient(135deg, #2d2d2d 0%, #000000 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -625,9 +625,9 @@ const formatDate = (timestamp) => {
 }
 
 .create-button:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .plus-icon {
@@ -681,7 +681,7 @@ const formatDate = (timestamp) => {
 .canvas-thumbnail {
   width: 100%;
   height: 200px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2d2d2d 0%, #000000 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -791,7 +791,7 @@ const formatDate = (timestamp) => {
 .empty-state-button {
   margin-top: 20px;
   padding: 12px 24px;
-  background: #3b82f6;
+  background: linear-gradient(135deg, #2d2d2d 0%, #000000 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -802,7 +802,7 @@ const formatDate = (timestamp) => {
 }
 
 .empty-state-button:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
 }
 
 /* Modal Styles */
@@ -896,8 +896,8 @@ const formatDate = (timestamp) => {
 
 .form-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #2d2d2d;
+  box-shadow: 0 0 0 3px rgba(45, 45, 45, 0.1);
 }
 
 .size-row {
@@ -984,12 +984,12 @@ const formatDate = (timestamp) => {
 }
 
 .button-primary {
-  background: #3b82f6;
+  background: linear-gradient(135deg, #2d2d2d 0%, #000000 100%);
   color: white;
 }
 
 .button-primary:hover:not(:disabled) {
-  background: #2563eb;
+  background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
 }
 
 .button-primary:disabled {

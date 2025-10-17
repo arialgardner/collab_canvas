@@ -453,7 +453,7 @@ export function usePerformanceMetrics() {
     startBandwidthMonitoring()
     startFrameRateMonitoring()
     startOperationsMonitoring()
-    console.log('[Performance Metrics] Monitoring started')
+    // console.log('[Performance Metrics] Monitoring started')
   }
   
   /**
@@ -463,7 +463,7 @@ export function usePerformanceMetrics() {
     stopBandwidthMonitoring()
     stopFrameRateMonitoring()
     stopOperationsMonitoring()
-    console.log('[Performance Metrics] Monitoring stopped')
+    // console.log('[Performance Metrics] Monitoring stopped')
   }
   
   /**
@@ -471,14 +471,14 @@ export function usePerformanceMetrics() {
    */
   function logPerformanceReport() {
     const report = getPerformanceReport()
-    console.log('=== Performance Report ===')
-    console.log('Session:', report.session)
-    console.log('Latency:', report.latency)
-    console.log('Bandwidth:', report.bandwidth)
-    console.log('Prediction:', report.prediction)
-    console.log('OT:', report.ot)
-    console.log('Performance:', report.performance)
-    console.log('========================')
+    // console.log('=== Performance Report ===')
+    // console.log('Session:', report.session)
+    // console.log('Latency:', report.latency)
+    // console.log('Bandwidth:', report.bandwidth)
+    // console.log('Prediction:', report.prediction)
+    // console.log('OT:', report.ot)
+    // console.log('Performance:', report.performance)
+    // console.log('========================')
   }
   
   onUnmounted(() => {

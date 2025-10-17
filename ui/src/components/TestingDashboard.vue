@@ -270,7 +270,7 @@ const saveIssue = () => {
 const generateReport = () => {
   const report = generateTestReport()
   // Could save to file or display in modal
-  console.log('Report generated:', report)
+  // console.log('Report generated:', report)
 }
 
 const resetTests = () => {

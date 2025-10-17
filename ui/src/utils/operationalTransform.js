@@ -193,13 +193,13 @@ export function transform(opA, opB) {
     
     // If B is delete and A is update, discard A
     if (opB.type === 'delete' && opA.type === 'update') {
-      console.log('[OT] Discarding update - shape deleted')
+      // console.log('[OT] Discarding update - shape deleted')
       return null
     }
     
     // If B is delete and A is create, keep A (race condition - A wins)
     if (opB.type === 'delete' && opA.type === 'create') {
-      console.log('[OT] Create wins over delete (race condition)')
+      // console.log('[OT] Create wins over delete (race condition)')
       return opA
     }
   }

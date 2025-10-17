@@ -509,7 +509,7 @@ function reconcileServerState(serverOp) {
     pendingOperations.delete(serverOp.clientOpId)
   } else {
     // Prediction wrong, rollback and apply server state
-    console.log('Rolling back prediction, applying server state')
+    // console.log('Rolling back prediction, applying server state')
     updateLocalShape(serverOp.shapeId, serverOp.authoritative)
     pendingOperations.delete(serverOp.clientOpId)
   }
@@ -1128,7 +1128,7 @@ async function migrateCursorsToRealtimeDB() {
     await realtimeDB.ref(`/cursors/${doc.id}`).set(data)
   }
   
-  console.log(`Migrated ${cursors.size} cursors to Realtime DB`)
+  // console.log(`Migrated ${cursors.size} cursors to Realtime DB`)
 }
 ```
 
@@ -1148,7 +1148,7 @@ async function verifyCursorParity() {
     return false
   }
   
-  console.log('✅ Cursor parity verified')
+  // console.log('✅ Cursor parity verified')
   return true
 }
 ```
@@ -1166,7 +1166,7 @@ firebase.remoteConfig.setPercentageRollout('use_realtime_db', 10)
 ```javascript
 // After 100% on Realtime DB for 1 week, clean up Firestore
 async function cleanupFirestoreCursors() {
-  console.log('⚠️ Deleting old Firestore cursor collection')
+  // console.log('⚠️ Deleting old Firestore cursor collection')
   const batch = firestore.batch()
   const cursors = await firestore.collection('cursors').get()
   
@@ -1175,7 +1175,7 @@ async function cleanupFirestoreCursors() {
   })
   
   await batch.commit()
-  console.log('✅ Firestore cursors cleaned up')
+  // console.log('✅ Firestore cursors cleaned up')
 }
 ```
 

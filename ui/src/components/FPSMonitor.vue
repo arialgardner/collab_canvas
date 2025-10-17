@@ -243,7 +243,7 @@ onMounted(() => {
   // Keyboard shortcut
   window.addEventListener('keydown', handleKeyDown)
   
-  console.log('📊 FPS Monitor initialized (press Shift+P to toggle)')
+  // console.log('📊 FPS Monitor initialized (press Shift+P to toggle)')
 })
 
 onUnmounted(() => {

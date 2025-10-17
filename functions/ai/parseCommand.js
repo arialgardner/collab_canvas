@@ -87,10 +87,10 @@ exports.parseAICommand = onCall(
       }
 
       try {
-        console.log(
-            `Parsing command for user ${request.auth.uid}: ` +
-          `"${userInput}"`,
-        );
+        // console.log(
+        //     `Parsing command for user ${request.auth.uid}: ` +
+        //   `"${userInput}"`,
+        // );
 
         // Build prompt string
         const selectedShapes = JSON.stringify(
@@ -187,13 +187,13 @@ Respond with ONLY the JSON, no other text.
           const templateName = parsed.parameters.template;
           if (TEMPLATES[templateName]) {
             parsed.parameters.templateData = TEMPLATES[templateName];
-            console.log(`✅ Using template: ${templateName}`);
+            // console.log(`✅ Using template: ${templateName}`);
           } else {
             console.warn(`⚠️ Template not found: ${templateName}`);
           }
         }
 
-        console.log(`✅ Parsed command: ${parsed.category} - ${parsed.action}`);
+        // console.log(`✅ Parsed command: ${parsed.category} - ${parsed.action}`);
 
         return {
           success: true,

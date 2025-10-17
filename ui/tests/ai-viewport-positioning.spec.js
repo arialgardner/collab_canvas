@@ -108,7 +108,7 @@ test.describe('AI Shape Positioning in Viewport', () => {
       }
     })
 
-    console.log('Shape positioning:', shapeCreated)
+    // console.log('Shape positioning:', shapeCreated)
     
     // Verify shape was created
     expect(shapeCreated).not.toBeNull()

@@ -15,7 +15,7 @@ export const useMVPTesting = () => {
 
   // Test Scenario 1: Two-User Simultaneous Editing
   const runScenario1 = () => {
-    console.log('🧪 Starting Scenario 1: Two-User Simultaneous Editing')
+    // console.log('🧪 Starting Scenario 1: Two-User Simultaneous Editing')
     
     const instructions = `
 📋 SCENARIO 1: Two-User Simultaneous Editing
@@ -39,7 +39,7 @@ export const useMVPTesting = () => {
 ⏱️ EXPECTED TIME: 2-3 minutes
     `
     
-    console.log(instructions)
+    // console.log(instructions)
     testResults.scenario1.status = 'running'
     currentTest.value = 'scenario1'
     testStartTime.value = Date.now()
@@ -60,7 +60,7 @@ export const useMVPTesting = () => {
 
   // Test Scenario 2: Mid-Edit Refresh
   const runScenario2 = () => {
-    console.log('🧪 Starting Scenario 2: Mid-Edit Refresh')
+    // console.log('🧪 Starting Scenario 2: Mid-Edit Refresh')
     
     const instructions = `
 📋 SCENARIO 2: Mid-Edit Refresh
@@ -84,7 +84,7 @@ export const useMVPTesting = () => {
 ⏱️ EXPECTED TIME: 2-3 minutes
     `
     
-    console.log(instructions)
+    // console.log(instructions)
     testResults.scenario2.status = 'running'
     currentTest.value = 'scenario2'
     testStartTime.value = Date.now()
@@ -105,7 +105,7 @@ export const useMVPTesting = () => {
 
   // Test Scenario 3: Rapid Rectangle Creation
   const runScenario3 = () => {
-    console.log('🧪 Starting Scenario 3: Rapid Rectangle Creation')
+    // console.log('🧪 Starting Scenario 3: Rapid Rectangle Creation')
     
     const instructions = `
 📋 SCENARIO 3: Rapid Rectangle Creation
@@ -128,7 +128,7 @@ export const useMVPTesting = () => {
 ⏱️ EXPECTED TIME: 3-4 minutes
     `
     
-    console.log(instructions)
+    // console.log(instructions)
     testResults.scenario3.status = 'running'
     currentTest.value = 'scenario3'
     testStartTime.value = Date.now()
@@ -149,7 +149,7 @@ export const useMVPTesting = () => {
 
   // Test Scenario 4: Conflict Resolution
   const runScenario4 = () => {
-    console.log('🧪 Starting Scenario 4: Conflict Resolution')
+    // console.log('🧪 Starting Scenario 4: Conflict Resolution')
     
     const instructions = `
 📋 SCENARIO 4: Conflict Resolution
@@ -173,7 +173,7 @@ export const useMVPTesting = () => {
 ⏱️ EXPECTED TIME: 2 minutes
     `
     
-    console.log(instructions)
+    // console.log(instructions)
     testResults.scenario4.status = 'running'
     currentTest.value = 'scenario4'
     testStartTime.value = Date.now()
@@ -194,7 +194,7 @@ export const useMVPTesting = () => {
 
   // Test Scenario 5: Disconnect/Reconnect
   const runScenario5 = () => {
-    console.log('🧪 Starting Scenario 5: Disconnect/Reconnect')
+    // console.log('🧪 Starting Scenario 5: Disconnect/Reconnect')
     
     const instructions = `
 📋 SCENARIO 5: Disconnect/Reconnect
@@ -218,7 +218,7 @@ export const useMVPTesting = () => {
 ⏱️ EXPECTED TIME: 3-4 minutes
     `
     
-    console.log(instructions)
+    // console.log(instructions)
     testResults.scenario5.status = 'running'
     currentTest.value = 'scenario5'
     testStartTime.value = Date.now()
@@ -240,7 +240,7 @@ export const useMVPTesting = () => {
 
   // Test Scenario 6: Multi-User Scaling
   const runScenario6 = () => {
-    console.log('🧪 Starting Scenario 6: Multi-User Scaling')
+    // console.log('🧪 Starting Scenario 6: Multi-User Scaling')
     
     const instructions = `
 📋 SCENARIO 6: Multi-User Scaling
@@ -264,7 +264,7 @@ export const useMVPTesting = () => {
 ⏱️ EXPECTED TIME: 5-6 minutes
     `
     
-    console.log(instructions)
+    // console.log(instructions)
     testResults.scenario6.status = 'running'
     currentTest.value = 'scenario6'
     testStartTime.value = Date.now()
@@ -293,10 +293,10 @@ export const useMVPTesting = () => {
     testResults[scenario].issues = issues
     testResults[scenario].duration = duration
     
-    console.log(`✅ Scenario ${scenario} completed in ${duration}ms`)
-    console.log(`Result: ${passed ? 'PASSED' : 'FAILED'}`)
+    // console.log(`✅ Scenario ${scenario} completed in ${duration}ms`)
+    // console.log(`Result: ${passed ? 'PASSED' : 'FAILED'}`)
     if (issues.length > 0) {
-      console.log('Issues found:', issues)
+      // console.log('Issues found:', issues)
     }
   }
 
@@ -317,19 +317,19 @@ export const useMVPTesting = () => {
       timestamp: new Date().toISOString()
     }
     
-    console.log('📊 MVP TEST REPORT')
-    console.log('==================')
-    console.log(`Total Tests: ${totalTests}`)
-    console.log(`Passed: ${passedTests}`)
-    console.log(`Failed: ${failedTests}`)
-    console.log(`Pass Rate: ${report.summary.passRate}%`)
-    console.log('\nDetailed Results:')
+    // console.log('📊 MVP TEST REPORT')
+    // console.log('==================')
+    // console.log(`Total Tests: ${totalTests}`)
+    // console.log(`Passed: ${passedTests}`)
+    // console.log(`Failed: ${failedTests}`)
+    // console.log(`Pass Rate: ${report.summary.passRate}%`)
+    // console.log('\nDetailed Results:')
     
     Object.entries(testResults).forEach(([scenario, result]) => {
       const status = result.passed ? '✅ PASS' : '❌ FAIL'
-      console.log(`${scenario}: ${status} (${result.duration}ms)`)
+      // console.log(`${scenario}: ${status} (${result.duration}ms)`)
       if (result.issues.length > 0) {
-        result.issues.forEach(issue => console.log(`  - ${issue}`))
+        // issues intentionally not logged in production
       }
     })
     
@@ -338,7 +338,7 @@ export const useMVPTesting = () => {
 
   // Quick automated checks
   const runAutomatedChecks = () => {
-    console.log('🤖 Running Automated Checks...')
+    // console.log('🤖 Running Automated Checks...')
     
     const checks = {
       rectangleCount: 0,
@@ -367,7 +367,7 @@ export const useMVPTesting = () => {
       checks.consoleErrors = errors
     }, 1000)
     
-    console.log('Automated Checks Results:', checks)
+    // console.log('Automated Checks Results:', checks)
     return checks
   }
 

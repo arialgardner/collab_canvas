@@ -126,7 +126,7 @@ async function flushBatch() {
     await batch.commit()
     totalBatches++
     savedWrites += writes.length - 1 // Saved (n-1) writes by batching
-    console.log(`[BatchWrite] Flushed ${writes.length} operations (saved ${writes.length - 1} writes)`)
+    // console.log(`[BatchWrite] Flushed ${writes.length} operations (saved ${writes.length - 1} writes)`)
   } catch (error) {
     console.error('[BatchWrite] Batch commit failed:', error)
     // Re-queue failed writes
@@ -161,7 +161,7 @@ async function flushPriorityQueue() {
     await batch.commit()
     totalBatches++
     savedWrites += writes.length - 1
-    console.log(`[BatchWrite] Flushed ${writes.length} priority operations`)
+    // console.log(`[BatchWrite] Flushed ${writes.length} priority operations`)
   } catch (error) {
     console.error('[BatchWrite] Priority batch commit failed:', error)
     // Re-queue failed writes
@@ -227,7 +227,7 @@ export function clearQueues() {
     priorityTimer = null
   }
   
-  console.log('[BatchWrite] Queues cleared')
+  // console.log('[BatchWrite] Queues cleared')
 }
 
 // Expose to window for debugging

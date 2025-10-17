@@ -90,7 +90,7 @@ test.describe('PR #3: Presence Migration to Realtime DB', () => {
     
     if (!isLoggedIn) {
       // Skip test if not logged in
-      console.log('Skipping test - user not logged in')
+      // console.log('Skipping test - user not logged in')
       return
     }
     
