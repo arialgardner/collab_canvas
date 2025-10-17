@@ -12,6 +12,7 @@ import { db } from '../firebase/config'
 
 // Shared state across all components
 const activeUsers = reactive(new Map())
+const activeUsersVersion = ref(0) // Increment to force reactivity updates
 const isOnline = ref(false)
 let presenceUnsubscribe = null
 let heartbeatInterval = null
@@ -122,12 +123,19 @@ export const usePresence = () => {
   const cleanupStalePresence = () => {
     const now = Date.now()
     const STALE_THRESHOLD = 60000 // 60 seconds (2x heartbeat interval)
+    let hasChanges = false
     
     for (const [userId, presence] of activeUsers.entries()) {
       if (presence.lastSeen && (now - presence.lastSeen > STALE_THRESHOLD)) {
         // console.log(`Removing stale presence for user: ${presence.userName || userId}`)
         activeUsers.delete(userId)
+        hasChanges = true
       }
+    }
+    
+    // Force reactivity update if changes occurred
+    if (hasChanges) {
+      activeUsersVersion.value++
     }
   }
 
@@ -156,14 +164,18 @@ export const usePresence = () => {
       // console.log('Unsubscribing from previous presence subscription')
       presenceUnsubscribe()
       presenceUnsubscribe = null
-      // Clear old users when switching canvases
-      activeUsers.clear()
+      // Note: Don't clear activeUsers here - let the new subscription update it
+      // This prevents UI flicker when reconnecting
     }
 
     try {
       const presenceRef = getPresenceCollectionRef(canvasId)
       
       presenceUnsubscribe = onSnapshot(presenceRef, (snapshot) => {
+        // Batch process changes to prevent UI thrashing
+        const usersToAdd = []
+        const usersToRemove = []
+        
         snapshot.docChanges().forEach((change) => {
           const presenceData = change.doc.data()
           const userId = change.doc.id
@@ -184,20 +196,44 @@ export const usePresence = () => {
           if (change.type === 'added' || change.type === 'modified') {
             // Only add users who are marked as online
             if (presence.online) {
-              activeUsers.set(userId, presence)
-              // console.log(`✅ User ${presence.userName} joined canvas ${canvasId} (total: ${activeUsers.size})`)
+              usersToAdd.push({ userId, presence })
             } else {
               // User marked as offline, remove them
-              activeUsers.delete(userId)
-              // console.log(`⚠️ User ${presence.userName} marked offline, removing (total: ${activeUsers.size})`)
+              usersToRemove.push(userId)
             }
           }
           
           if (change.type === 'removed') {
-            activeUsers.delete(userId)
-            // console.log(`👋 User ${presenceData.userName || userId} left canvas ${canvasId} (total: ${activeUsers.size})`)
+            usersToRemove.push(userId)
           }
         })
+        
+        // Track if any changes were made
+        let hasChanges = false
+        
+        // Apply batch updates
+        usersToRemove.forEach(userId => {
+          const user = activeUsers.get(userId)
+          activeUsers.delete(userId)
+          hasChanges = true
+          // console.log(`👋 User ${user?.userName || userId} left canvas (total: ${activeUsers.size})`)
+        })
+        
+        usersToAdd.forEach(({ userId, presence }) => {
+          const isNew = !activeUsers.has(userId)
+          activeUsers.set(userId, presence)
+          if (isNew) {
+            hasChanges = true
+            // console.log(`✅ User ${presence.userName} joined canvas ${canvasId} (total: ${activeUsers.size})`)
+          }
+        })
+        
+        // Force reactivity update if changes occurred
+        if (hasChanges) {
+          activeUsersVersion.value++
+        }
+        
+        // console.log(`📊 Presence updated: ${activeUsers.size} users online`)
       })
       
       // Start periodic cleanup of stale presence
@@ -287,6 +323,7 @@ export const usePresence = () => {
     
     // Clear local state
     activeUsers.clear()
+    activeUsersVersion.value++ // Trigger reactivity update
     isOnline.value = false
     
     // console.log('Presence tracking cleaned up')
@@ -300,6 +337,7 @@ export const usePresence = () => {
   return {
     // State
     activeUsers,
+    activeUsersVersion, // Export version for reactivity tracking
     isOnline,
     
     // Methods

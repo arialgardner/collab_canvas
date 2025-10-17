@@ -139,7 +139,7 @@ export default {
     // Use the correct presence system based on feature flag
     const useRealtimeDB = getFeatureFlag('USE_REALTIME_DB', false)
     const presenceComposable = useRealtimeDB ? usePresenceRTDB() : usePresence()
-    const { activeUsers, getActiveUsers, getActiveUserCount, setUserOffline } = presenceComposable
+    const { activeUsers, activeUsersVersion, getActiveUsers, getActiveUserCount, setUserOffline } = presenceComposable
     
     const { removeCursor } = useCursors()
     const { state: connectionState } = useConnectionState()
@@ -157,8 +157,14 @@ export default {
     })
 
     // Use activeUsers directly for reactivity
-    const activeUserCount = computed(() => activeUsers.size)
-    const activeUsersList = computed(() => Array.from(activeUsers.values()))
+    // Convert to array first to ensure Vue tracks changes properly
+    // Include activeUsersVersion in computation to force updates
+    const activeUsersList = computed(() => {
+      // Access version to trigger reactivity
+      activeUsersVersion.value
+      return Array.from(activeUsers.values())
+    })
+    const activeUserCount = computed(() => activeUsersList.value.length)
     
     // Check if offline
     const isOffline = computed(() => connectionState.status === CONNECTION_STATUS.OFFLINE)
@@ -206,8 +212,21 @@ export default {
     }
 
     // Handle back to dashboard
-    const handleBackToDashboard = () => {
-      router.push({ name: 'Dashboard' })
+    const handleBackToDashboard = async () => {
+      console.log('🔙 Back button clicked - navigating to Dashboard')
+      try {
+        await router.push({ name: 'Dashboard' })
+        console.log('✅ Navigation to Dashboard completed')
+      } catch (error) {
+        console.error('❌ Error navigating to dashboard:', error)
+        // Try alternative navigation
+        try {
+          await router.push('/')
+          console.log('✅ Navigation to / completed as fallback')
+        } catch (fallbackError) {
+          console.error('❌ Fallback navigation also failed:', fallbackError)
+        }
+      }
     }
 
     // Close dropdown when clicking outside

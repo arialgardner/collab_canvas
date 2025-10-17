@@ -265,7 +265,7 @@ import { useInactivityLogout } from '../composables/useInactivityLogout'
 import { useViewportCulling } from '../composables/useViewportCulling' // v5: Rendering optimization
 import { useBugFixes } from '../utils/bugFixUtils'
 import { calculateRectPositionAfterRotation } from '../utils/rotationUtils'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 
 export default {
   name: 'CanvasView',
@@ -370,6 +370,7 @@ export default {
       updateCursorPosition,
       subscribeToCursors,
       cleanup: cleanupCursors,
+      removeCursor,
       screenToCanvas,
       getAllCursors,
       cleanupStaleCursors
@@ -2136,24 +2137,53 @@ export default {
       }
     })
 
+    // Navigation guard - cleanup when navigating away
+    onBeforeRouteLeave((to, from, next) => {
+      console.log('🚪 Navigation guard triggered')
+      const userId = user.value?.uid
+      
+      if (userId && canvasId.value) {
+        console.log('🚪 Cleaning up presence and cursor for user:', userId)
+        
+        // Remove presence and cursor immediately (fire and forget)
+        setUserOffline(canvasId.value, userId).catch(err => {
+          console.error('Error setting user offline during navigation:', err)
+        })
+        removeCursor(canvasId.value, userId).catch(err => {
+          console.error('Error removing cursor during navigation:', err)
+        })
+      }
+      
+      // Always allow navigation to proceed
+      console.log('✅ Allowing navigation to:', to.name)
+      next()
+    })
+
     // Cleanup before component unmounts (e.g., when navigating away)
-    onBeforeUnmount(async () => {
+    onBeforeUnmount(() => {
       const userId = user.value?.uid
       
       if (userId) {
-        console.log('🚪 User leaving canvas - cleaning up presence and cursor')
+        console.log('🚪 Component unmounting - final cleanup')
         
-        // Remove presence and cursor BEFORE unmounting
-        // This ensures other users see the user leave immediately
-        try {
-          await Promise.all([
-            setUserOffline(canvasId.value, userId),
-            removeCursor(canvasId.value, userId)
-          ])
-        } catch (error) {
-          console.error('Error during beforeUnmount cleanup:', error)
-        }
+        // Remove presence and cursor synchronously
+        // Note: setUserOffline and removeCursor are async, but we call them
+        // without await so they fire immediately. The Firebase SDK will handle
+        // them even if the component unmounts.
+        setUserOffline(canvasId.value, userId).catch(err => {
+          console.error('Error setting user offline:', err)
+        })
+        removeCursor(canvasId.value, userId).catch(err => {
+          console.error('Error removing cursor:', err)
+        })
       }
+      
+      // Stop all intervals and subscriptions immediately
+      stopRealtimeSync()
+      stopPeriodic()
+      
+      // Clear periodic timer
+      try { window.clearInterval(periodicTimer) } catch {}
     })
 
     onUnmounted(() => {
@@ -2166,14 +2196,11 @@ export default {
       // Clean up canvas subscription
       unsubscribeFromCanvas()
       
-      // Clean up real-time listeners
-      stopRealtimeSync()
-      
-      // Clean up cursor tracking
+      // Clean up cursor tracking (this will unsubscribe from listeners)
       const userId = user.value?.uid
       cleanupCursors(canvasId.value, userId)
       
-      // Clean up presence tracking
+      // Clean up presence tracking (this will unsubscribe from listeners)
       cleanupPresence(canvasId.value, userId)
       
       // Remove cursor event listeners
@@ -2182,10 +2209,6 @@ export default {
         canvasWrapper.value.removeEventListener('mouseenter', handleMouseEnter)
         canvasWrapper.value.removeEventListener('mouseleave', handleMouseLeave)
       }
-
-      stopPeriodic()
-      // Clear periodic timer
-      try { window.clearInterval(periodicTimer) } catch {}
     })
 
     // Computed properties for properties panel
@@ -2225,6 +2248,44 @@ export default {
           console.error('Error cleaning up old canvas:', error)
         }
       }
+    })
+
+    // Watch for connection state changes to handle reconnection
+    let previousConnectionStatus = ref(connectionState.status)
+    watch(() => connectionState.status, async (newStatus, oldStatus) => {
+      const userId = user.value?.uid
+      
+      // Only handle reconnection when moving from offline/error to connected
+      if (
+        userId && 
+        canvasId.value && 
+        (oldStatus === CONNECTION_STATUS.OFFLINE || oldStatus === CONNECTION_STATUS.ERROR) &&
+        newStatus === CONNECTION_STATUS.CONNECTED
+      ) {
+        console.log('🔄 Connection restored - re-establishing presence and cursors')
+        
+        try {
+          // Re-establish user's own presence
+          const userName = user.value.displayName || user.value.email?.split('@')[0] || 'Anonymous'
+          const cursorColor = '#667eea'
+          
+          await setUserOnline(canvasId.value, userId, userName, cursorColor)
+          console.log('✅ Presence re-established after reconnection')
+          
+          // Re-subscribe to presence updates (this will refresh the user list)
+          subscribeToPresence(canvasId.value, userId)
+          console.log('✅ Presence subscription refreshed')
+          
+          // Re-subscribe to cursors
+          subscribeToCursors(canvasId.value, userId)
+          console.log('✅ Cursor subscription refreshed')
+          
+        } catch (error) {
+          console.error('❌ Error re-establishing presence after reconnection:', error)
+        }
+      }
+      
+      previousConnectionStatus.value = newStatus
     })
 
     // Properties panel handlers

@@ -26,12 +26,13 @@ import { rtdbMonitoring } from './useRealtimeDBMonitoring.js'
 
 // Shared state across all components
 const activeUsers = reactive(new Map())
+const activeUsersVersion = ref(0) // Increment to force reactivity updates
 const isOnline = ref(false)
 let presenceUnsubscribe = null
 let heartbeatInterval = null
 let cleanupInterval = null
 let beforeUnloadHandler = null
-let disconnectHandler = null
+const disconnectHandlers = new Map() // Store per-user disconnect handlers
 
 export const usePresenceRTDB = () => {
 
@@ -63,14 +64,24 @@ export const usePresenceRTDB = () => {
       const presenceRef = getPresenceRef(canvasId, userId)
       await set(presenceRef, presenceData)
       
-      // Set up automatic removal on disconnect
-      if (!disconnectHandler) {
-        disconnectHandler = onDisconnect(presenceRef)
-        await disconnectHandler.remove()
+      // Always set up automatic removal on disconnect (re-establish if reconnecting)
+      // Cancel any existing handler for this user first
+      const existingHandler = disconnectHandlers.get(userId)
+      if (existingHandler) {
+        try {
+          await existingHandler.cancel()
+        } catch (e) {
+          // Ignore errors when canceling
+        }
       }
       
+      // Set up new disconnect handler for this specific user
+      const newDisconnectHandler = onDisconnect(presenceRef)
+      await newDisconnectHandler.remove()
+      disconnectHandlers.set(userId, newDisconnectHandler)
+      
       isOnline.value = true
-      // console.log(`User ${userName} set online (RTDB)`)
+      console.log(`✅ User ${userName} set online (RTDB) - Disconnect handler registered`)
       
       // Start heartbeat to keep presence alive
       startHeartbeat(canvasId, userId)
@@ -97,11 +108,19 @@ export const usePresenceRTDB = () => {
       const presenceRef = getPresenceRef(canvasId, userId)
       await remove(presenceRef)
       
-      // Cancel disconnect handler
-      disconnectHandler = null
+      // Cancel and remove disconnect handler for this user
+      const existingHandler = disconnectHandlers.get(userId)
+      if (existingHandler) {
+        try {
+          await existingHandler.cancel()
+        } catch (e) {
+          // Ignore errors when canceling
+        }
+        disconnectHandlers.delete(userId)
+      }
       
       isOnline.value = false
-      // console.log(`User ${userId} set offline (RTDB)`)
+      console.log(`👋 User ${userId} set offline (RTDB) - Disconnect handler removed`)
       
     } catch (error) {
       console.error('Error setting user offline (RTDB):', error)
@@ -152,12 +171,22 @@ export const usePresenceRTDB = () => {
   const cleanupStalePresence = () => {
     const now = Date.now()
     const STALE_THRESHOLD = 60000 // 60 seconds (2x heartbeat interval)
+    let hasChanges = false
+    let removedCount = 0
     
     for (const [userId, presence] of activeUsers.entries()) {
       if (presence.lastSeen && (now - presence.lastSeen > STALE_THRESHOLD)) {
-        // console.log(`Removing stale presence (RTDB) for user: ${presence.userName || userId}`)
+        console.log(`🧹 Removing stale presence (RTDB) for user: ${presence.userName || userId} (last seen: ${Math.round((now - presence.lastSeen) / 1000)}s ago)`)
         activeUsers.delete(userId)
+        hasChanges = true
+        removedCount++
       }
+    }
+    
+    // Force reactivity update if changes occurred
+    if (hasChanges) {
+      activeUsersVersion.value++
+      console.log(`🧹 Cleaned up ${removedCount} stale presence entries. ${activeUsers.size} users remaining`)
     }
   }
 
@@ -186,7 +215,8 @@ export const usePresenceRTDB = () => {
       // console.log('Unsubscribing from previous presence subscription (RTDB)')
       presenceUnsubscribe()
       presenceUnsubscribe = null
-      activeUsers.clear()
+      // Note: Don't clear activeUsers here - let the new subscription update it
+      // This prevents UI flicker when reconnecting
     }
 
     try {
@@ -199,19 +229,30 @@ export const usePresenceRTDB = () => {
         const dataSize = JSON.stringify(presenceData).length
         rtdbMonitoring.recordBytesReceived(dataSize)
         
-        // Update active users map
-        const currentUserIds = new Set(Object.keys(presenceData))
+        // Get current user IDs from server
+        const serverUserIds = new Set(Object.keys(presenceData))
         
-        // Remove users that no longer exist
+        // Remove users that no longer exist on the server
+        // This handles multiple users going offline simultaneously
+        const usersToRemove = []
         for (const userId of activeUsers.keys()) {
-          if (!currentUserIds.has(userId)) {
-            const user = activeUsers.get(userId)
-            activeUsers.delete(userId)
-            // console.log(`👋 User ${user?.userName || userId} left canvas (RTDB) (total: ${activeUsers.size})`)
+          if (!serverUserIds.has(userId)) {
+            usersToRemove.push(userId)
           }
         }
         
-        // Add/update users
+        // Track if any changes were made
+        let hasChanges = false
+        
+        // Batch remove users to prevent UI thrashing
+        for (const userId of usersToRemove) {
+          const user = activeUsers.get(userId)
+          activeUsers.delete(userId)
+          hasChanges = true
+          console.log(`👋 User ${user?.userName || userId} left canvas (RTDB) (total: ${activeUsers.size})`)
+        }
+        
+        // Add/update users from server data
         for (const [userId, presence] of Object.entries(presenceData)) {
           // Don't include current user in active users list
           if (userId === currentUserId) continue
@@ -231,15 +272,23 @@ export const usePresenceRTDB = () => {
             const isNew = !activeUsers.has(userId)
             activeUsers.set(userId, presenceObj)
             if (isNew) {
-              // console.log(`✅ User ${presenceObj.userName} joined canvas ${canvasId} (RTDB) (total: ${activeUsers.size})`)
+              hasChanges = true
+              console.log(`✅ User ${presenceObj.userName} joined canvas ${canvasId} (RTDB) (total: ${activeUsers.size})`)
             }
           } else {
             // User marked as offline, remove them
             if (activeUsers.has(userId)) {
               activeUsers.delete(userId)
-              // console.log(`⚠️ User ${presenceObj.userName} marked offline (RTDB), removing (total: ${activeUsers.size})`)
+              hasChanges = true
+              console.log(`⚠️ User ${presenceObj.userName} marked offline (RTDB), removing (total: ${activeUsers.size})`)
             }
           }
+        }
+        
+        // Force reactivity update if changes occurred
+        if (hasChanges) {
+          activeUsersVersion.value++
+          console.log(`📊 Presence updated: ${activeUsers.size} users online on canvas ${canvasId}`)
         }
       }, (error) => {
         console.error('Error in presence subscription (RTDB):', error)
@@ -330,15 +379,18 @@ export const usePresenceRTDB = () => {
       presenceUnsubscribe = null
     }
     
-    // Set user offline
+    // Set user offline (this will also clean up the disconnect handler)
     if (userId) {
       await setUserOffline(canvasId, userId)
     }
     
     // Clear local state
     activeUsers.clear()
+    activeUsersVersion.value++ // Trigger reactivity update
     isOnline.value = false
-    disconnectHandler = null
+    
+    // Clear all disconnect handlers
+    disconnectHandlers.clear()
     
     // console.log('Presence tracking cleaned up (RTDB)')
   }
@@ -351,6 +403,7 @@ export const usePresenceRTDB = () => {
   return {
     // State
     activeUsers,
+    activeUsersVersion, // Export version for reactivity tracking
     isOnline,
     
     // Methods

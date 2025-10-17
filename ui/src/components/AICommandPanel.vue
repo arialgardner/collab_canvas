@@ -292,6 +292,33 @@ onUnmounted(() => {
   border: 1px solid #e2e8f0;
 }
 
+/* Responsive positioning - stay on right side */
+@media (max-width: 1200px) {
+  .ai-command-panel {
+    right: 270px; /* Adjust for narrower properties panel */
+    width: 350px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ai-command-panel {
+    right: 1rem; /* Properties panel hidden, move to right edge */
+    width: 280px;
+    padding: 10px;
+    bottom: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .ai-command-panel {
+    right: 0.75rem;
+    left: 0.75rem; /* Full width on very small screens */
+    width: auto;
+    bottom: 0.75rem;
+    padding: 8px;
+  }
+}
+
 .ai-command-panel.is-focused {
   background-color: rgba(255, 255, 255, 1);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -391,6 +418,42 @@ onUnmounted(() => {
   box-shadow: none;
 }
 
+/* Responsive input and button sizing */
+@media (max-width: 768px) {
+  .command-input {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  
+  .send-button {
+    padding: 8px 16px;
+    font-size: 13px;
+    min-width: 70px;
+  }
+}
+
+@media (max-width: 480px) {
+  .command-input {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+  
+  .send-button {
+    padding: 7px 14px;
+    font-size: 12px;
+    min-width: 60px;
+  }
+  
+  .beta-text {
+    font-size: 12px;
+  }
+  
+  .beta-label {
+    font-size: 9px;
+    padding: 1px 5px;
+  }
+}
+
 .spinner {
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-top: 2px solid #fff;
@@ -429,6 +492,15 @@ onUnmounted(() => {
   background-color: #fee2e2;
   color: #991b1b;
   border: 1px solid #fca5a5;
+}
+
+/* Responsive feedback message */
+@media (max-width: 480px) {
+  .feedback-message {
+    padding: 8px 12px;
+    font-size: 12px;
+    gap: 6px;
+  }
 }
 
 .suggested-commands {
@@ -478,6 +550,25 @@ onUnmounted(() => {
   font-style: italic;
 }
 
+/* Responsive suggestions */
+@media (max-width: 480px) {
+  .suggestion-item {
+    padding: 8px 10px;
+    font-size: 12px;
+    gap: 8px;
+  }
+  
+  .suggestion-icon {
+    font-size: 14px;
+    width: 18px;
+  }
+  
+  .suggestions-header {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+}
+
 .command-history {
   border-top: 1px solid #e2e8f0;
   padding-top: 10px;
@@ -523,6 +614,26 @@ onUnmounted(() => {
   font-size: 12px;
   font-weight: bold;
   flex-shrink: 0;
+}
+
+/* Responsive history */
+@media (max-width: 480px) {
+  .history-item {
+    padding: 7px 8px;
+    font-size: 12px;
+    gap: 6px;
+  }
+  
+  .history-icon {
+    width: 16px;
+    height: 16px;
+    font-size: 11px;
+  }
+  
+  .history-header {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
 }
 
 .history-icon.success {
