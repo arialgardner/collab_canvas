@@ -73,10 +73,10 @@
         </div>
 
         <!-- Version History & Save (owner-only) -->
-        <button v-if="isOwner" class="logout-button" title="Version History" @click="$emit('toggle-versions')" style="background:#e0e7ff;color:#3730a3;border-color:#c7d2fe;">
+        <button v-if="isOwner" class="logout-button" title="Version History" @click="$emit('toggle-versions')" style="background:#e5e7eb;color:#374151;border-color:#d1d5db;">
           History
         </button>
-        <button v-if="isOwner" class="logout-button" title="Save Version" @click="$emit('save-version')" :disabled="isOffline" style="background:#dcfce7;color:#065f46;border-color:#bbf7d0;">
+        <button v-if="isOwner" class="logout-button" title="Save Version" @click="$emit('save-version')" :disabled="isOffline" style="background:#6b7280;color:#ffffff;border-color:#4b5563;">
           Save
         </button>
         
@@ -88,8 +88,8 @@
           class="logout-button"
           title="Sign out"
         >
-          <svg class="logout-icon" viewBox="0 0 20 20">
-            <path d="M3 3a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 13.846 4.632 16 6.414 16H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 6H6.28l-.31-1.243A1 1 0 005 4H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+          <svg class="logout-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
           </svg>
           {{ isLoading ? 'Signing out...' : 'Sign Out' }}
         </button>
@@ -346,7 +346,7 @@ export default {
 }
 
 .count-badge {
-  background: #667eea;
+  background: #000000;
   color: white;
   border-radius: 50%;
   width: 20px;
@@ -426,7 +426,7 @@ export default {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 2px solid #000000;
 }
 
 .user-cursor-color {
@@ -460,9 +460,9 @@ export default {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: #fed7d7;
-  color: #c53030;
-  border: 1px solid #fca5a5;
+  background: #f3f4f6;
+  color: #000000;
+  border: 1px solid #d1d5db;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
@@ -470,8 +470,8 @@ export default {
 }
 
 .logout-button:hover:not(:disabled) {
-  background: #feb2b2;
-  border-color: #f87171;
+  background: #e5e7eb;
+  border-color: #9ca3af;
 }
 
 .logout-button:disabled {

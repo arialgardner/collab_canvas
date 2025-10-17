@@ -86,47 +86,48 @@ export const useShapes = () => {
       let shape
       switch (type) {
         case 'rectangle': {
-          const { x = 0, y = 0 } = properties
+          const { x = 0, y = 0, width, height, fill } = properties
           shape = {
             ...baseShape,
             x,
             y,
-            width: DEFAULT_SHAPE_PROPERTIES.rectangle.width,
-            height: DEFAULT_SHAPE_PROPERTIES.rectangle.height,
-            fill: DEFAULT_SHAPE_PROPERTIES.rectangle.fill
+            width: width ?? DEFAULT_SHAPE_PROPERTIES.rectangle.width,
+            height: height ?? DEFAULT_SHAPE_PROPERTIES.rectangle.height,
+            fill: fill ?? DEFAULT_SHAPE_PROPERTIES.rectangle.fill
           }
           break
         }
         case 'circle': {
-          const { x = 0, y = 0 } = properties
+          const { x = 0, y = 0, radius, fill } = properties
           shape = {
             ...baseShape,
             x,
             y,
-            radius: DEFAULT_SHAPE_PROPERTIES.circle.radius,
-            fill: DEFAULT_SHAPE_PROPERTIES.circle.fill
+            radius: radius ?? DEFAULT_SHAPE_PROPERTIES.circle.radius,
+            fill: fill ?? DEFAULT_SHAPE_PROPERTIES.circle.fill
           }
           break
         }
         case 'line': {
-          const { points = [0, 0, 100, 100] } = properties
+          const { points = [0, 0, 100, 100], stroke, strokeWidth } = properties
           shape = {
             ...baseShape,
             x: 0, // Lines need x,y for drag positioning
             y: 0,
             points,
-            stroke: DEFAULT_SHAPE_PROPERTIES.line.stroke,
-            strokeWidth: DEFAULT_SHAPE_PROPERTIES.line.strokeWidth
+            stroke: stroke ?? DEFAULT_SHAPE_PROPERTIES.line.stroke,
+            strokeWidth: strokeWidth ?? DEFAULT_SHAPE_PROPERTIES.line.strokeWidth
           }
           break
         }
         case 'text': {
-          const { x = 0, y = 0 } = properties
+          const { x = 0, y = 0, ...textProps } = properties
           shape = {
             ...baseShape,
             x,
             y,
             ...DEFAULT_SHAPE_PROPERTIES.text,
+            ...textProps, // Override defaults with provided properties
             lockedBy: null,
             lockedAt: null
           }

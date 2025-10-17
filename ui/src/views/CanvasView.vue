@@ -31,7 +31,13 @@
     <TestingDashboard />
 
     <!-- Konva Canvas -->
-    <div ref="canvasWrapper" class="canvas-wrapper" @click="handleCloseContextMenu">
+    <div 
+      ref="canvasWrapper" 
+      class="canvas-wrapper" 
+      :data-panning="activeTool === 'pan' ? 'true' : 'false'"
+      :data-is-dragging="isPanning ? 'true' : 'false'"
+      @click="handleCloseContextMenu"
+    >
       <!-- Empty state when no shapes (outside Konva stage) -->
       <EmptyState 
         v-if="!isLoading && shapesList.length === 0"
@@ -875,10 +881,9 @@ export default {
           canvasWrapper.value.style.cursor = 'default'
         } else if (toolName === 'pan') {
           canvasWrapper.value.style.cursor = 'grab'
-        } else if (toolName === 'text') {
-          canvasWrapper.value.style.cursor = 'text'
         } else {
-          canvasWrapper.value.style.cursor = 'crosshair'
+          // Text and shape tools use default cursor
+          canvasWrapper.value.style.cursor = 'default'
         }
       }
     }
@@ -1616,10 +1621,9 @@ export default {
           canvasWrapper.value.style.cursor = 'default'
         } else if (activeTool.value === 'pan') {
           canvasWrapper.value.style.cursor = 'grab'
-        } else if (activeTool.value === 'text') {
-          canvasWrapper.value.style.cursor = 'text'
         } else {
-          canvasWrapper.value.style.cursor = 'crosshair'
+          // Text and shape tools use default cursor
+          canvasWrapper.value.style.cursor = 'default'
         }
       }
     }
@@ -1680,10 +1684,9 @@ export default {
             canvasWrapper.value.style.cursor = 'default'
           } else if (activeTool.value === 'pan') {
             canvasWrapper.value.style.cursor = 'grab'
-          } else if (activeTool.value === 'text') {
-            canvasWrapper.value.style.cursor = 'text'
           } else {
-            canvasWrapper.value.style.cursor = 'crosshair'
+            // Text and shape tools use default cursor
+            canvasWrapper.value.style.cursor = 'default'
           }
         }
       }
@@ -2243,32 +2246,6 @@ export default {
       updateShape(shapeId, { [property]: validatedValue }, userId, canvasId.value, true, true, userName.value)
     }
 
-    const handleUpdateCanvasSize = async ({ width, height }) => {
-      const updates = {}
-      
-      if (width !== undefined) {
-        const newWidth = Math.max(100, Math.min(10000, width))
-        canvasWidth.value = newWidth
-        stageConfig.width = newWidth
-        updates.width = newWidth
-      }
-      if (height !== undefined) {
-        const newHeight = Math.max(100, Math.min(10000, height))
-        canvasHeight.value = newHeight
-        stageConfig.height = newHeight
-        updates.height = newHeight
-      }
-      
-      // Update canvas size in Firestore
-      if (Object.keys(updates).length > 0) {
-        try {
-          await updateCanvas(canvasId.value, updates)
-        } catch (err) {
-          console.error('Failed to update canvas size:', err)
-        }
-      }
-    }
-
     const handleBulkUpdate = ({ shapeIds, property, value }) => {
       shapeIds.forEach(shapeId => {
         handleUpdateProperty({ shapeId, property, value })
@@ -2572,7 +2549,6 @@ export default {
       canvasWidth,
       canvasHeight,
       handleUpdateProperty,
-      handleUpdateCanvasSize,
       handleBulkUpdate,
       // Recovery modal
       showRecoveryModal,
@@ -2616,6 +2592,14 @@ export default {
   overflow: hidden; /* Clip any overflow content including cursors */
 }
 
+.canvas-wrapper[data-panning="true"] {
+  cursor: grab;
+}
+
+.canvas-wrapper[data-panning="true"][data-is-dragging="true"] {
+  cursor: grabbing !important;
+}
+
 /* Responsive canvas width for smaller screens */
 @media (max-width: 1200px) {
   .canvas-wrapper {
@@ -2638,9 +2622,9 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: white;
+  background-color: #ffffff;
   background-image: 
-    radial-gradient(circle, #ddd 1px, transparent 1px);
+    radial-gradient(circle, #e5e7eb 1px, transparent 1px);
   background-size: 20px 20px;
   pointer-events: none;
   z-index: -1;

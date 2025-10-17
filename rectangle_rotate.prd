@@ -1,0 +1,307 @@
+# Rectangle Rotation Fix PRD
+
+## Problem Statement
+
+Rectangles do not maintain their visual position after rotation. When a user rotates a rectangle via the properties panel, the rectangle visually rotates correctly during the interaction, but upon re-render or sync, it "snaps back" to an incorrect position.
+
+### Root Cause
+
+1. **Storage Model**: Rectangles are stored with top-left corner coordinates (`x`, `y`)
+2. **Rendering Model**: Konva renders rectangles with center point at (`x + width/2`, `y + height/2`) and offsets of (`width/2`, `height/2`) to rotate around center
+3. **The Gap**: When rotation is applied, the visual center stays in place but the actual top-left corner moves to a new position in canvas space. The stored `x, y` values are NOT updated to reflect this new top-left position.
+4. **The Bug**: When the shape re-renders from the stored data, it uses the old `x, y` values which no longer correspond to where the rotated top-left corner should be.
+
+### Example
+
+```
+Before Rotation (0°):
+Stored: x=100, y=100, width=100, height=100
+Visual Center: (150, 150)
+Top-Left Corner: (100, 100)
+
+After Rotating 45° (Current Broken Behavior):
+Stored: x=100, y=100, rotation=45°
+Visual Center: (150, 150) ✓ Correct during interaction
+Top-Left Corner: (100, 100) ✗ Wrong! Should be ~(150, 79.3)
+
+On Re-render:
+Rectangle appears at wrong position because stored x,y are stale
+```
+
+## Solution Overview
+
+**Recalculate and update stored `x, y` coordinates after every rotation to reflect the new top-left corner position in canvas space.**
+
+The approach:
+1. Keep existing storage model (`x`, `y`, `width`, `height`, `rotation`)
+2. After rotation, calculate where the top-left corner has moved to
+3. Update stored `x, y` to reflect the new position
+4. Maintain visual center position throughout rotation
+
+## Technical Approach
+
+### Coordinate Transformation
+
+When a rectangle rotates around its center:
+- Center point: `(centerX, centerY)` = `(x + width/2, y + height/2)`
+- Top-left offset from center: `(-width/2, -height/2)` in local coordinates
+- After rotation by angle θ, the top-left corner is at:
+  ```javascript
+  newX = centerX + (-width/2) * cos(θ) - (-height/2) * sin(θ)
+  newY = centerY + (-width/2) * sin(θ) + (-height/2) * cos(θ)
+  ```
+
+Simplified:
+```javascript
+const centerX = x + width / 2
+const centerY = y + height / 2
+const radians = (rotation * Math.PI) / 180
+
+const newX = centerX - (width / 2) * Math.cos(radians) + (height / 2) * Math.sin(radians)
+const newY = centerY - (width / 2) * Math.sin(radians) - (height / 2) * Math.cos(radians)
+```
+
+### Implementation Points
+
+1. **PropertiesPanel.vue** - When rotation input changes
+2. **CanvasView.vue** - When transform/rotation completes
+3. **Rectangle.vue** - Potentially watch rotation changes
+4. **Utility Function** - Centralized rotation calculation
+
+## Changes Required
+
+### 1. Create Utility Function
+
+**File**: `ui/src/utils/rotationUtils.js` (new file)
+
+```javascript
+/**
+ * Calculate new top-left position after rotating a rectangle
+ * Maintains the visual center position while rotating
+ */
+export function calculateRectPositionAfterRotation(x, y, width, height, rotation) {
+  // Current center (before rotation)
+  const centerX = x + width / 2
+  const centerY = y + height / 2
+  
+  // Convert rotation to radians
+  const radians = (rotation * Math.PI) / 180
+  
+  // Calculate where top-left corner is after rotation around center
+  const newX = centerX - (width / 2) * Math.cos(radians) + (height / 2) * Math.sin(radians)
+  const newY = centerY - (width / 2) * Math.sin(radians) - (height / 2) * Math.cos(radians)
+  
+  return { x: newX, y: newY }
+}
+
+/**
+ * Update rectangle with new rotation, adjusting position to maintain visual center
+ */
+export function applyRotationToRectangle(rectangle, newRotation) {
+  const oldRotation = rectangle.rotation || 0
+  if (oldRotation === newRotation) return rectangle
+  
+  // Calculate position adjustment needed to maintain center
+  const { x: newX, y: newY } = calculateRectPositionAfterRotation(
+    rectangle.x,
+    rectangle.y,
+    rectangle.width,
+    rectangle.height,
+    newRotation
+  )
+  
+  return {
+    ...rectangle,
+    x: newX,
+    y: newY,
+    rotation: newRotation
+  }
+}
+```
+
+### 2. Update PropertiesPanel.vue
+
+When user changes rotation via properties panel input:
+
+```javascript
+const handlePropertyChange = (property, value) => {
+  if (props.selectedShapes.length === 0) return;
+  
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    // Special handling for rectangle rotation
+    if (property === 'rotation' && props.selectedShapes[0].type === 'rectangle') {
+      const rect = props.selectedShapes[0]
+      const { x: newX, y: newY } = calculateRectPositionAfterRotation(
+        rect.x, rect.y, rect.width, rect.height, value
+      )
+      
+      emit('update-property', {
+        shapeId: rect.id,
+        property: 'rotation',
+        value,
+        additionalUpdates: { x: newX, y: newY }
+      });
+    } else {
+      emit('update-property', {
+        shapeId: props.selectedShapes[0].id,
+        property,
+        value
+      });
+    }
+  }, 300);
+};
+```
+
+### 3. Update CanvasView.vue
+
+**Transform End Handler** - Already partially handles this but needs fix:
+
+```javascript
+const handleTransformEnd = (e) => {
+  const node = e.target
+  const shapeId = node.id()
+  
+  if (shape.type === 'rectangle') {
+    const rotation = node.rotation()
+    const { x: newX, y: newY } = calculateRectPositionAfterRotation(
+      rectangle.x,
+      rectangle.y,
+      rectangle.width,
+      rectangle.height,
+      rotation
+    )
+    
+    updates.x = newX
+    updates.y = newY
+    updates.rotation = rotation
+  }
+}
+```
+
+**Properties Panel Handler**:
+
+```javascript
+const handleUpdateProperty = ({ shapeId, property, value, additionalUpdates }) => {
+  if (!shapeId) return
+  
+  let updates = { [property]: validatedValue }
+  
+  // Merge additional updates (like x, y from rotation)
+  if (additionalUpdates) {
+    updates = { ...updates, ...additionalUpdates }
+  }
+  
+  const userId = user.value?.uid || 'anonymous'
+  updateShape(shapeId, updates, userId, canvasId.value, true, true, userName.value)
+}
+```
+
+### 4. Update Rectangle.vue (Optional Enhancement)
+
+Add watcher to sync visual position when rotation changes:
+
+```javascript
+watch(() => props.rectangle.rotation, (newRotation, oldRotation) => {
+  if (rectNode.value && newRotation !== undefined && newRotation !== oldRotation) {
+    const node = rectNode.value.getNode()
+    if (node) {
+      // Calculate new position to maintain visual center
+      const { x: newX, y: newY } = calculateRectPositionAfterRotation(
+        props.rectangle.x,
+        props.rectangle.y,
+        props.rectangle.width,
+        props.rectangle.height,
+        newRotation
+      )
+      
+      // Update node position and rotation
+      node.x(newX + props.rectangle.width / 2)
+      node.y(newY + props.rectangle.height / 2)
+      node.rotation(newRotation)
+      node.getLayer()?.batchDraw()
+    }
+  }
+})
+```
+
+## Testing Requirements
+
+### Manual Testing
+
+1. **Basic Rotation Test**
+   - Create rectangle at (100, 100)
+   - Rotate to 45° via properties panel
+   - Verify rectangle stays in same visual position
+   - Refresh page
+   - Verify rectangle is still in correct position
+
+2. **Multiple Rotation Test**
+   - Create rectangle
+   - Rotate to 45°, then 90°, then 180°, then 360°
+   - Verify position maintained through all rotations
+
+3. **Drag After Rotation Test**
+   - Create rectangle
+   - Rotate to 45°
+   - Drag to new position
+   - Verify rotation is maintained
+   - Verify position is correct
+
+4. **Transform Tool Rotation Test**
+   - Create rectangle
+   - Use transform tool to rotate (if available)
+   - Verify position maintained
+   - Verify stored values updated
+
+5. **Multi-user Test**
+   - User A creates and rotates rectangle
+   - User B sees rectangle in correct rotated position
+   - User B rotates it further
+   - Both users see correct position
+
+### Automated Tests
+
+Create test file: `ui/tests/rectangle-rotation-position.spec.js`
+
+```javascript
+test('rectangle maintains position after rotation via properties panel', async () => {
+  // Create rectangle
+  // Get initial visual center
+  // Rotate via properties panel
+  // Verify visual center unchanged
+  // Verify stored x,y updated
+  // Reload page
+  // Verify position still correct
+})
+
+test('rectangle rotation works with drag', async () => {
+  // Create and rotate rectangle
+  // Drag to new position
+  // Verify rotation maintained
+  // Verify position correct
+})
+```
+
+## Backward Compatibility
+
+**Impact**: Minimal - existing rectangles will work as before. Only NEW rotations will use the corrected calculation.
+
+**Migration**: Not required. Existing rectangles with rotation values will be fixed upon next rotation update.
+
+## Success Criteria
+
+1. ✓ Rectangle maintains visual position when rotated via properties panel
+2. ✓ Rectangle position persists correctly across page refreshes
+3. ✓ Rectangle position syncs correctly across multiple users
+4. ✓ Drag and rotation work together correctly
+5. ✓ Transform tool rotation works correctly (if applicable)
+6. ✓ No performance regression
+7. ✓ Automated tests pass
+
+## Future Enhancements
+
+- Apply similar fix to other shapes if they support rotation
+- Add rotation handle/control for visual rotation (beyond current transform tool)
+- Add rotation snapping (0°, 45°, 90°, etc.)
+

@@ -249,7 +249,7 @@ onUnmounted(() => {
 .ai-command-panel.is-focused {
   background-color: rgba(255, 255, 255, 1);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  border-color: #3b82f6;
+  border-color: #2d2d2d;
 }
 
 .input-area {
@@ -270,8 +270,8 @@ onUnmounted(() => {
 }
 
 .command-input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #2d2d2d;
+  box-shadow: 0 0 0 3px rgba(45, 45, 45, 0.1);
 }
 
 .command-input::placeholder {
@@ -285,7 +285,7 @@ onUnmounted(() => {
 }
 
 .send-button {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, #2d2d2d 0%, #000000 100%);
   color: white;
   padding: 10px 20px;
   border: none;
@@ -298,12 +298,12 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   min-width: 80px;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .send-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.3);
+  background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
   transform: translateY(-1px);
 }
 
@@ -312,7 +312,7 @@ onUnmounted(() => {
 }
 
 .send-button:disabled {
-  background: linear-gradient(135deg, #93c5fd 0%, #bfdbfe 100%);
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
   cursor: not-allowed;
   box-shadow: none;
 }

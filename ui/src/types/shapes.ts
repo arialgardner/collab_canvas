@@ -92,11 +92,11 @@ export const DEFAULT_SHAPE_PROPERTIES = {
   rectangle: {
     width: 100,
     height: 100,
-    fill: '#3B82F6' // Blue
+    fill: '#000000' // Black
   },
   circle: {
     radius: 50,
-    fill: '#EF4444' // Red
+    fill: '#000000' // Black
     // stroke and strokeWidth are optional, omit from defaults
   },
   line: {

@@ -138,39 +138,6 @@
               @keyup.enter="handleCreateCanvas"
             />
           </div>
-
-          <div class="form-group">
-            <label>Canvas Size</label>
-            <div class="size-row">
-              <div class="size-input-group">
-                <label for="canvas-width">Width</label>
-                <input
-                  id="canvas-width"
-                  v-model.number="newCanvasWidth"
-                  type="number"
-                  min="100"
-                  max="10000"
-                  class="form-input"
-                />
-              </div>
-              <span class="size-separator">×</span>
-              <div class="size-input-group">
-                <label for="canvas-height">Height</label>
-                <input
-                  id="canvas-height"
-                  v-model.number="newCanvasHeight"
-                  type="number"
-                  min="100"
-                  max="10000"
-                  class="form-input"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div class="form-info">
-            <span class="info-text">Maximum size: 10000 × 10000px</span>
-          </div>
         </div>
 
         <div class="modal-footer">
@@ -331,8 +298,6 @@ const canvasesList = computed(() => {
 // Create modal
 const showCreateModal = ref(false)
 const newCanvasName = ref('')
-const newCanvasWidth = ref(3000)
-const newCanvasHeight = ref(3000)
 const isCreating = ref(false)
 
 // Rename modal
@@ -383,16 +348,12 @@ const handleCreateCanvas = async () => {
   try {
     isCreating.value = true
     const canvas = await createCanvas(user.value.uid, user.value.displayName || user.value.email, {
-      name: newCanvasName.value,
-      width: newCanvasWidth.value,
-      height: newCanvasHeight.value
+      name: newCanvasName.value
     })
 
     // Reset form
     showCreateModal.value = false
     newCanvasName.value = ''
-    newCanvasWidth.value = 3000
-    newCanvasHeight.value = 3000
 
     // Navigate to new canvas
     openCanvas(canvas.id)

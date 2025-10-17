@@ -88,8 +88,8 @@ export default {
 }
 
 .tool-button.active {
-  background: #3b82f6;
-  border-color: #3b82f6;
+  background: #000000;
+  border-color: #000000;
   color: white;
 }
 

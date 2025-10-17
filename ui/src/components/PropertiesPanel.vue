@@ -11,7 +11,6 @@
             <input
               type="number"
               :value="canvasWidth"
-              @input="handleCanvasSizeChange('width', $event)"
               min="100"
               max="10000"
               readonly
@@ -23,7 +22,6 @@
             <input
               type="number"
               :value="canvasHeight"
-              @input="handleCanvasSizeChange('height', $event)"
               min="100"
               max="10000"
               readonly
@@ -617,7 +615,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['update-property', 'update-canvas-size', 'bulk-update']);
+const emit = defineEmits(['update-property', 'bulk-update']);
 // MRU state
 const mruFill = ref([])
 const mruStroke = ref([])
@@ -750,16 +748,6 @@ const handleLinePointChange = (index, value) => {
   }, 300);
 };
 
-const handleCanvasSizeChange = (dimension, event) => {
-  const value = parseInt(event.target.value);
-  if (isNaN(value) || value < 100 || value > 10000) return;
-  
-  clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => {
-    emit('update-canvas-size', { [dimension]: value });
-  }, 500);
-};
-
 // Multi-selection helpers
 const hasCommonProperty = (property) => {
   if (props.selectedShapes.length === 0) return false;
@@ -842,7 +830,7 @@ const preventTyping = (event) => {
   color: #111827;
   margin: 0 0 8px 0;
   padding-bottom: 12px;
-  border-bottom: 2px solid #3b82f6;
+  border-bottom: 2px solid #000000;
 }
 
 .property-group {

@@ -30,6 +30,10 @@ export default {
     disableDrag: {
       type: Boolean,
       default: false
+    },
+    activeTool: {
+      type: String,
+      default: 'select'
     }
   },
   emits: ['update', 'select'],
@@ -82,17 +86,23 @@ export default {
     // Event handlers
     const handleMouseEnter = (e) => {
       isHovered.value = true
-      // Change cursor to move
-      const stage = e.target.getStage()
-      stage.container().style.cursor = 'move'
+      // Only change cursor to move if select tool is active
+      if (props.activeTool === 'select') {
+        const stage = e.target.getStage()
+        stage.container().style.cursor = 'move'
+      }
     }
 
     const handleMouseLeave = (e) => {
       if (!isDragging.value) {
         isHovered.value = false
-        // Reset cursor
+        // Reset cursor based on active tool
         const stage = e.target.getStage()
-        stage.container().style.cursor = 'grab'
+        if (props.activeTool === 'pan') {
+          stage.container().style.cursor = 'grab'
+        } else {
+          stage.container().style.cursor = 'default'
+        }
       }
     }
 

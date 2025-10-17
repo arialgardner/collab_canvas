@@ -53,11 +53,12 @@ export default {
     const localText = ref('')
 
     // Calculate editor position based on shape position and stage transform
+    // Position 20px below the text's y position
     const editorStyle = computed(() => {
       if (!props.textShape) return {}
       
       const x = props.textShape.x * props.stageScale + props.stagePosition.x
-      const y = props.textShape.y * props.stageScale + props.stagePosition.y
+      const y = props.textShape.y * props.stageScale + props.stagePosition.y + 20
       
       return {
         left: `${x}px`,

@@ -28,6 +28,10 @@ export default {
     disableDrag: {
       type: Boolean,
       default: false
+    },
+    activeTool: {
+      type: String,
+      default: 'select'
     }
   },
   emits: ['update', 'select', 'edit'],
@@ -56,16 +60,24 @@ export default {
     }))
 
     const handleMouseEnter = (e) => {
-      const stage = e.target.getStage()
-      if (stage) {
-        stage.container().style.cursor = 'move'
+      // Only change cursor to move if select tool is active
+      if (props.activeTool === 'select') {
+        const stage = e.target.getStage()
+        if (stage) {
+          stage.container().style.cursor = 'move'
+        }
       }
     }
 
     const handleMouseLeave = (e) => {
       const stage = e.target.getStage()
       if (stage) {
-        stage.container().style.cursor = 'default'
+        // Reset cursor based on active tool
+        if (props.activeTool === 'pan') {
+          stage.container().style.cursor = 'grab'
+        } else {
+          stage.container().style.cursor = 'default'
+        }
       }
     }
 
@@ -75,6 +87,12 @@ export default {
 
     const handleDragStart = (e) => {
       emit('select', props.text.id, e.evt)
+      
+      // Update cursor to grabbing during drag
+      const stage = e.target.getStage()
+      if (stage) {
+        stage.container().style.cursor = 'grabbing'
+      }
     }
 
     const handleDragMove = (e) => {
@@ -102,6 +120,18 @@ export default {
         y: finalY,
         saveToFirestore: true
       })
+      
+      // Reset cursor after drag
+      const stage = e.target.getStage()
+      if (stage) {
+        if (props.activeTool === 'pan') {
+          stage.container().style.cursor = 'grab'
+        } else if (props.activeTool === 'select') {
+          stage.container().style.cursor = 'move'
+        } else {
+          stage.container().style.cursor = 'default'
+        }
+      }
     }
 
     const handleDoubleClick = () => {
