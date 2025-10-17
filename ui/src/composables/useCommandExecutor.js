@@ -44,7 +44,7 @@ export function useCommandExecutor() {
       switch (category) {
         case 'creation':
           if (action === 'create-multiple') {
-            result = await executeCreateMultiple(parameters, userId, canvasId, userName, viewportCenter)
+            result = await executeCreateMultiple(parameters, userId, canvasId, userName, viewportCenter, context)
             info(`Created ${parameters.count || 0} ${parameters.shapeType || 'shapes'}`)
           } else {
             result = await executeCreation(parameters, userId, canvasId, userName, viewportCenter)
@@ -105,7 +105,16 @@ export function useCommandExecutor() {
    * Execute creation command
    */
   const executeCreation = async (params, userId, canvasId, userName, viewportCenter) => {
-    const { shapeType, color, size, position, text, fontSize, fontFamily, fontStyle } = params
+    const { shapeType, color, size, position, text, fontSize, fontFamily, fontStyle, points, length, angle } = params
+
+    // Debug logging to trace shapeType
+    console.log('🔍 executeCreation params:', params)
+    console.log('🔍 shapeType extracted:', shapeType)
+
+    // Validate that lines are not supported
+    if (shapeType === 'line') {
+      throw new Error('Lines are not supported. Only rectangles, circles, and text can be created.')
+    }
 
     // Use viewport center (visible screen area) as default position
     const properties = {
@@ -119,11 +128,22 @@ export function useCommandExecutor() {
     }
 
     // Add size properties
+    console.log('🔍 Size parameter:', size)
     if (size) {
-      if (size.width !== undefined) properties.width = size.width
-      if (size.height !== undefined) properties.height = size.height
-      if (size.radius !== undefined) properties.radius = size.radius
+      if (size.width !== undefined) {
+        properties.width = size.width
+        console.log('🔍 Setting width:', size.width)
+      }
+      if (size.height !== undefined) {
+        properties.height = size.height
+        console.log('🔍 Setting height:', size.height)
+      }
+      if (size.radius !== undefined) {
+        properties.radius = size.radius
+        console.log('🔍 Setting radius:', size.radius)
+      }
     }
+    console.log('🔍 Final properties:', properties)
 
     // Add text properties
     if (text) properties.text = text
@@ -131,7 +151,11 @@ export function useCommandExecutor() {
     if (fontFamily) properties.fontFamily = fontFamily
     if (fontStyle) properties.fontStyle = fontStyle
 
-    const shape = await createShape(shapeType || 'rectangle', properties, userId, canvasId, userName)
+    // Ensure we have a valid shapeType, default to rectangle only if truly missing
+    const finalShapeType = shapeType || 'rectangle'
+    console.log('🔍 Creating shape with type:', finalShapeType)
+    
+    const shape = await createShape(finalShapeType, properties, userId, canvasId, userName)
     return { createdShapes: [shape] }
   }
 
@@ -211,7 +235,7 @@ export function useCommandExecutor() {
   /**
    * Execute multiple creations with arrangements
    */
-  const executeCreateMultiple = async (params, userId, canvasId, userName, viewportCenter) => {
+  const executeCreateMultiple = async (params, userId, canvasId, userName, viewportCenter, context) => {
     const {
       shapeType = 'rectangle',
       count = 1,
@@ -220,59 +244,120 @@ export function useCommandExecutor() {
       size,
     } = params
 
+    // Validate that lines are not supported
+    if (shapeType === 'line') {
+      throw new Error('Lines are not supported. Only rectangles, circles, and text can be created.')
+    }
+
     const createdShapes = []
-    const spacing = 120
+    
+    // Get viewport dimensions from context (default to reasonable values)
+    const viewportWidth = context?.viewportWidth || 1280
+    const viewportHeight = context?.viewportHeight || 720
+    
+    // Use 80% of viewport to leave some padding
+    const usableWidth = viewportWidth * 0.8
+    const usableHeight = viewportHeight * 0.8
 
     const baseX = viewportCenter.x
     const baseY = viewportCenter.y
 
+    // Determine default shape size
+    const shapeWidth = size?.width || size?.radius * 2 || 100
+    const shapeHeight = size?.height || size?.radius * 2 || 100
+
     // Layout helpers
     const positions = []
 
-    if (arrangement === 'horizontal') {
-      const startX = baseX - Math.floor(count / 2) * spacing
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: startX + i * spacing, y: baseY })
-      }
-    } else if (arrangement === 'vertical') {
-      const startY = baseY - Math.floor(count / 2) * spacing
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: baseX, y: startY + i * spacing })
-      }
-    } else if (arrangement === 'grid') {
+    // For large counts, always use grid layout within viewport
+    if (count > 10 || arrangement === 'grid') {
+      // Calculate grid that fits in viewport
       const cols = Math.ceil(Math.sqrt(count))
       const rows = Math.ceil(count / cols)
-      const startX = baseX - Math.floor(cols / 2) * spacing
-      const startY = baseY - Math.floor(rows / 2) * spacing
+      
+      // Calculate spacing to fit all shapes in viewport
+      const horizontalSpacing = Math.max(20, Math.min(120, usableWidth / cols - shapeWidth))
+      const verticalSpacing = Math.max(20, Math.min(120, usableHeight / rows - shapeHeight))
+      
+      const gridWidth = cols * (shapeWidth + horizontalSpacing)
+      const gridHeight = rows * (shapeHeight + verticalSpacing)
+      
+      const startX = baseX - gridWidth / 2
+      const startY = baseY - gridHeight / 2
+      
+      console.log('🎯 Grid layout:', { 
+        count, 
+        cols, 
+        rows, 
+        horizontalSpacing, 
+        verticalSpacing,
+        gridWidth,
+        gridHeight,
+        viewportWidth,
+        viewportHeight
+      })
+      
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           if (positions.length >= count) break
-          positions.push({ x: startX + c * spacing, y: startY + r * spacing })
+          positions.push({ 
+            x: startX + c * (shapeWidth + horizontalSpacing), 
+            y: startY + r * (shapeHeight + verticalSpacing) 
+          })
         }
       }
+    } else if (arrangement === 'horizontal') {
+      const spacing = Math.max(20, Math.min(120, usableWidth / count - shapeWidth))
+      const startX = baseX - (count * (shapeWidth + spacing)) / 2
+      for (let i = 0; i < count; i++) {
+        positions.push({ x: startX + i * (shapeWidth + spacing), y: baseY })
+      }
+    } else if (arrangement === 'vertical') {
+      const spacing = Math.max(20, Math.min(120, usableHeight / count - shapeHeight))
+      const startY = baseY - (count * (shapeHeight + spacing)) / 2
+      for (let i = 0; i < count; i++) {
+        positions.push({ x: baseX, y: startY + i * (shapeHeight + spacing) })
+      }
     } else if (arrangement === 'scattered') {
+      // Scatter within viewport bounds
       for (let i = 0; i < count; i++) {
         positions.push({
-          x: baseX + (Math.random() * 400 - 200),
-          y: baseY + (Math.random() * 400 - 200)
+          x: baseX + (Math.random() * usableWidth - usableWidth / 2),
+          y: baseY + (Math.random() * usableHeight - usableHeight / 2)
         })
       }
     } else {
-      // default to horizontal
-      const startX = baseX - Math.floor(count / 2) * spacing
-      for (let i = 0; i < count; i++) {
-        positions.push({ x: startX + i * spacing, y: baseY })
+      // Default to grid for better viewport fitting
+      const cols = Math.ceil(Math.sqrt(count))
+      const rows = Math.ceil(count / cols)
+      const horizontalSpacing = Math.max(20, Math.min(120, usableWidth / cols - shapeWidth))
+      const verticalSpacing = Math.max(20, Math.min(120, usableHeight / rows - shapeHeight))
+      const gridWidth = cols * (shapeWidth + horizontalSpacing)
+      const gridHeight = rows * (shapeHeight + verticalSpacing)
+      const startX = baseX - gridWidth / 2
+      const startY = baseY - gridHeight / 2
+      
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (positions.length >= count) break
+          positions.push({ 
+            x: startX + c * (shapeWidth + horizontalSpacing), 
+            y: startY + r * (shapeHeight + verticalSpacing) 
+          })
+        }
       }
     }
 
     for (const pos of positions) {
       const properties = { x: pos.x, y: pos.y }
+      
       if (color) properties.fill = color
       if (size) {
         if (size.width !== undefined) properties.width = size.width
         if (size.height !== undefined) properties.height = size.height
         if (size.radius !== undefined) properties.radius = size.radius
       }
+      
       const shape = await createShape(shapeType, properties, userId, canvasId, userName)
       createdShapes.push(shape)
     }

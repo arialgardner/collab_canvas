@@ -26,9 +26,13 @@ export default {
     onUpdate: {
       type: Function,
       default: () => {}
+    },
+    disableDrag: {
+      type: Boolean,
+      default: false
     }
   },
-  emits: ['update'],
+  emits: ['update', 'select'],
   setup(props, { emit }) {
     const isHovered = ref(false)
     const isDragging = ref(false)
@@ -55,7 +59,7 @@ export default {
       height: props.rectangle.height,
       fill: props.rectangle.fill,
       rotation: props.rectangle.rotation || 0,
-      draggable: true,
+      draggable: !props.disableDrag,
       // Rotate around center point
       offsetX: props.rectangle.width / 2,
       offsetY: props.rectangle.height / 2,

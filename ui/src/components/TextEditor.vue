@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 
 export default {
   name: 'TextEditor',
@@ -123,6 +123,33 @@ export default {
     const handleCancel = () => {
       emit('cancel')
     }
+
+    // Global click handler to close editor when clicking outside
+    const handleGlobalClick = (e) => {
+      if (!props.isVisible) return
+      
+      // Check if click is outside text editor and toolbar
+      const isEditorClick = e.target.closest('.text-editor-overlay')
+      const isToolbarClick = e.target.closest('.text-format-toolbar')
+      
+      if (!isEditorClick && !isToolbarClick) {
+        // Save text if it has content, otherwise cancel
+        if (localText.value.trim()) {
+          emit('save', localText.value)
+        } else {
+          emit('cancel')
+        }
+      }
+    }
+
+    onMounted(() => {
+      // Add click listener with capture phase to catch clicks before they bubble
+      document.addEventListener('click', handleGlobalClick, true)
+    })
+
+    onUnmounted(() => {
+      document.removeEventListener('click', handleGlobalClick, true)
+    })
 
     return {
       textInput,

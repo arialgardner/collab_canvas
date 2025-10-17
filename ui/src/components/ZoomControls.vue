@@ -53,7 +53,7 @@ export default {
 .zoom-controls {
   position: fixed;
   bottom: 2rem;
-  right: 340px; /* Account for properties panel (300px) + margin */
+  left: 2rem; /* Move to bottom-left to avoid AI panel on right */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -68,13 +68,13 @@ export default {
 /* Responsive positioning for smaller screens */
 @media (max-width: 1200px) {
   .zoom-controls {
-    right: 290px; /* Account for narrower properties panel (250px) + margin */
+    left: 1rem;
   }
 }
 
 @media (max-width: 768px) {
   .zoom-controls {
-    right: 2rem; /* Align to right edge on mobile */
+    left: 1rem;
     bottom: 5rem; /* Higher to avoid mobile UI elements */
   }
 }

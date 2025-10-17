@@ -19,11 +19,8 @@ This document breaks down the V6 AI Command System PRD into PR-sized, logical un
 
 **Implementation**:
 1. Create `functions/ai/` directory structure
-2. Install dependencies in functions:
-   ```bash
-   cd functions
-   npm install langchain @langchain/openai @langchain/core zod
-   ```
+2. No additional dependencies needed (uses native fetch for OpenAI API)
+
 3. Implement `parseAICommand` Cloud Function with:
    - Firebase auth verification (`context.auth` check)
    - Basic command schema (category, action, parameters)
