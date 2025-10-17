@@ -14,6 +14,9 @@ const openaiApiKey = defineSecret("OPENAI_API_KEY");
 
 /**
  * Call OpenAI API directly using fetch
+ * @param {string} prompt - The prompt to send to OpenAI
+ * @param {string} apiKey - The OpenAI API key
+ * @return {Promise<string>} The response content from OpenAI
  */
 const callOpenAI = async (prompt, apiKey) => {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {

@@ -12,11 +12,25 @@ import { useFirestore } from './useFirestore'
 import { usePerformance } from './usePerformance'
 import { useNotifications } from './useNotifications'
 import { usePerformanceMonitoring } from './usePerformanceMonitoring'
+import { useOperationLog } from './useOperationLog'
+import { getFeatureFlag } from '../utils/featureFlags'
+import { transform, applyTransformedOperation } from '../utils/operationalTransform'
+import { useConflictDetection } from './useConflictDetection'
+import { usePrediction } from './usePrediction'
 
 export const useShapes = () => {
   // Firestore integration
   const { saveShape, updateShape: updateShapeInFirestore, deleteShape: deleteShapeFromFirestore, loadShapes, subscribeToShapes } = useFirestore()
   const { measureRectangleSync, measureRender, trackListener } = usePerformance()
+  
+  // v8: Operation log for OT (feature flag controlled)
+  const useOpLog = getFeatureFlag('USE_REALTIME_DB', false)
+  const operationLog = useOpLog ? useOperationLog() : null
+  const conflictDetection = useOpLog ? useConflictDetection() : null
+  
+  // v8: Client-side prediction (feature flag controlled)
+  const usePredictionFlag = getFeatureFlag('ENABLE_PREDICTION', false)
+  const prediction = usePredictionFlag ? usePrediction() : null
   
   // v3 Performance monitoring
   const { 
@@ -128,6 +142,12 @@ export const useShapes = () => {
       // Save to Firestore
       await saveShape(canvasId, shape)
       
+      // v8: Log operation for OT
+      if (operationLog) {
+        const operation = operationLog.createOperation('create', shape.id, userId, shape, null)
+        await operationLog.appendOperation(canvasId, operation)
+      }
+      
       // End sync measurement and track creation for v3
       syncMeasurement.end()
       trackShapeCreation()
@@ -169,6 +189,12 @@ export const useShapes = () => {
 
     // Update local state immediately (optimistic update)
     shapes.set(id, updatedShape)
+    
+    // v8: Create prediction for local update
+    let predictionId = null
+    if (prediction && prediction.shouldApplyPrediction()) {
+      predictionId = prediction.predict(id, updates, shape)
+    }
 
     // Save to Firestore if requested (e.g., on drag end)
     if (saveToFirestore) {
@@ -178,9 +204,36 @@ export const useShapes = () => {
           isFinal,  // High priority if final, low if interim
           usePriorityQueue: true
         })
+        
+        // v8: Log operation for OT (only on final edits)
+        let operationId = null
+        if (operationLog && isFinal) {
+          const operation = operationLog.createOperation('update', id, userId, updates, shape)
+          await operationLog.appendOperation(canvasId, operation)
+          operationId = operation.operationId
+        }
+        
+        // v8: Confirm prediction on successful save
+        if (predictionId && prediction) {
+          if (operationId) {
+            // Will be confirmed when operation is acknowledged
+          } else {
+            prediction.confirmPrediction(predictionId)
+          }
+        }
       } catch (err) {
         console.error('Error updating shape in Firestore:', err)
         error.value = err.message
+        
+        // v8: Rollback prediction on error
+        if (predictionId && prediction) {
+          prediction.rollbackPrediction(predictionId, (shapeId, reverseDelta) => {
+            const currentShape = shapes.get(shapeId)
+            if (currentShape) {
+              shapes.set(shapeId, { ...currentShape, ...reverseDelta })
+            }
+          })
+        }
       }
     }
 
@@ -215,12 +268,14 @@ export const useShapes = () => {
   }
 
   // Delete shapes from both local state and Firestore
-  const deleteShapes = async (shapeIds, canvasId = 'default') => {
+  const deleteShapes = async (shapeIds, canvasId = 'default', userId = 'anonymous') => {
     if (!Array.isArray(shapeIds)) shapeIds = [shapeIds]
     
     const deletePromises = []
     
     for (const shapeId of shapeIds) {
+      const shape = shapes.get(shapeId)
+      
       // Optimistic local removal
       shapes.delete(shapeId)
       
@@ -234,6 +289,16 @@ export const useShapes = () => {
           // Don't re-add to local state on error - deletion is optimistic
         })
       )
+      
+      // v8: Log operation for OT
+      if (operationLog && shape) {
+        const operation = operationLog.createOperation('delete', shapeId, userId, null, shape)
+        deletePromises.push(
+          operationLog.appendOperation(canvasId, operation).catch(err => {
+            console.error(`Failed to log delete operation for ${shapeId}:`, err)
+          })
+        )
+      }
     }
     
     await Promise.all(deletePromises)
@@ -325,7 +390,55 @@ export const useShapes = () => {
           if (change.type === 'modified') {
             const localShape = shapes.get(shapeId)
             
-            // Conflict resolution: Last write wins with server timestamp
+            // v8: OT-based conflict resolution (if enabled)
+            if (useOpLog && conflictDetection && operationLog) {
+              // Check for pending local operations
+              const pendingOps = operationLog.getPendingOperations(shapeId)
+              
+              if (pendingOps.length > 0) {
+                // Create remote operation from incoming shape
+                const remoteOp = {
+                  type: 'update',
+                  shapeId,
+                  userId: shape.lastModifiedBy,
+                  timestamp: shape.lastModified,
+                  delta: shape,  // Full shape as delta
+                  baseState: localShape
+                }
+                
+                // Check for conflicts
+                const conflicts = conflictDetection.findConflictingOperations(remoteOp, operationLog.pendingOperations)
+                
+                if (conflicts.length > 0) {
+                  console.log(`[OT] Detected ${conflicts.length} conflict(s) for shape ${shapeId}`)
+                  
+                  // Transform remote operation against pending local operations
+                  let transformedOp = remoteOp
+                  for (const { localOp } of conflicts) {
+                    transformedOp = transform(transformedOp, localOp)
+                    
+                    if (!transformedOp) {
+                      console.log('[OT] Remote operation discarded after transform')
+                      break
+                    }
+                  }
+                  
+                  // Apply transformed operation if not discarded
+                  if (transformedOp) {
+                    const updatedShape = applyTransformedOperation(localShape, transformedOp)
+                    if (updatedShape) {
+                      shapes.set(shapeId, updatedShape)
+                      conflictDetection.markResolved()
+                      console.log(`[OT] Applied transformed operation to shape ${shapeId}`)
+                    }
+                  }
+                  
+                  return // Skip normal conflict resolution
+                }
+              }
+            }
+            
+            // Standard conflict resolution: Last write wins with server timestamp
             if (!localShape || shape.lastModified > localShape.lastModified) {
               // If user is editing locally, queue remote update to apply after finish
               if (currentlyEditing.has(shapeId)) {

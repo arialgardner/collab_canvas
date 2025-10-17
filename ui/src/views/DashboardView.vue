@@ -68,14 +68,14 @@
               Owner
             </span>
             <span
-              v-else-if="getUserRole(canvas) === 'editor'"
+              v-else-if="getUserRole(canvas, user.uid) === 'editor'"
               class="editor-badge"
               title="You can edit this canvas"
             >
               Editor
             </span>
             <span
-              v-else-if="getUserRole(canvas) === 'viewer'"
+              v-else-if="getUserRole(canvas, user.uid) === 'viewer'"
               class="viewer-badge"
               title="You can view this canvas"
             >
@@ -367,7 +367,13 @@ onMounted(async () => {
 
 // Navigation
 const openCanvas = (canvasId) => {
-  router.push({ name: 'Canvas', params: { canvasId } })
+  console.log('[Dashboard] Opening canvas:', canvasId)
+  try {
+    router.push({ name: 'Canvas', params: { canvasId } })
+  } catch (error) {
+    console.error('[Dashboard] Error navigating to canvas:', error)
+    alert('Failed to open canvas. Please try again.')
+  }
 }
 
 // Create canvas

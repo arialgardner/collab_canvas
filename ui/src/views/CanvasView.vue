@@ -244,7 +244,10 @@ import { getMaxZIndex } from '../types/shapes'
 import { useAuth } from '../composables/useAuth'
 import { useCanvases } from '../composables/useCanvases'
 import { useCursors } from '../composables/useCursors'
+import { useCursorsRTDB } from '../composables/useCursorsRTDB'
 import { usePresence } from '../composables/usePresence'
+import { usePresenceRTDB } from '../composables/usePresenceRTDB'
+import { getFeatureFlag } from '../utils/featureFlags'
 import { usePerformance } from '../composables/usePerformance'
 import { usePerformanceMonitoring } from '../composables/usePerformanceMonitoring'
 import { useUndoRedo } from '../composables/useUndoRedo'
@@ -350,6 +353,12 @@ export default {
     // v5: Batch operations and snapshot support for version restore
     const { saveShapesBatch, deleteShapesBatch, loadCanvasSnapshot, updateCanvasSnapshot } = useFirestore()
     
+    // v8: Feature flag controlled dual-mode (Firestore vs Realtime DB)
+    const useRealtimeDB = getFeatureFlag('USE_REALTIME_DB', false)
+    console.log(`[v8] Using ${useRealtimeDB ? 'Realtime DB' : 'Firestore'} for cursors and presence`)
+    
+    // Choose cursor composable based on feature flag
+    const cursorsComposable = useRealtimeDB ? useCursorsRTDB() : useCursors()
     const {
       cursors,
       updateCursorPosition,
@@ -358,14 +367,17 @@ export default {
       screenToCanvas,
       getAllCursors,
       cleanupStaleCursors
-    } = useCursors()
+    } = cursorsComposable
+    
+    // Choose presence composable based on feature flag
+    const presenceComposable = useRealtimeDB ? usePresenceRTDB() : usePresence()
     const {
       setUserOnline,
       setUserOffline,
       subscribeToPresence,
       getActiveUserCount,
       cleanup: cleanupPresence
-    } = usePresence()
+    } = presenceComposable
     
     const { measureRender, throttle, logPerformanceSummary } = usePerformance()
     const { state: connectionState, setSyncHandler } = useConnectionState()
