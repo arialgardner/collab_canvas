@@ -108,13 +108,13 @@ const historyIndex = ref(-1)
 
 // Suggested commands for users to learn the format
 const suggestedCommands = [
-  { icon: '🟢', text: 'draw three green circles' },
-  { icon: '📝', text: 'add a text layer that says i am gothcollabcanvas' },
+  { icon: '⭕', text: 'create a circle made of squares' },
+  { icon: '⭐', text: 'make a star made of circles' },
+  { icon: '💎', text: 'draw a diamond made of rectangles' },
+  { icon: '❤️', text: 'create a heart made of circles' },
+  { icon: '🔲', text: 'create a 3x3 grid of squares' },
   { icon: '🎯', text: 'move selected to center' },
   { icon: '📏', text: 'make selected twice as big' },
-  { icon: '🔲', text: 'create a 3x3 grid of squares' },
-  { icon: '🧭', text: 'navigation bar with 5 items' },
-  { icon: '🎴', text: 'create a card layout' },
   { icon: '🗑️', text: 'delete all selected shapes' },
 ]
 

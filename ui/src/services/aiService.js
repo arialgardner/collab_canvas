@@ -62,6 +62,13 @@ Examples:
 - "draw a 50px circle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "circle", "radius": 50}}
 - "create a 300 by 150 rectangle" → {"intent": "CREATE_SHAPE", "parameters": {"type": "rectangle", "width": 300, "height": 150}}
 - "create 3 circles" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "circle", "count": 3}}
+- "create a 3x3 grid of squares" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "rectangle", "gridRows": 3, "gridCols": 3}}
+- "make a 5 by 5 grid of rectangles" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "rectangle", "gridRows": 5, "gridCols": 5}}
+- "create a 4x6 grid of circles" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "circle", "gridRows": 4, "gridCols": 6}}
+- "create a circle made of squares" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "rectangle", "pattern": "circle"}}
+- "make a star made of circles" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "circle", "pattern": "star"}}
+- "draw a square made of rectangles" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "rectangle", "pattern": "square"}}
+- "create a triangle made of circles" → {"intent": "CREATE_MULTIPLE_SHAPES", "parameters": {"type": "circle", "pattern": "triangle"}}
 - "move selected to center" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
 - "center the selected rectangle" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
 - "move it to the middle of the screen" → {"intent": "MOVE_SHAPE", "parameters": {"target": "selected", "moveTo": "center"}}
@@ -69,6 +76,25 @@ Examples:
 - "resize to 50% larger" → {"intent": "RESIZE_SHAPE", "parameters": {"target": "selected", "sizePercent": 150}}
 - "make it half the size" → {"intent": "RESIZE_SHAPE", "parameters": {"target": "selected", "sizeMultiplier": 0.5}}
 - "double the size" → {"intent": "RESIZE_SHAPE", "parameters": {"target": "selected", "sizeMultiplier": 2.0}}
+
+Grid creation rules:
+- For grid commands with specific dimensions (e.g., "3x3", "5 by 5", "4x6"), use CREATE_MULTIPLE_SHAPES with gridRows and gridCols
+- "NxM grid" → gridRows: N, gridCols: M (N rows, M columns)
+- "N by M grid" → gridRows: N, gridCols: M
+- "square grid" without dimensions → use a reasonable default like 3x3
+- Grids will be centered in the viewport with automatic spacing
+- Maximum grid size is 15x15 (225 shapes)
+- "squares" → use type "rectangle" (not a separate type)
+
+Pattern creation rules (shapes made of shapes):
+- For "X made of Y" or "Y forming X" commands, use CREATE_MULTIPLE_SHAPES with pattern parameter
+- Pattern is the TARGET SHAPE to draw (circle, square, star, triangle, heart, diamond)
+- Type is the BUILDING BLOCK shape (rectangle, circle, text)
+- Examples: "circle made of squares" → type: "rectangle", pattern: "circle"
+- Examples: "star made of circles" → type: "circle", pattern: "star"
+- Supported patterns: circle, square, star, triangle, heart, diamond, line
+- Building blocks will be arranged to form the outline/shape of the pattern
+- "squares" → always use type "rectangle"
 
 IMPORTANT: If user requests to create a "line", return an error response explaining that lines are not supported.
 Only rectangles, circles, and text can be created.

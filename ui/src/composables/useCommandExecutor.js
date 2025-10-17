@@ -364,6 +364,229 @@ export function useCommandExecutor() {
   }
 
   /**
+   * Generate positions for pattern shapes
+   */
+  const generatePatternPositions = (pattern, center, shapeWidth, shapeHeight) => {
+    const positions = []
+    const spacing = Math.max(shapeWidth, shapeHeight) * 0.8 // Space between shapes
+    
+    switch (pattern) {
+      case 'circle': {
+        // Arrange shapes in a circular pattern
+        const radius = 200 // Pattern radius
+        const numShapes = Math.floor((2 * Math.PI * radius) / spacing)
+        for (let i = 0; i < numShapes; i++) {
+          const angle = (i / numShapes) * 2 * Math.PI
+          positions.push({
+            x: center.x + radius * Math.cos(angle),
+            y: center.y + radius * Math.sin(angle)
+          })
+        }
+        break
+      }
+      
+      case 'square': {
+        // Arrange shapes in a square outline
+        const sideLength = 400
+        const shapesPerSide = Math.floor(sideLength / spacing)
+        const halfSide = sideLength / 2
+        
+        // Top side
+        for (let i = 0; i < shapesPerSide; i++) {
+          positions.push({
+            x: center.x - halfSide + (i * spacing),
+            y: center.y - halfSide
+          })
+        }
+        // Right side
+        for (let i = 1; i < shapesPerSide; i++) {
+          positions.push({
+            x: center.x + halfSide,
+            y: center.y - halfSide + (i * spacing)
+          })
+        }
+        // Bottom side
+        for (let i = 1; i < shapesPerSide; i++) {
+          positions.push({
+            x: center.x + halfSide - (i * spacing),
+            y: center.y + halfSide
+          })
+        }
+        // Left side
+        for (let i = 1; i < shapesPerSide - 1; i++) {
+          positions.push({
+            x: center.x - halfSide,
+            y: center.y + halfSide - (i * spacing)
+          })
+        }
+        break
+      }
+      
+      case 'star': {
+        // Create 5-pointed star
+        const outerRadius = 200
+        const innerRadius = 80
+        const points = 5
+        const shapesPerLine = 8
+        
+        for (let i = 0; i < points; i++) {
+          // Outer point
+          const outerAngle = (i / points) * 2 * Math.PI - Math.PI / 2
+          const innerAngle = ((i + 0.5) / points) * 2 * Math.PI - Math.PI / 2
+          
+          const outerX = center.x + outerRadius * Math.cos(outerAngle)
+          const outerY = center.y + outerRadius * Math.sin(outerAngle)
+          const innerX = center.x + innerRadius * Math.cos(innerAngle)
+          const innerY = center.y + innerRadius * Math.sin(innerAngle)
+          
+          // Line from center to outer point
+          for (let j = 0; j < shapesPerLine; j++) {
+            const t = j / (shapesPerLine - 1)
+            positions.push({
+              x: center.x + (outerX - center.x) * t,
+              y: center.y + (outerY - center.y) * t
+            })
+          }
+          
+          // Line from outer to inner
+          for (let j = 1; j < shapesPerLine; j++) {
+            const t = j / (shapesPerLine - 1)
+            positions.push({
+              x: outerX + (innerX - outerX) * t,
+              y: outerY + (innerY - outerY) * t
+            })
+          }
+        }
+        break
+      }
+      
+      case 'triangle': {
+        // Equilateral triangle outline
+        const sideLength = 400
+        const height = sideLength * Math.sqrt(3) / 2
+        const shapesPerSide = Math.floor(sideLength / spacing)
+        
+        // Bottom left to bottom right
+        for (let i = 0; i < shapesPerSide; i++) {
+          const t = i / shapesPerSide
+          positions.push({
+            x: center.x - sideLength / 2 + t * sideLength,
+            y: center.y + height / 3
+          })
+        }
+        
+        // Bottom right to top
+        for (let i = 1; i < shapesPerSide; i++) {
+          const t = i / shapesPerSide
+          positions.push({
+            x: center.x + sideLength / 2 - t * sideLength / 2,
+            y: center.y + height / 3 - t * height
+          })
+        }
+        
+        // Top to bottom left
+        for (let i = 1; i < shapesPerSide; i++) {
+          const t = i / shapesPerSide
+          positions.push({
+            x: center.x - t * sideLength / 2,
+            y: center.y - 2 * height / 3 + t * height
+          })
+        }
+        break
+      }
+      
+      case 'heart': {
+        // Heart shape using parametric equations
+        const size = 150
+        const numPoints = 50
+        
+        for (let i = 0; i < numPoints; i++) {
+          const t = (i / numPoints) * 2 * Math.PI
+          // Parametric heart equations
+          const x = 16 * Math.pow(Math.sin(t), 3)
+          const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))
+          
+          positions.push({
+            x: center.x + x * size / 16,
+            y: center.y + y * size / 16
+          })
+        }
+        break
+      }
+      
+      case 'diamond': {
+        // Diamond (rotated square)
+        const size = 300
+        const shapesPerSide = Math.floor(size / spacing)
+        
+        // Top to right
+        for (let i = 0; i < shapesPerSide; i++) {
+          const t = i / shapesPerSide
+          positions.push({
+            x: center.x + t * size / 2,
+            y: center.y - size / 2 + t * size / 2
+          })
+        }
+        
+        // Right to bottom
+        for (let i = 1; i < shapesPerSide; i++) {
+          const t = i / shapesPerSide
+          positions.push({
+            x: center.x + size / 2 - t * size / 2,
+            y: center.y + t * size / 2
+          })
+        }
+        
+        // Bottom to left
+        for (let i = 1; i < shapesPerSide; i++) {
+          const t = i / shapesPerSide
+          positions.push({
+            x: center.x - t * size / 2,
+            y: center.y + size / 2 - t * size / 2
+          })
+        }
+        
+        // Left to top
+        for (let i = 1; i < shapesPerSide - 1; i++) {
+          const t = i / shapesPerSide
+          positions.push({
+            x: center.x - size / 2 + t * size / 2,
+            y: center.y - t * size / 2
+          })
+        }
+        break
+      }
+      
+      case 'line': {
+        // Horizontal line
+        const length = 400
+        const numShapes = Math.floor(length / spacing)
+        for (let i = 0; i < numShapes; i++) {
+          positions.push({
+            x: center.x - length / 2 + (i * spacing),
+            y: center.y
+          })
+        }
+        break
+      }
+      
+      default:
+        // Default to circle if pattern not recognized
+        const radius = 200
+        const numShapes = 20
+        for (let i = 0; i < numShapes; i++) {
+          const angle = (i / numShapes) * 2 * Math.PI
+          positions.push({
+            x: center.x + radius * Math.cos(angle),
+            y: center.y + radius * Math.sin(angle)
+          })
+        }
+    }
+    
+    return positions
+  }
+
+  /**
    * Execute multiple creations with arrangements
    */
   const executeCreateMultiple = async (params, userId, canvasId, userName, viewportCenter, viewportBounds, context) => {
@@ -448,6 +671,36 @@ export function useCommandExecutor() {
           const shape = await createShape(shapeType, properties, userId, canvasId, userName)
           createdShapes.push(shape)
         }
+      }
+      
+      return { createdShapes }
+    }
+
+    // Handle pattern creation (shapes forming patterns like circle, star, etc.)
+    if (params.pattern) {
+      const pattern = params.pattern.toLowerCase()
+      const positions = generatePatternPositions(pattern, viewportCenter, shapeWidth, shapeHeight)
+      
+      console.log('🎨 Creating pattern layout:', {
+        pattern,
+        shapeType,
+        positionCount: positions.length,
+        center: viewportCenter
+      })
+      
+      for (const pos of positions) {
+        const properties = {
+          x: Math.round(pos.x),
+          y: Math.round(pos.y)
+        }
+        
+        if (color) properties.fill = color
+        if (size?.width) properties.width = size.width
+        if (size?.height) properties.height = size.height
+        if (size?.radius) properties.radius = size.radius
+        
+        const shape = await createShape(shapeType, properties, userId, canvasId, userName)
+        createdShapes.push(shape)
       }
       
       return { createdShapes }

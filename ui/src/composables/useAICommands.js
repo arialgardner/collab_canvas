@@ -272,6 +272,10 @@ export function useAICommands() {
             count: p.count,
             arrangement: p.arrangement,
             color: p.fill || p.color,
+            gridRows: p.gridRows,
+            gridCols: p.gridCols,
+            spacing: p.spacing,
+            pattern: p.pattern, // Pattern type: circle, square, star, triangle, etc.
           }
         }
         break
